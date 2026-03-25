@@ -4,15 +4,87 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
 var marketsWidgetTemplate = mustParseTemplate("markets.html", "widget-base.html")
+
+type yahooFinanceCrumbCache struct {
+	sync.Mutex
+	crumb   string
+	cookies []*http.Cookie
+}
+
+var yahooFinanceCrumb = &yahooFinanceCrumbCache{}
+
+func (c *yahooFinanceCrumbCache) get() (string, []*http.Cookie, error) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.crumb != "" {
+		return c.crumb, c.cookies, nil
+	}
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return "", nil, err
+	}
+
+	client := &http.Client{
+		Jar:       jar,
+		Timeout:   10 * time.Second,
+		Transport: defaultHTTPClient.Transport,
+	}
+
+	// Visit fc.yahoo.com to obtain initial session cookies
+	req, _ := http.NewRequest("GET", "https://fc.yahoo.com", nil)
+	setBrowserUserAgentHeader(req)
+	if resp, err := client.Do(req); err == nil {
+		resp.Body.Close()
+	}
+
+	// Fetch the crumb token
+	req, _ = http.NewRequest("GET", "https://query1.finance.yahoo.com/v1/test/getcrumb", nil)
+	setBrowserUserAgentHeader(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("getting Yahoo Finance crumb: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", nil, fmt.Errorf("reading Yahoo Finance crumb: %w", err)
+	}
+
+	crumb := strings.TrimSpace(string(body))
+	if resp.StatusCode != http.StatusOK || crumb == "" {
+		return "", nil, fmt.Errorf("invalid Yahoo Finance crumb response (status %d)", resp.StatusCode)
+	}
+
+	u, _ := url.Parse("https://query1.finance.yahoo.com")
+
+	c.crumb = crumb
+	c.cookies = jar.Cookies(u)
+
+	return crumb, c.cookies, nil
+}
+
+func (c *yahooFinanceCrumbCache) invalidate() {
+	c.Lock()
+	defer c.Unlock()
+	c.crumb = ""
+	c.cookies = nil
+}
 
 type marketsWidget struct {
 	widgetBase         `yaml:",inline"`
@@ -127,11 +199,25 @@ type marketResponseJson struct {
 const marketChartDays = 21
 
 func fetchMarketsDataFromYahoo(marketRequests []marketRequest) (marketList, error) {
+	crumb, cookies, err := yahooFinanceCrumb.get()
+	if err != nil {
+		slog.Warn("Failed to get Yahoo Finance crumb, requests may be rate limited", "error", err)
+		crumb = ""
+		cookies = nil
+	}
+
 	requests := make([]*http.Request, 0, len(marketRequests))
 
 	for i := range marketRequests {
-		request, _ := http.NewRequest("GET", fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?range=1mo&interval=1d", marketRequests[i].Symbol), nil)
+		urlStr := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?range=1mo&interval=1d", marketRequests[i].Symbol)
+		if crumb != "" {
+			urlStr += "&crumb=" + url.QueryEscape(crumb)
+		}
+		request, _ := http.NewRequest("GET", urlStr, nil)
 		setBrowserUserAgentHeader(request)
+		for _, cookie := range cookies {
+			request.AddCookie(cookie)
+		}
 		requests = append(requests, request)
 	}
 
@@ -143,10 +229,14 @@ func fetchMarketsDataFromYahoo(marketRequests []marketRequest) (marketList, erro
 
 	markets := make(marketList, 0, len(responses))
 	var failed int
+	var authFailed int
 
 	for i := range responses {
 		if errs[i] != nil {
 			failed++
+			if strings.Contains(errs[i].Error(), "status code 429") || strings.Contains(errs[i].Error(), "status code 401") {
+				authFailed++
+			}
 			slog.Error("Failed to fetch market data", "symbol", marketRequests[i].Symbol, "error", errs[i])
 			continue
 		}
@@ -166,7 +256,7 @@ func fetchMarketsDataFromYahoo(marketRequests []marketRequest) (marketList, erro
 			prices = prices[len(prices)-marketChartDays:]
 		}
 
-		previous := result.Meta.RegularMarketPrice
+		previous := result.Meta.ChartPreviousClose
 
 		if len(prices) >= 2 && prices[len(prices)-2] != 0 {
 			previous = prices[len(prices)-2]
@@ -194,6 +284,10 @@ func fetchMarketsDataFromYahoo(marketRequests []marketRequest) (marketList, erro
 			),
 			SvgChartPoints: points,
 		})
+	}
+
+	if authFailed > 0 {
+		yahooFinanceCrumb.invalidate()
 	}
 
 	if len(markets) == 0 {
