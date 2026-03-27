@@ -949,6 +949,7 @@ async function updateWidget(widgetElement) {
             setupMasonries();
             setupLazyImages();
             setupTruncatedElementTitles();
+            setupDynamicRelativeTime();
 
             const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
             for (const cb of newCallbacks) {
@@ -977,14 +978,18 @@ function updateContentPreservingImages(oldContent, newContent) {
     const imageMap = new Map();
 
     for (const img of oldImages) {
-        if (!imageMap.has(img.src)) {
-            imageMap.set(img.src, img);
+        const list = imageMap.get(img.src);
+        if (list) {
+            list.push(img);
+        } else {
+            imageMap.set(img.src, [img]);
         }
     }
 
     for (const newImg of newImages) {
-        const oldImg = imageMap.get(newImg.src);
-        if (oldImg) {
+        const list = imageMap.get(newImg.src);
+        if (list && list.length > 0) {
+            const oldImg = list.shift();
             for (const attr of newImg.attributes) {
                 if (attr.name !== 'src' && attr.name !== 'class') {
                     oldImg.setAttribute(attr.name, attr.value);
