@@ -1,0 +1,24 @@
+{{ template "widget-base.html" . }}
+
+{{- define "widget-content" }}
+{{- if .Entries }}
+<ul class="list list-gap-10 cloud-status-list">
+    {{- range .Entries }}
+    <li class="cloud-status-item cloud-status-item-{{ .StatusClass }}">
+        <div class="cloud-status-item-header">
+            <a class="size-h4 color-highlight visited-indicator" href="{{ .URL | safeURL }}" target="_blank" rel="noreferrer">{{ .Provider }}</a>
+            <span class="cloud-status-badge cloud-status-badge-{{ .StatusClass }}">{{ .Status }}</span>
+        </div>
+        {{- if .Summary }}
+        <p class="cloud-status-summary color-paragraph text-truncate-2-lines">{{ .Summary }}</p>
+        {{- end }}
+        {{- if not .UpdatedAt.IsZero }}
+        <div class="size-h6 color-text-subdue" {{ dynamicRelativeTimeAttrs .UpdatedAt }}></div>
+        {{- end }}
+    </li>
+    {{- end }}
+</ul>
+{{- else }}
+<p class="color-text-subdue">No active incidents for selected providers.</p>
+{{- end }}
+{{- end }}

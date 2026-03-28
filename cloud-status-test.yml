@@ -1,0 +1,15 @@
+pages:
+  - name: Cloud Status Test
+    hide-desktop-navigation: true
+    columns:
+      - size: full
+        widgets:
+          - type: cloud-status
+            title: Public Cloud Outages
+            providers:
+              - aws
+              - gcp
+              - azure
+              - cloudflare
+            hide-operational: false
+            update-interval: 2m

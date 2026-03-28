@@ -75,6 +75,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &splitColumnWidget{}
 	case "custom-api":
 		w = &customAPIWidget{}
+	case "cloud-status":
+		w = &cloudStatusWidget{}
 	case "docker-containers":
 		w = &dockerContainersWidget{}
 	case "docker-controller":
