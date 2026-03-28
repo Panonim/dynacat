@@ -21,29 +21,35 @@ var cloudStatusWidgetTemplate = mustParseTemplate("cloud-status.html", "widget-b
 
 const (
 	cloudStatusAWSFeedURL       = "https://status.aws.amazon.com/rss/all.rss"
-	cloudStatusGCPFeedURL       = "https://status.cloud.google.com/feed.atom"
+	cloudStatusGCPIncidentsURL  = "https://status.cloud.google.com/incidents.json"
 	cloudStatusAzureFeedURL     = "https://azure.status.microsoft/en-us/status/feed/"
 	cloudStatusCloudflareAPIURL = "https://www.cloudflarestatus.com/api/v2/summary.json"
+	cloudStatusCFUnresolvedURL  = "https://www.cloudflarestatus.com/api/v2/incidents/unresolved.json"
 )
 
 var cloudStatusProviderOrder = []string{"aws", "gcp", "azure", "cloudflare"}
 var cloudStatusHTMLTagPattern = regexp.MustCompile(`<[^>]+>`)
+var cloudStatusAWSRegionPattern = regexp.MustCompile(`(?i)\b(?:af|ap|ca|cn|eu|il|me|mx|sa|us)-[a-z0-9-]+-\d\b`)
+var cloudStatusGCPRegionPattern = regexp.MustCompile(`(?i)\b[a-z]+(?:-[a-z0-9]+)+\d\b`)
 
 type cloudStatusWidget struct {
 	widgetBase      `yaml:",inline"`
 	Providers       []string              `yaml:"providers"`
 	HideOperational bool                  `yaml:"hide-operational"`
+	ShowRegions     *bool                 `yaml:"show-impacted-regions"`
 	Entries         []cloudProviderStatus `yaml:"-"`
 }
 
 type cloudProviderStatus struct {
-	ProviderKey string
-	Provider    string
-	Status      string
-	StatusClass string
-	Summary     string
-	URL         string
-	UpdatedAt   time.Time
+	ProviderKey          string
+	Provider             string
+	Status               string
+	StatusClass          string
+	Summary              string
+	URL                  string
+	UpdatedAt            time.Time
+	ImpactedRegions      []string
+	ImpactedRegionsLabel string
 }
 
 func (widget *cloudStatusWidget) initialize() error {
@@ -141,6 +147,10 @@ func (widget *cloudStatusWidget) Render() template.HTML {
 	return widget.renderTemplate(widget, cloudStatusWidgetTemplate)
 }
 
+func (widget *cloudStatusWidget) ShouldShowImpactedRegions() bool {
+	return widget.ShowRegions == nil || *widget.ShowRegions
+}
+
 func fetchCloudProviderStatus(ctx context.Context, provider string) (cloudProviderStatus, error) {
 	switch provider {
 	case "aws":
@@ -191,11 +201,20 @@ func fetchAWSCloudStatus(ctx context.Context) (cloudProviderStatus, error) {
 		status.UpdatedAt = *item.PublishedParsed
 	}
 
+	status.setImpactedRegions(extractRegionHints(combined+" "+item.GUID+" "+item.Link, "aws"))
+
 	return status, nil
 }
 
 func fetchGCPCloudStatus(ctx context.Context) (cloudProviderStatus, error) {
-	feed, err := parseCloudStatusFeed(ctx, cloudStatusGCPFeedURL)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, cloudStatusGCPIncidentsURL, nil)
+	if err != nil {
+		return cloudProviderStatus{}, err
+	}
+
+	request.Header.Set("User-Agent", dynacatUserAgentString)
+
+	incidents, err := decodeJsonFromRequest[[]gcpCloudStatusIncident](defaultHTTPClient, request)
 	if err != nil {
 		return cloudProviderStatus{}, err
 	}
@@ -205,31 +224,74 @@ func fetchGCPCloudStatus(ctx context.Context) (cloudProviderStatus, error) {
 		Provider:    "Google Cloud",
 		Status:      "Operational",
 		StatusClass: "ok",
-		Summary:     "No active incident in latest Google Cloud status feed entry.",
+		Summary:     "No active incident in latest Google Cloud status entry.",
 		URL:         "https://status.cloud.google.com/",
 	}
 
-	if len(feed.Items) == 0 {
+	if len(incidents) == 0 {
 		return status, nil
 	}
 
-	item := feed.Items[0]
-	title := cleanCloudStatusText(item.Title)
-	details := cleanCloudStatusText(item.Description)
-	combined := strings.TrimSpace(title + " " + details)
+	incident, hasActiveIncident := firstActiveGCPIncident(incidents)
+	if !hasActiveIncident {
+		return status, nil
+	}
 
-	status.Status, status.StatusClass = cloudStatusFromIncidentText(combined)
-	if title != "" {
-		status.Summary = title
+	if incident.ExternalDesc != "" {
+		status.Summary = cleanCloudStatusText(incident.ExternalDesc)
 	}
-	if item.Link != "" {
-		status.URL = item.Link
+
+	if incident.URI != "" {
+		status.URL = "https://status.cloud.google.com/" + strings.TrimPrefix(incident.URI, "/")
 	}
-	if item.PublishedParsed != nil {
-		status.UpdatedAt = *item.PublishedParsed
+
+	if incident.Modified != "" {
+		if parsedTime, parseErr := time.Parse(time.RFC3339, incident.Modified); parseErr == nil {
+			status.UpdatedAt = parsedTime
+		}
 	}
+
+	status.Status, status.StatusClass = cloudStatusFromGCPStatusImpact(incident.StatusImpact)
+
+	if strings.EqualFold(incident.MostRecentUpdate.Status, "available") {
+		status.Status = "Operational"
+		status.StatusClass = "ok"
+	}
+
+	if status.Summary == "" {
+		status.Summary = clampText(cleanCloudStatusText(incident.MostRecentUpdate.Text), 180)
+	}
+
+	regions := collectGCPLocations(incident.CurrentlyAffectedLocations)
+	if len(regions) == 0 {
+		regions = collectGCPLocations(incident.PreviouslyAffectedLocations)
+	}
+	status.setImpactedRegions(regions)
 
 	return status, nil
+}
+
+func firstActiveGCPIncident(incidents []gcpCloudStatusIncident) (gcpCloudStatusIncident, bool) {
+	for i := range incidents {
+		if isActiveGCPIncident(incidents[i]) {
+			return incidents[i], true
+		}
+	}
+
+	return gcpCloudStatusIncident{}, false
+}
+
+func isActiveGCPIncident(incident gcpCloudStatusIncident) bool {
+	if len(incident.CurrentlyAffectedLocations) > 0 {
+		return true
+	}
+
+	if incident.End == "" {
+		return true
+	}
+
+	updateStatus := strings.ToLower(strings.TrimSpace(incident.MostRecentUpdate.Status))
+	return updateStatus != "" && updateStatus != "available"
 }
 
 func fetchAzureCloudStatus(ctx context.Context) (cloudProviderStatus, error) {
@@ -267,6 +329,8 @@ func fetchAzureCloudStatus(ctx context.Context) (cloudProviderStatus, error) {
 		status.UpdatedAt = *item.PublishedParsed
 	}
 
+	status.setImpactedRegions(extractRegionHints(combined+" "+item.GUID+" "+item.Link, "azure"))
+
 	return status, nil
 }
 
@@ -301,8 +365,43 @@ func fetchCloudflareCloudStatus(ctx context.Context) (cloudProviderStatus, error
 		status.Summary = cleanCloudStatusText(response.Status.Description)
 	}
 
+	status.setImpactedRegions(extractRegionHints(status.Summary, "cloudflare"))
+
+	var unresolved cloudflareUnresolvedIncidents
+	hasUnresolved := false
+	request, err = http.NewRequestWithContext(ctx, http.MethodGet, cloudStatusCFUnresolvedURL, nil)
+	if err == nil {
+		request.Header.Set("User-Agent", dynacatUserAgentString)
+
+		decodedUnresolved, unresolvedErr := decodeJsonFromRequest[cloudflareUnresolvedIncidents](defaultHTTPClient, request)
+		if unresolvedErr == nil {
+			unresolved = decodedUnresolved
+			hasUnresolved = true
+		}
+	}
+
+	if hasUnresolved && len(unresolved.Incidents) > 0 {
+		incident := unresolved.Incidents[0]
+
+		status.Status, status.StatusClass = cloudStatusFromCloudflareIncidentStatus(incident.Status, incident.Impact)
+
+		if incident.Name != "" {
+			status.Summary = cleanCloudStatusText(incident.Name)
+		}
+
+		if status.Summary == "" {
+			status.Summary = "Cloudflare has an active incident."
+		}
+
+		status.setImpactedRegions(extractCloudflareRegions(incident))
+
+		return status, nil
+	}
+
 	if len(response.Incidents) > 0 {
 		incident := response.Incidents[0]
+		status.Status, status.StatusClass = cloudStatusFromCloudflareIncidentStatus(incident.Status, "")
+
 		if incident.Name != "" {
 			status.Summary = cleanCloudStatusText(incident.Name)
 		}
@@ -320,9 +419,66 @@ func fetchCloudflareCloudStatus(ctx context.Context) (cloudProviderStatus, error
 				status.UpdatedAt = parsedTime
 			}
 		}
+
+		status.setImpactedRegions(extractRegionHints(status.Summary, "cloudflare"))
+
+		return status, nil
+	}
+
+	if len(response.ScheduledMaintenances) > 0 {
+		status.Status = "Maintenance"
+		status.StatusClass = "maintenance"
+
+		if status.Summary == "" || strings.EqualFold(cleanCloudStatusText(status.Summary), "minor service outage") {
+			status.Summary = "Scheduled maintenance or traffic rerouting in progress."
+		}
+
+		return status, nil
+	}
+
+	status.Status = "Operational"
+	status.StatusClass = "ok"
+
+	if status.Summary == "" || strings.EqualFold(cleanCloudStatusText(status.Summary), "minor service outage") {
+		status.Summary = "All systems operational."
 	}
 
 	return status, nil
+}
+
+type gcpCloudStatusIncident struct {
+	ExternalDesc               string `json:"external_desc"`
+	URI                        string `json:"uri"`
+	End                        string `json:"end"`
+	Modified                   string `json:"modified"`
+	StatusImpact               string `json:"status_impact"`
+	CurrentlyAffectedLocations []struct {
+		Title string `json:"title"`
+		ID    string `json:"id"`
+	} `json:"currently_affected_locations"`
+	PreviouslyAffectedLocations []struct {
+		Title string `json:"title"`
+		ID    string `json:"id"`
+	} `json:"previously_affected_locations"`
+	MostRecentUpdate struct {
+		Status string `json:"status"`
+		Text   string `json:"text"`
+	} `json:"most_recent_update"`
+}
+
+type cloudflareUnresolvedIncidents struct {
+	Incidents []cloudflareUnresolvedIncident `json:"incidents"`
+}
+
+type cloudflareUnresolvedIncident struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Impact     string `json:"impact"`
+	Components []struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		Group  bool   `json:"group"`
+	} `json:"components"`
 }
 
 type cloudflareStatusSummary struct {
@@ -336,6 +492,9 @@ type cloudflareStatusSummary struct {
 		UpdatedAt string `json:"updated_at"`
 		Shortlink string `json:"shortlink"`
 	} `json:"incidents"`
+	ScheduledMaintenances []struct {
+		Status string `json:"status"`
+	} `json:"scheduled_maintenances"`
 }
 
 func parseCloudStatusFeed(ctx context.Context, feedURL string) (*gofeed.Feed, error) {
@@ -418,6 +577,53 @@ func cloudStatusFromCloudflareIndicator(indicator string) (status string, class 
 	}
 }
 
+func cloudStatusFromCloudflareIncidentStatus(incidentStatus string, impact string) (status string, class string) {
+	lowerStatus := strings.ToLower(strings.TrimSpace(incidentStatus))
+	lowerImpact := strings.ToLower(strings.TrimSpace(impact))
+
+	if lowerImpact == "maintenance" {
+		return "Maintenance", "maintenance"
+	}
+
+	switch lowerStatus {
+	case "scheduled", "in_progress", "verifying", "maintenance":
+		return "Maintenance", "maintenance"
+	case "resolved", "completed", "available":
+		return "Operational", "ok"
+	case "major", "major_outage", "critical":
+		return "Outage", "error"
+	case "minor", "partial_outage", "investigating", "identified", "monitoring":
+		return "Degraded", "warn"
+	default:
+		if strings.Contains(lowerStatus, "outage") || strings.Contains(lowerStatus, "critical") {
+			return "Outage", "error"
+		}
+
+		if strings.Contains(lowerStatus, "maint") || strings.Contains(lowerStatus, "schedule") {
+			return "Maintenance", "maintenance"
+		}
+
+		if strings.Contains(lowerStatus, "invest") || strings.Contains(lowerStatus, "ident") || strings.Contains(lowerStatus, "monitor") {
+			return "Degraded", "warn"
+		}
+
+		return "Degraded", "warn"
+	}
+}
+
+func cloudStatusFromGCPStatusImpact(statusImpact string) (status string, class string) {
+	switch strings.ToUpper(strings.TrimSpace(statusImpact)) {
+	case "SERVICE_OUTAGE":
+		return "Outage", "error"
+	case "SERVICE_DISRUPTION":
+		return "Degraded", "warn"
+	case "SERVICE_INFORMATION":
+		return "Maintenance", "maintenance"
+	default:
+		return "Operational", "ok"
+	}
+}
+
 func normalizeCloudStatusProviders(providers []string) ([]string, error) {
 	seen := make(map[string]bool, len(providers))
 	normalized := make([]string, 0, len(providers))
@@ -486,6 +692,137 @@ func cloudStatusProviderHomepage(provider string) string {
 	default:
 		return ""
 	}
+}
+
+func (status *cloudProviderStatus) setImpactedRegions(regions []string) {
+	status.ImpactedRegions = normalizeRegionLabels(regions)
+
+	if len(status.ImpactedRegions) == 0 && status.StatusClass != "ok" {
+		status.ImpactedRegions = []string{"Unknown"}
+	}
+
+	status.ImpactedRegionsLabel = strings.Join(status.ImpactedRegions, ", ")
+}
+
+func collectGCPLocations(locations []struct {
+	Title string `json:"title"`
+	ID    string `json:"id"`
+}) []string {
+	result := make([]string, 0, len(locations))
+
+	for i := range locations {
+		location := strings.TrimSpace(locations[i].Title)
+		if location == "" {
+			location = strings.TrimSpace(locations[i].ID)
+		}
+
+		if location != "" {
+			result = append(result, location)
+		}
+	}
+
+	return normalizeRegionLabels(result)
+}
+
+func extractCloudflareRegions(incident cloudflareUnresolvedIncident) []string {
+	regions := extractRegionHints(incident.Name+" "+incident.Status, "cloudflare")
+
+	for i := range incident.Components {
+		component := incident.Components[i]
+		componentStatus := strings.ToLower(strings.TrimSpace(component.Status))
+		if componentStatus == "operational" {
+			continue
+		}
+
+		if component.Name == "" {
+			continue
+		}
+
+		regions = append(regions, cleanCloudStatusText(component.Name))
+	}
+
+	return normalizeRegionLabels(regions)
+}
+
+func extractRegionHints(text string, provider string) []string {
+	clean := strings.ToLower(cleanCloudStatusText(text))
+	regions := make([]string, 0, 4)
+
+	if strings.Contains(clean, "global") {
+		regions = append(regions, "Global")
+	}
+
+	if provider == "aws" {
+		for _, match := range cloudStatusAWSRegionPattern.FindAllString(clean, -1) {
+			regions = append(regions, strings.ToUpper(match))
+		}
+	}
+
+	if provider == "gcp" || provider == "azure" {
+		for _, match := range cloudStatusGCPRegionPattern.FindAllString(clean, -1) {
+			regions = append(regions, match)
+		}
+	}
+
+	// Only fall back to vague geographic terms when no specific region codes were found.
+	// For AWS/GCP/Azure incidents, region codes are authoritative; geographic words in the
+	// text (e.g. "customers in Europe and Asia") describe downstream impact, not the actual
+	// impacted region.
+	if len(regions) == 0 {
+		for _, token := range []string{"north america", "south america", "europe", "asia", "africa", "oceania", "middle east"} {
+			if strings.Contains(clean, token) {
+				regions = append(regions, strings.Title(token))
+			}
+		}
+	}
+
+	return normalizeRegionLabels(regions)
+}
+
+func normalizeRegionLabels(regions []string) []string {
+	result := make([]string, 0, len(regions))
+	seen := make(map[string]bool, len(regions))
+
+	for i := range regions {
+		region := strings.TrimSpace(cleanCloudStatusText(regions[i]))
+		if region == "" {
+			continue
+		}
+
+		humanized := humanizeRegionLabel(region)
+		key := strings.ToLower(humanized)
+
+		if seen[key] {
+			continue
+		}
+
+		result = append(result, humanized)
+		seen[key] = true
+
+		if len(result) >= 5 {
+			break
+		}
+	}
+
+	return result
+}
+
+func humanizeRegionLabel(region string) string {
+	lower := strings.ToLower(strings.TrimSpace(region))
+
+	if lower == "global" {
+		return "Global"
+	}
+
+	if cloudStatusAWSRegionPattern.MatchString(lower) {
+		return strings.ToUpper(lower)
+	}
+
+	if cloudStatusGCPRegionPattern.MatchString(lower) {
+		return lower
+	}
+
+	return humanizeCloudStatusText(region)
 }
 
 func cleanCloudStatusText(text string) string {

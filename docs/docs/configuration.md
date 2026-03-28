@@ -3047,6 +3047,7 @@ Example:
 | ---- | ---- | -------- | ------- |
 | providers | array | no | aws, gcp, azure, cloudflare |
 | hide-operational | boolean | no | false |
+| show-impacted-regions | boolean | no | true |
 | update-interval | string | no | 5m |
 
 ##### `providers`
@@ -3061,6 +3062,10 @@ Aliases are also accepted (`google`, `google-cloud`, `microsoft-azure`, `cf`, et
 
 ##### `hide-operational`
 When set to `true`, only providers with degraded/outage/maintenance/unknown states are shown.
+
+##### `show-impacted-regions`
+When set to `true` (default), displays impacted region/location hints for ongoing incidents.
+When set to `false`, region/location lines are hidden.
 
 ##### `update-interval`
 How often the browser requests refreshed cloud status data. Defaults to `5m`.

@@ -12,6 +12,9 @@
         {{- if .Summary }}
         <p class="cloud-status-summary color-paragraph text-truncate-2-lines">{{ .Summary }}</p>
         {{- end }}
+        {{- if and $.ShouldShowImpactedRegions .ImpactedRegionsLabel }}
+        <p class="cloud-status-regions size-h6">Impacted: {{ .ImpactedRegionsLabel }}</p>
+        {{- end }}
         {{- if not .UpdatedAt.IsZero }}
         <div class="size-h6 color-text-subdue" {{ dynamicRelativeTimeAttrs .UpdatedAt }}></div>
         {{- end }}

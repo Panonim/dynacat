@@ -12,4 +12,5 @@ pages:
               - azure
               - cloudflare
             hide-operational: false
+            show-impacted-regions: true
             update-interval: 2m

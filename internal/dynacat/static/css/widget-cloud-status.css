@@ -24,6 +24,11 @@
     margin: 0;
 }
 
+.cloud-status-regions {
+    margin: 0;
+    color: var(--color-text-subdue);
+}
+
 .cloud-status-badge {
     display: inline-flex;
     align-items: center;
