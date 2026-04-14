@@ -3,6 +3,7 @@ module github.com/Panonim/dynacat
 go 1.25.0
 
 require (
+	github.com/arran4/golang-ical v0.3.5
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/mmcdole/gofeed v1.3.0

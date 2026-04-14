@@ -1,0 +1,14 @@
+{{ template "widget-base.html" . }} {{- define "widget-content" }}
+<ul class="list list-gap-14">
+    {{- range .UpcomingEvents }}
+    <li>
+        <div class="flex gap-10 row-reverse-on-mobile thumbnail-parent">
+            <div class="grow min-width-0">
+                <p>{{ .EndDate }}</p>
+                <p>{{ .Content }}</p>
+            </div>
+        </div>
+    </li>
+    {{- end }}
+</ul>
+{{- end }}

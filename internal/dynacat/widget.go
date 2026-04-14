@@ -93,6 +93,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &latestMediaWidget{}
 	case "torrenting":
 		w = &torrentingWidget{}
+	case "upcoming-events-ical":
+		w = &upcomingEventsIcalWidget{}
 	default:
 		return nil, fmt.Errorf("unknown widget type: %s", widgetType)
 	}
