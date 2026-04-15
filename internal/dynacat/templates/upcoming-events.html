@@ -2,13 +2,20 @@
 <ul class="list list-gap-14">
     {{- range .UpcomingEvents }}
     <li>
-        <div class="flex gap-10 row-reverse-on-mobile thumbnail-parent">
+        <div
+            class="flex gap-10 row-reverse-on-mobile thumbnail-parent margin-bottom-15"
+        >
             <div class="grow min-width-0">
-                <p>{{ .EndDate }}</p>
-                <p>{{ .Content }}</p>
+                <p class="text-center size-h2">{{ .EndDate }}</p>
+                <ul class="list list-gap-2">
+                    <li>
+                        <p>{{ .Content }}</p>
+                    </li>
+                </ul>
             </div>
         </div>
     </li>
+    <hr />
     {{- end }}
 </ul>
 {{- end }}

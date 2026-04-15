@@ -2,9 +2,11 @@ package dynacat
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	ics "github.com/arran4/golang-ical"
@@ -48,6 +50,22 @@ func (widget *upcomingEventsIcalWidget) initialize() error {
 	}
 
 	return nil
+}
+
+func prettyPrintDate(date string) (pretty string, err error) {
+	t, err := time.Parse("20060102", date) // TODO group events on the same date
+	if err != nil {
+		return "", err
+	}
+
+	day := t.Day()
+
+	weekday := t.Format("Monday")
+	month := strings.ToLower(t.Format("Jan."))
+
+	result := fmt.Sprintf("%s %d %s", weekday, day, month)
+
+	return result, err
 }
 
 func getUpcomingEvents(icalURL string, limit int) (events upcomingEventsIcalList, err error) {
@@ -102,7 +120,13 @@ func getUpcomingEvents(icalURL string, limit int) (events upcomingEventsIcalList
 	returnValue := make(upcomingEventsIcalList, limit)
 	for i := range limit {
 		keyString := strconv.Itoa(keys[i])
-		returnValue[i] = endDate[keyString]
+		evt := endDate[keyString]
+		valPP, err := prettyPrintDate(evt.EndDate)
+		if err != nil {
+			return nil, err
+		}
+		evt.EndDate = valPP
+		returnValue[i] = evt
 	}
 
 	return returnValue, nil
