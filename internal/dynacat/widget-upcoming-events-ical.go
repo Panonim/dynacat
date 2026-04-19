@@ -118,7 +118,6 @@ func getUpcomingEvents(icalURL string, limit int) ([]upcomingEventsIcalList, err
 		}
 
 		if !dateEnd.IsZero() && content != "" && startHour != "" {
-			fmt.Println(dateEnd.String())
 			eventsByDate[dateEnd.YearDay()] = append(eventsByDate[dateEnd.YearDay()], upcomingEventIcal{
 				EndDate:   dateEnd,
 				Content:   content,
