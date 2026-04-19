@@ -1,16 +1,25 @@
 {{ template "widget-base.html" . }} {{- define "widget-content" }}
 <ul class="list list-gap-14">
-    {{- range .UpcomingEvents }}
+    {{- range .UpcomingEvents }} {{ $firstItem := index . 0 }}
+
     <li>
         <div
             class="flex gap-10 row-reverse-on-mobile thumbnail-parent margin-bottom-15"
         >
             <div class="grow min-width-0">
-                <p class="text-center size-h2">{{ .EndDate }}</p>
+                <p class="text-center size-h2">
+                    {{ $firstItem.EndDatePrettyPrint }}
+                </p>
                 <ul class="list list-gap-2">
+                    {{- range . }}
                     <li>
-                        <p>{{ .Content }}</p>
+                        {{ if .IsCurrent }}
+                        <p class="color-highlight">Now - {{ .Content }}</p>
+                        {{ else }}
+                        <p>{{ .StartHour }} - {{ .Content }}</p>
+                        {{ end }}
                     </li>
+                    {{- end }}
                 </ul>
             </div>
         </div>
