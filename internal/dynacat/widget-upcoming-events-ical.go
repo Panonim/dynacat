@@ -28,11 +28,6 @@ type upcomingEventsIcalWidget struct {
 	UpcomingEvents []upcomingEventsIcalList
 }
 
-type Node struct {
-	Data any
-	Next *Node
-}
-
 func (widget *upcomingEventsIcalWidget) initialize() error {
 	widget.
 		withTitle("Upcoming events").
@@ -54,20 +49,20 @@ func (widget *upcomingEventsIcalWidget) initialize() error {
 	return nil
 }
 
-func prettyPrintDate(date string) (pretty string, err error) {
+func prettyPrintDate(date string) (string, error) {
 	t, err := parseDate(date)
-
-	day := t.Day()
+	if err != nil {
+		return "", err
+	}
 
 	weekday := t.Format("Monday")
 	month := strings.ToLower(t.Format("Jan."))
+	day := t.Day()
 
-	result := fmt.Sprintf("%s %d %s", weekday, day, month)
-
-	return result, err
+	return fmt.Sprintf("%s %d %s", weekday, day, month), nil
 }
 
-func parseDate(date string) (t time.Time, err error) {
+func parseDate(date string) (time.Time, error) {
 	layout := ""
 	switch len(date) {
 	case 8:
@@ -79,117 +74,92 @@ func parseDate(date string) (t time.Time, err error) {
 	default:
 		return time.Time{}, fmt.Errorf("unknown date format: %s", date)
 	}
-	t, err = time.Parse(layout, date)
-	return t, err
+
+	return time.Parse(layout, date)
 }
 
-func getUpcomingEvents(icalURL string, limit int) (events []upcomingEventsIcalList, err error) {
+func getUpcomingEvents(icalURL string, limit int) ([]upcomingEventsIcalList, error) {
 	cal, err := ics.ParseCalendarFromUrl(icalURL)
-
 	if err != nil {
 		return nil, err
 	}
 
-	endDate := make(map[time.Time]upcomingEventsIcalList)
+	eventsByDate := make(map[int]upcomingEventsIcalList)
+	now := time.Now()
 
 	for _, component := range cal.Components {
 		var dateEnd time.Time
-		isCurrent := false
-		content := ""
-		startHour := ""
+		var isCurrent bool
+		var content, startHour string
+
 		for _, property := range component.UnknownPropertiesIANAProperties() {
 			switch property.IANAToken {
 			case "DTSTART":
 				t, err := parseDate(property.Value)
-
 				if err != nil {
 					return nil, err
 				}
-				now := time.Now()
-
 				isCurrent = t.Before(now)
 				startHour = t.Format("15:04")
-				break
+
 			case "DTEND":
 				t, err := parseDate(property.Value)
-
 				if err != nil {
 					return nil, err
 				}
-				now := time.Now()
-
 				if t.Before(now) {
 					break
 				}
-
 				dateEnd = t
-				break
+
 			case "SUMMARY":
 				content = property.Value
-				break
 			}
 		}
+
 		if !dateEnd.IsZero() && content != "" && startHour != "" {
-			var val upcomingEventsIcalList
-			var ok = false
-			if val, ok = endDate[dateEnd]; !ok {
-				val = upcomingEventsIcalList{}
-			}
-			val = append(val, upcomingEventIcal{
+			fmt.Println(dateEnd.String())
+			eventsByDate[dateEnd.YearDay()] = append(eventsByDate[dateEnd.YearDay()], upcomingEventIcal{
 				EndDate:   dateEnd,
 				Content:   content,
 				IsCurrent: isCurrent,
 				StartHour: startHour,
 			})
-			endDate[dateEnd] = val
 		}
-
 	}
-	keys := make([]time.Time, 0, len(endDate))
-	for k := range endDate {
+
+	keys := make([]int, 0, len(eventsByDate))
+	for k := range eventsByDate {
 		keys = append(keys, k)
-		if err != nil {
-			return nil, err
-		}
 	}
-	slices.SortFunc(keys, func(a, b time.Time) int {
-		return a.Compare(b)
-	})
+	slices.Sort(keys)
+	var result []upcomingEventsIcalList
+	totalAdded := 0
 
-	returnValue := make([]upcomingEventsIcalList, 0)
-	added := 0
-	keyID := 0
-	for added != limit {
-
-		if keyID >= len(keys) {
+	for _, key := range keys {
+		if totalAdded >= limit {
 			break
 		}
 
-		evt := endDate[keys[keyID]]
-		if len(evt) < limit-added {
-			added += len(evt)
+		events := eventsByDate[key]
+		remaining := limit - totalAdded
 
-			valPP, err := prettyPrintDate(evt[0].EndDate.String())
-			if err != nil {
-				return nil, err
-			}
-
-			evt[0].EndDatePrettyPrint = valPP
-			returnValue = append(returnValue, evt)
-		} else {
-			delta := limit - added
-			valPP, err := prettyPrintDate(evt[0].EndDate.String())
-			if err != nil {
-				return nil, err
-			}
-			evt[0].EndDatePrettyPrint = valPP
-			returnValue = append(returnValue, evt[:delta])
-			added += delta
+		prettyDate, err := prettyPrintDate(events[0].EndDate.String())
+		if err != nil {
+			return nil, err
 		}
-		keyID++
+		events[0].EndDatePrettyPrint = prettyDate
+
+		if len(events) <= remaining {
+			result = append(result, events)
+			totalAdded += len(events)
+		} else {
+			result = append(result, events[:remaining])
+			totalAdded = limit
+		}
 	}
 
-	return returnValue, nil
+	return result, nil
 }
 
 func (widget *upcomingEventsIcalWidget) update(ctx context.Context) {
@@ -198,7 +168,6 @@ func (widget *upcomingEventsIcalWidget) update(ctx context.Context) {
 		return
 	}
 	widget.UpcomingEvents = evt
-
 }
 
 var upcomingEventsTemplate = mustParseTemplate("upcoming-events.html", "widget-base.html")

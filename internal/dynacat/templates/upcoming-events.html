@@ -14,7 +14,7 @@
                     {{- range . }}
                     <li>
                         {{ if .IsCurrent }}
-                        <p class="color-highlight">Now - {{ .Content }}</p>
+                        <p class="color-positive">Now - {{ .Content }}</p>
                         {{ else }}
                         <p>{{ .StartHour }} - {{ .Content }}</p>
                         {{ end }}
