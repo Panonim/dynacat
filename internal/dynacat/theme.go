@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -134,8 +135,17 @@ func (a *application) getThemeCookieValue(r *http.Request, name string) string {
 }
 
 func (a *application) getThemeFromCookie(r *http.Request, name string) (string, *themeProperties, bool) {
-	themeKey := a.getThemeCookieValue(r, name)
-	if themeKey == "" {
+	rawThemeKey := a.getThemeCookieValue(r, name)
+	if rawThemeKey == "" {
+		return "", nil, false
+	}
+
+	if properties, ok := a.getThemeByKey(rawThemeKey); ok {
+		return rawThemeKey, properties, true
+	}
+
+	themeKey, err := url.PathUnescape(rawThemeKey)
+	if err != nil || themeKey == rawThemeKey {
 		return "", nil, false
 	}
 
