@@ -34,6 +34,30 @@ type themeSelectionState struct {
 	ActiveTheme *themeProperties
 }
 
+func (a *application) newThemeSelectionState() themeSelectionState {
+	return themeSelectionState{
+		Mode:        themeModeManual,
+		ActiveKey:   a.Config.Theme.Key,
+		ManualKey:   a.Config.Theme.Key,
+		LightKey:    a.getFallbackThemeKey(true),
+		DarkKey:     a.getFallbackThemeKey(false),
+		ActiveTheme: &a.Config.Theme.themeProperties,
+	}
+}
+
+func (state *themeSelectionState) setThemeKeyForScheme(themeKey string, properties *themeProperties) {
+	if properties == nil {
+		return
+	}
+
+	if properties.Light {
+		state.LightKey = themeKey
+		return
+	}
+
+	state.DarkKey = themeKey
+}
+
 func (a *application) handleThemeChangeRequest(w http.ResponseWriter, r *http.Request) {
 	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
 		return
@@ -109,57 +133,45 @@ func (a *application) getThemeCookieValue(r *http.Request, name string) string {
 	return cookie.Value
 }
 
-func (a *application) getThemeSelectionState(r *http.Request) themeSelectionState {
-	state := themeSelectionState{
-		Mode:        themeModeManual,
-		ActiveKey:   a.Config.Theme.Key,
-		ManualKey:   a.Config.Theme.Key,
-		LightKey:    a.getFallbackThemeKey(true),
-		DarkKey:     a.getFallbackThemeKey(false),
-		ActiveTheme: &a.Config.Theme.themeProperties,
+func (a *application) getThemeFromCookie(r *http.Request, name string) (string, *themeProperties, bool) {
+	themeKey := a.getThemeCookieValue(r, name)
+	if themeKey == "" {
+		return "", nil, false
 	}
 
+	properties, ok := a.getThemeByKey(themeKey)
+	if !ok {
+		return "", nil, false
+	}
+
+	return themeKey, properties, true
+}
+
+func (a *application) getThemeSelectionState(r *http.Request) themeSelectionState {
+	state := a.newThemeSelectionState()
 	activeThemeWasLoaded := false
 
-	if themeKey := a.getThemeCookieValue(r, themeCookieName); themeKey != "" {
-		if properties, ok := a.getThemeByKey(themeKey); ok {
-			state.ActiveKey = themeKey
-			state.ManualKey = themeKey
-			state.ActiveTheme = properties
-			activeThemeWasLoaded = true
-
-			if properties.Light {
-				state.LightKey = themeKey
-			} else {
-				state.DarkKey = themeKey
-			}
-		}
+	if themeKey, properties, ok := a.getThemeFromCookie(r, themeCookieName); ok {
+		state.ActiveKey = themeKey
+		state.ManualKey = themeKey
+		state.ActiveTheme = properties
+		activeThemeWasLoaded = true
+		state.setThemeKeyForScheme(themeKey, properties)
 	}
 
 	manualTheme := state.ActiveTheme
-	if themeKey := a.getThemeCookieValue(r, themeManualCookieName); themeKey != "" {
-		if properties, ok := a.getThemeByKey(themeKey); ok {
-			state.ManualKey = themeKey
-			manualTheme = properties
-		}
+	if themeKey, properties, ok := a.getThemeFromCookie(r, themeManualCookieName); ok {
+		state.ManualKey = themeKey
+		manualTheme = properties
+	}
+	state.setThemeKeyForScheme(state.ManualKey, manualTheme)
+
+	if themeKey, properties, ok := a.getThemeFromCookie(r, themeLightCookieName); ok && properties.Light {
+		state.LightKey = themeKey
 	}
 
-	if manualTheme.Light {
-		state.LightKey = state.ManualKey
-	} else {
-		state.DarkKey = state.ManualKey
-	}
-
-	if themeKey := a.getThemeCookieValue(r, themeLightCookieName); themeKey != "" {
-		if properties, ok := a.getThemeByKey(themeKey); ok && properties.Light {
-			state.LightKey = themeKey
-		}
-	}
-
-	if themeKey := a.getThemeCookieValue(r, themeDarkCookieName); themeKey != "" {
-		if properties, ok := a.getThemeByKey(themeKey); ok && !properties.Light {
-			state.DarkKey = themeKey
-		}
+	if themeKey, properties, ok := a.getThemeFromCookie(r, themeDarkCookieName); ok && !properties.Light {
+		state.DarkKey = themeKey
 	}
 
 	if a.getThemeCookieValue(r, themeModeCookieName) == themeModeSystem {
@@ -168,7 +180,7 @@ func (a *application) getThemeSelectionState(r *http.Request) themeSelectionStat
 
 	if state.Mode == themeModeManual {
 		state.ActiveKey = state.ManualKey
-		state.ActiveTheme, _ = a.getThemeByKey(state.ManualKey)
+		state.ActiveTheme = manualTheme
 		if state.ActiveTheme == nil {
 			state.ActiveKey = a.Config.Theme.Key
 			state.ActiveTheme = &a.Config.Theme.themeProperties

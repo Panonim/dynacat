@@ -537,17 +537,11 @@ type templateData struct {
 }
 
 func (a *application) populateTemplateRequestData(data *templateRequestData, r *http.Request) {
-	data.Theme = &a.Config.Theme.themeProperties
-	data.ThemeMode = themeModeManual
-	data.ManualThemeKey = a.Config.Theme.Key
-	data.LightThemeKey = a.getFallbackThemeKey(true)
-	data.DarkThemeKey = a.getFallbackThemeKey(false)
-
-	if a.Config.Theme.DisablePicker {
-		return
+	themeState := a.newThemeSelectionState()
+	if !a.Config.Theme.DisablePicker {
+		themeState = a.getThemeSelectionState(r)
 	}
 
-	themeState := a.getThemeSelectionState(r)
 	data.Theme = themeState.ActiveTheme
 	data.ThemeMode = themeState.Mode
 	data.ManualThemeKey = themeState.ManualKey

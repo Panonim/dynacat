@@ -16,13 +16,14 @@
 {{ end }}
 
 {{ define "theme-picker-popover-content" }}
+{{ $isSystemThemeMode := eq .Request.ThemeMode "system" }}
 <div class="theme-picker-popover-content">
-    <button type="button" class="theme-mode-toggle{{ if eq .Request.ThemeMode "system" }} current{{ end }}" data-theme-mode-toggle aria-pressed="{{ if eq .Request.ThemeMode "system" }}true{{ else }}false{{ end }}">
+    <button type="button" class="theme-mode-toggle{{ if $isSystemThemeMode }} current{{ end }}" data-theme-mode-toggle aria-pressed="{{ if $isSystemThemeMode }}true{{ else }}false{{ end }}">
         <span class="flex gap-10 items-center">
             <img class="ui-icon flat-icon" src='{{ .App.StaticAssetPath "icons/system.svg" }}' alt="" aria-hidden="true">
             <span>System</span>
         </span>
-        <span class="theme-mode-toggle-state">{{ if eq .Request.ThemeMode "system" }}On{{ else }}Off{{ end }}</span>
+        <span class="theme-mode-toggle-state">{{ if $isSystemThemeMode }}On{{ else }}Off{{ end }}</span>
     </button>
 
     <div class="theme-groups">

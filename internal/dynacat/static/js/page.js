@@ -1033,9 +1033,21 @@ async function changeTheme(key) {
     return true;
 }
 
+const themeModeManual = "manual";
+const themeModeSystem = "system";
+const themeSchemeLight = "light";
+const themeSchemeDark = "dark";
+const themeCookieDuration = 2 * 365 * 24 * 60 * 60 * 1000;
+
+const themeCookieNames = {
+    mode: "theme-mode",
+    manual: "theme-manual",
+    light: "theme-light",
+    dark: "theme-dark",
+};
+
 function initThemePicker() {
-    const themePickerContent = find(".theme-picker-popover-content");
-    if (!themePickerContent) return;
+    if (!find(".theme-picker-popover-content")) return;
 
     const presetElems = findAll(".theme-picker-popover-content .theme-preset");
     const presetElemsByKey = new Map();
@@ -1062,8 +1074,17 @@ function initThemePicker() {
         presetElemsByKey.set(themeKey, presetElement);
     });
 
-    const getSystemThemeScheme = () => systemThemeQuery.matches ? "dark" : "light";
-    const getThemeKeyForScheme = (scheme, state = themeState) => scheme == "light" ? state.lightKey : state.darkKey;
+    const getSystemThemeScheme = () => systemThemeQuery.matches ? themeSchemeDark : themeSchemeLight;
+    const getCurrentThemeScheme = () => document.documentElement.getAttribute("data-scheme") == themeSchemeLight ? themeSchemeLight : themeSchemeDark;
+    const getThemeKeyForScheme = (scheme, state = themeState) => scheme == themeSchemeLight ? state.lightKey : state.darkKey;
+    const setThemeKeyForScheme = (state, scheme, themeKey) => {
+        if (scheme == themeSchemeLight) {
+            state.lightKey = themeKey;
+            return;
+        }
+
+        state.darkKey = themeKey;
+    };
 
     const getPreviewElem = (themeKey) => {
         if (!themeKey) {
@@ -1071,17 +1092,6 @@ function initThemePicker() {
         }
 
         return presetElemsByKey.get(themeKey) || null;
-    };
-
-    const clonePreviewElem = (themeKey) => {
-        const previewSource = getPreviewElem(themeKey);
-        if (!previewSource) {
-            return null;
-        }
-
-        const previewElem = previewSource.cloneNode(true);
-        previewElem.classList.remove("current");
-        return previewElem;
     };
 
     const syncPageThemeState = () => {
@@ -1093,23 +1103,26 @@ function initThemePicker() {
     };
 
     const writeThemeCookie = (name, value) => {
-        const expires = new Date(Date.now() + (2 * 365 * 24 * 60 * 60 * 1000)).toUTCString();
+        const expires = new Date(Date.now() + themeCookieDuration).toUTCString();
         document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=${themeCookiePath}; SameSite=Lax`;
     };
 
     const persistThemeState = () => {
-        writeThemeCookie("theme-mode", themeState.mode);
-        writeThemeCookie("theme-manual", themeState.manualKey);
-        writeThemeCookie("theme-light", themeState.lightKey);
-        writeThemeCookie("theme-dark", themeState.darkKey);
+        writeThemeCookie(themeCookieNames.mode, themeState.mode);
+        writeThemeCookie(themeCookieNames.manual, themeState.manualKey);
+        writeThemeCookie(themeCookieNames.light, themeState.lightKey);
+        writeThemeCookie(themeCookieNames.dark, themeState.darkKey);
     };
 
     const syncCurrentThemePreview = () => {
+        const previewSource = getPreviewElem(themeState.activeKey);
+        if (!previewSource) {
+            return;
+        }
+
         Array.from(themePreviewElems).forEach((previewContainer) => {
-            const previewElem = clonePreviewElem(themeState.activeKey);
-            if (!previewElem) {
-                return;
-            }
+            const previewElem = previewSource.cloneNode(true);
+            previewElem.classList.remove("current");
 
             const currentPreview = previewContainer.querySelector(".theme-preset");
 
@@ -1132,7 +1145,7 @@ function initThemePicker() {
     };
 
     const syncThemePickerUI = () => {
-        const isSystemMode = themeState.mode == "system";
+        const isSystemMode = themeState.mode == themeModeSystem;
         document.documentElement.setAttribute("data-theme-mode", themeState.mode);
 
         themeModeToggleElems.forEach((toggleElem) => {
@@ -1183,21 +1196,15 @@ function initThemePicker() {
     const toggleThemeMode = async () => {
         const nextThemeState = { ...themeState };
 
-        if (themeState.mode == "system") {
-            nextThemeState.mode = "manual";
+        if (themeState.mode == themeModeSystem) {
+            nextThemeState.mode = themeModeManual;
             nextThemeState.manualKey = themeState.activeKey;
             await applyThemeState(nextThemeState, themeState.activeKey);
             return;
         }
 
-        nextThemeState.mode = "system";
-        const activeScheme = document.documentElement.getAttribute("data-scheme") == "light" ? "light" : "dark";
-
-        if (activeScheme == "light") {
-            nextThemeState.lightKey = themeState.activeKey;
-        } else {
-            nextThemeState.darkKey = themeState.activeKey;
-        }
+        nextThemeState.mode = themeModeSystem;
+        setThemeKeyForScheme(nextThemeState, getCurrentThemeScheme(), themeState.activeKey);
 
         await applyThemeState(nextThemeState, getThemeKeyForScheme(getSystemThemeScheme(), nextThemeState));
     };
@@ -1205,17 +1212,12 @@ function initThemePicker() {
     const selectTheme = async (themeKey, themeScheme) => {
         const nextThemeState = { ...themeState };
 
-        if (themeState.mode == "system") {
-            const themeKeyToUpdate = themeScheme == "light" ? themeState.lightKey : themeState.darkKey;
-            if (themeKeyToUpdate == themeKey) {
+        if (themeState.mode == themeModeSystem) {
+            if (getThemeKeyForScheme(themeScheme) == themeKey) {
                 return;
             }
 
-            if (themeScheme == "light") {
-                nextThemeState.lightKey = themeKey;
-            } else {
-                nextThemeState.darkKey = themeKey;
-            }
+            setThemeKeyForScheme(nextThemeState, themeScheme, themeKey);
 
             await applyThemeState(nextThemeState, getThemeKeyForScheme(getSystemThemeScheme(), nextThemeState));
             return;
@@ -1226,17 +1228,13 @@ function initThemePicker() {
         }
 
         nextThemeState.manualKey = themeKey;
-        if (themeScheme == "light") {
-            nextThemeState.lightKey = themeKey;
-        } else {
-            nextThemeState.darkKey = themeKey;
-        }
+        setThemeKeyForScheme(nextThemeState, themeScheme, themeKey);
 
         await applyThemeState(nextThemeState, themeKey);
     };
 
     const syncThemeWithSystemPreference = async () => {
-        if (themeState.mode != "system" || isLoading) {
+        if (themeState.mode != themeModeSystem || isLoading) {
             return;
         }
 
@@ -1278,7 +1276,7 @@ function initThemePicker() {
 
     syncThemePickerUI();
 
-    if (themeState.mode == "system") {
+    if (themeState.mode == themeModeSystem) {
         syncThemeWithSystemPreference();
     }
 }
