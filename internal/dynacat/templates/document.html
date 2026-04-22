@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" id="top" data-theme="{{ .Request.Theme.Key }}" data-scheme="{{ if .Request.Theme.Light }}light{{ else }}dark{{ end }}">
+<html lang="en" id="top" data-theme="{{ .Request.Theme.Key }}" data-theme-mode="{{ .Request.ThemeMode }}" data-scheme="{{ if .Request.Theme.Light }}light{{ else }}dark{{ end }}">
 <head>
     {{ block "document-head-before" . }}{{ end }}
     <script>
@@ -11,12 +11,16 @@
         /*{{ end }}*/
         baseURL: "{{ .App.Config.Server.BaseURL }}",
         theme: "{{ .Request.Theme.Key }}",
+        themeMode: "{{ .Request.ThemeMode }}",
+        themeManual: "{{ .Request.ManualThemeKey }}",
+        themeLight: "{{ .Request.LightThemeKey }}",
+        themeDark: "{{ .Request.DarkThemeKey }}",
         dynamicUpdateEnabled: {{ if .Page }}{{ and .App.DynamicUpdateEnabled (.Page.DynamicUpdatesEnabled) }}{{ else }}{{ .App.DynamicUpdateEnabled }}{{ end }},
     };
     </script>
     <title>{{ block "document-title" . }}{{ end }}</title>
     <meta charset="UTF-8">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="dark light">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">

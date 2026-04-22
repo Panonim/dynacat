@@ -1008,16 +1008,16 @@ function setupTruncatedElementTitles() {
     }
 }
 
-async function changeTheme(key, onChanged) {
+async function changeTheme(key) {
     const themeStyleElem = find("#theme-style");
 
-    const response = await fetch(`${pageData.baseURL}/api/set-theme/${key}`, {
+    const response = await fetch(`${pageData.baseURL}/api/set-theme/${encodeURIComponent(key)}`, {
         method: "POST",
     });
 
     if (response.status != 200) {
         alert("Failed to set theme: " + response.statusText);
-        return;
+        return false;
     }
     const newThemeStyle = await response.text();
 
@@ -1028,60 +1028,259 @@ async function changeTheme(key, onChanged) {
     themeStyleElem.html(newThemeStyle);
     document.documentElement.setAttribute("data-theme", key);
     document.documentElement.setAttribute("data-scheme", response.headers.get("X-Scheme"));
-    typeof onChanged == "function" && onChanged();
     setTimeout(() => { tempStyle.remove(); }, 10);
+
+    return true;
 }
 
 function initThemePicker() {
-    const themeChoicesInMobileNav = find(".mobile-navigation .theme-choices");
-    if (!themeChoicesInMobileNav) return;
+    const themePickerContent = find(".theme-picker-popover-content");
+    if (!themePickerContent) return;
 
-    const themeChoicesInHeader = find(".header-container .theme-choices");
-
-    if (themeChoicesInHeader) {
-        themeChoicesInHeader.replaceWith(
-            themeChoicesInMobileNav.cloneNode(true)
-        );
-    }
-
-    const presetElems = findAll(".theme-choices .theme-preset");
-    let themePreviewElems = document.getElementsByClassName("current-theme-preview");
+    const presetElems = findAll(".theme-picker-popover-content .theme-preset");
+    const presetElemsByKey = new Map();
+    const themePreviewElems = document.getElementsByClassName("current-theme-preview");
+    const themeModeToggleElems = findAll("[data-theme-mode-toggle]");
+    const themeColorMetaElem = document.querySelector('meta[name="theme-color"]');
+    const themeCookiePath = pageData.baseURL ? `${pageData.baseURL}/` : "/";
+    const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const themeState = {
+        activeKey: pageData.theme,
+        mode: pageData.themeMode,
+        manualKey: pageData.themeManual,
+        lightKey: pageData.themeLight,
+        darkKey: pageData.themeDark,
+    };
     let isLoading = false;
 
     presetElems.forEach((presetElement) => {
         const themeKey = presetElement.dataset.key;
-
-        if (themeKey === undefined) {
+        if (!themeKey || presetElemsByKey.has(themeKey)) {
             return;
         }
 
-        if (themeKey == pageData.theme) {
-            presetElement.classList.add("current");
+        presetElemsByKey.set(themeKey, presetElement);
+    });
+
+    const getSystemThemeScheme = () => systemThemeQuery.matches ? "dark" : "light";
+    const getThemeKeyForScheme = (scheme, state = themeState) => scheme == "light" ? state.lightKey : state.darkKey;
+
+    const getPreviewElem = (themeKey) => {
+        if (!themeKey) {
+            return null;
+        }
+
+        return presetElemsByKey.get(themeKey) || null;
+    };
+
+    const clonePreviewElem = (themeKey) => {
+        const previewSource = getPreviewElem(themeKey);
+        if (!previewSource) {
+            return null;
+        }
+
+        const previewElem = previewSource.cloneNode(true);
+        previewElem.classList.remove("current");
+        return previewElem;
+    };
+
+    const syncPageThemeState = () => {
+        pageData.theme = themeState.activeKey;
+        pageData.themeMode = themeState.mode;
+        pageData.themeManual = themeState.manualKey;
+        pageData.themeLight = themeState.lightKey;
+        pageData.themeDark = themeState.darkKey;
+    };
+
+    const writeThemeCookie = (name, value) => {
+        const expires = new Date(Date.now() + (2 * 365 * 24 * 60 * 60 * 1000)).toUTCString();
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=${themeCookiePath}; SameSite=Lax`;
+    };
+
+    const persistThemeState = () => {
+        writeThemeCookie("theme-mode", themeState.mode);
+        writeThemeCookie("theme-manual", themeState.manualKey);
+        writeThemeCookie("theme-light", themeState.lightKey);
+        writeThemeCookie("theme-dark", themeState.darkKey);
+    };
+
+    const syncCurrentThemePreview = () => {
+        Array.from(themePreviewElems).forEach((previewContainer) => {
+            const previewElem = clonePreviewElem(themeState.activeKey);
+            if (!previewElem) {
+                return;
+            }
+
+            const currentPreview = previewContainer.querySelector(".theme-preset");
+
+            if (currentPreview) {
+                currentPreview.replaceWith(previewElem);
+                return;
+            }
+
+            previewContainer.append(previewElem);
+        });
+    };
+
+    const syncThemeMeta = () => {
+        const previewElem = getPreviewElem(themeState.activeKey);
+        const backgroundColor = previewElem?.dataset.backgroundColor;
+
+        if (themeColorMetaElem && backgroundColor) {
+            themeColorMetaElem.setAttribute("content", backgroundColor);
+        }
+    };
+
+    const syncThemePickerUI = () => {
+        const isSystemMode = themeState.mode == "system";
+        document.documentElement.setAttribute("data-theme-mode", themeState.mode);
+
+        themeModeToggleElems.forEach((toggleElem) => {
+            toggleElem.classList.toggle("current", isSystemMode);
+            toggleElem.setAttribute("aria-pressed", isSystemMode ? "true" : "false");
+
+            const stateElem = toggleElem.querySelector(".theme-mode-toggle-state");
+            if (stateElem) {
+                stateElem.innerText = isSystemMode ? "On" : "Off";
+            }
+        });
+
+        presetElems.forEach((presetElement) => {
+            const themeKey = presetElement.dataset.key;
+            const isCurrent = isSystemMode
+                ? themeKey == themeState.lightKey || themeKey == themeState.darkKey
+                : themeKey == themeState.manualKey;
+
+            presetElement.classList.toggle("current", isCurrent);
+        });
+
+        syncCurrentThemePreview();
+        syncThemeMeta();
+        syncPageThemeState();
+    };
+
+    const applyThemeState = async (nextThemeState, activeThemeKey) => {
+        if (isLoading) {
+            return false;
+        }
+
+        if (activeThemeKey != themeState.activeKey) {
+            isLoading = true;
+            const didChangeTheme = await changeTheme(activeThemeKey);
+            isLoading = false;
+
+            if (!didChangeTheme) {
+                return false;
+            }
+        }
+
+        Object.assign(themeState, nextThemeState, { activeKey: activeThemeKey });
+        persistThemeState();
+        syncThemePickerUI();
+        return true;
+    };
+
+    const toggleThemeMode = async () => {
+        const nextThemeState = { ...themeState };
+
+        if (themeState.mode == "system") {
+            nextThemeState.mode = "manual";
+            nextThemeState.manualKey = themeState.activeKey;
+            await applyThemeState(nextThemeState, themeState.activeKey);
+            return;
+        }
+
+        nextThemeState.mode = "system";
+        const activeScheme = document.documentElement.getAttribute("data-scheme") == "light" ? "light" : "dark";
+
+        if (activeScheme == "light") {
+            nextThemeState.lightKey = themeState.activeKey;
+        } else {
+            nextThemeState.darkKey = themeState.activeKey;
+        }
+
+        await applyThemeState(nextThemeState, getThemeKeyForScheme(getSystemThemeScheme(), nextThemeState));
+    };
+
+    const selectTheme = async (themeKey, themeScheme) => {
+        const nextThemeState = { ...themeState };
+
+        if (themeState.mode == "system") {
+            const themeKeyToUpdate = themeScheme == "light" ? themeState.lightKey : themeState.darkKey;
+            if (themeKeyToUpdate == themeKey) {
+                return;
+            }
+
+            if (themeScheme == "light") {
+                nextThemeState.lightKey = themeKey;
+            } else {
+                nextThemeState.darkKey = themeKey;
+            }
+
+            await applyThemeState(nextThemeState, getThemeKeyForScheme(getSystemThemeScheme(), nextThemeState));
+            return;
+        }
+
+        if (themeState.manualKey == themeKey) {
+            return;
+        }
+
+        nextThemeState.manualKey = themeKey;
+        if (themeScheme == "light") {
+            nextThemeState.lightKey = themeKey;
+        } else {
+            nextThemeState.darkKey = themeKey;
+        }
+
+        await applyThemeState(nextThemeState, themeKey);
+    };
+
+    const syncThemeWithSystemPreference = async () => {
+        if (themeState.mode != "system" || isLoading) {
+            return;
+        }
+
+        await applyThemeState({ ...themeState }, getThemeKeyForScheme(getSystemThemeScheme()));
+    };
+
+    presetElems.forEach((presetElement) => {
+        const themeKey = presetElement.dataset.key;
+        const themeScheme = presetElement.dataset.scheme;
+
+        if (themeKey === undefined || themeScheme === undefined) {
+            return;
         }
 
         presetElement.addEventListener("click", () => {
-            if (themeKey == pageData.theme) return;
-            if (isLoading) return;
+            if (isLoading) {
+                return;
+            }
 
-            isLoading = true;
-            changeTheme(themeKey, function() {
-                isLoading = false;
-                pageData.theme = themeKey;
-                presetElems.forEach((e) => { e.classList.remove("current"); });
-
-                Array.from(themePreviewElems).forEach((preview) => {
-                    preview.querySelector(".theme-preset").replaceWith(
-                        presetElement.cloneNode(true)
-                    );
-                })
-
-                presetElems.forEach((e) => {
-                    if (e.dataset.key != themeKey) return;
-                    e.classList.add("current");
-                });
-            });
+            selectTheme(themeKey, themeScheme);
         });
-    })
+    });
+
+    themeModeToggleElems.forEach((toggleElem) => {
+        toggleElem.addEventListener("click", () => {
+            if (isLoading) {
+                return;
+            }
+
+            toggleThemeMode();
+        });
+    });
+
+    if (typeof systemThemeQuery.addEventListener == "function") {
+        systemThemeQuery.addEventListener("change", syncThemeWithSystemPreference);
+    } else if (typeof systemThemeQuery.addListener == "function") {
+        systemThemeQuery.addListener(syncThemeWithSystemPreference);
+    }
+
+    syncThemePickerUI();
+
+    if (themeState.mode == "system") {
+        syncThemeWithSystemPreference();
+    }
 }
 
 async function setupPage() {

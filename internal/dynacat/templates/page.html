@@ -15,6 +15,40 @@
 {{ end }}
 {{ end }}
 
+{{ define "theme-picker-popover-content" }}
+<div class="theme-picker-popover-content">
+    <button type="button" class="theme-mode-toggle{{ if eq .Request.ThemeMode "system" }} current{{ end }}" data-theme-mode-toggle aria-pressed="{{ if eq .Request.ThemeMode "system" }}true{{ else }}false{{ end }}">
+        <span class="flex gap-10 items-center">
+            <img class="ui-icon flat-icon" src='{{ .App.StaticAssetPath "icons/system.svg" }}' alt="" aria-hidden="true">
+            <span>System</span>
+        </span>
+        <span class="theme-mode-toggle-state">{{ if eq .Request.ThemeMode "system" }}On{{ else }}Off{{ end }}</span>
+    </button>
+
+    <div class="theme-groups">
+        <div class="theme-group">
+            <div class="theme-group-label">Dark</div>
+            <div class="theme-choices" data-theme-scheme="dark">
+                {{ if not .App.Config.Theme.Light }}{{ .App.Config.Theme.PreviewHTML }}{{ end }}
+                {{ range $_, $preset := .App.Config.Theme.Presets.Items }}
+                {{ if not $preset.Light }}{{ $preset.PreviewHTML }}{{ end }}
+                {{ end }}
+            </div>
+        </div>
+
+        <div class="theme-group">
+            <div class="theme-group-label">Light</div>
+            <div class="theme-choices" data-theme-scheme="light">
+                {{ if .App.Config.Theme.Light }}{{ .App.Config.Theme.PreviewHTML }}{{ end }}
+                {{ range $_, $preset := .App.Config.Theme.Presets.Items }}
+                {{ if $preset.Light }}{{ $preset.PreviewHTML }}{{ end }}
+                {{ end }}
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
 {{ define "document-body" }}
 <div class="flex flex-column body-content">
     {{ if not .Page.HideDesktopNavigation }}
@@ -52,7 +86,7 @@
                     {{ .Request.Theme.PreviewHTML }}
                 </div>
                 <div data-popover-html>
-                    <div class="theme-choices"></div>
+                    {{ template "theme-picker-popover-content" . }}
                 </div>
             </div>
             {{ end }}
@@ -93,12 +127,7 @@
             {{ if not .App.Config.Theme.DisablePicker }}
             <div class="theme-picker flex justify-between items-center" data-popover-type="html" data-popover-position="above" data-popover-show-delay="0" data-popover-hide-delay="100" data-popover-anchor=".current-theme-preview" data-popover-trigger="click">
                 <div data-popover-html>
-                    <div class="theme-choices">
-                        {{ .App.Config.Theme.PreviewHTML }}
-                        {{ range $_, $preset := .App.Config.Theme.Presets.Items }}
-                        {{ $preset.PreviewHTML }}
-                        {{ end }}
-                    </div>
+                    {{ template "theme-picker-popover-content" . }}
                 </div>
 
                 <div class="size-h3 pointer-events-none select-none">Change theme</div>
