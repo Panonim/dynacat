@@ -521,6 +521,8 @@ func (a *application) resolveUserDefinedAssetPath(path string) string {
 
 type templateRequestData struct {
 	Theme          *themeProperties
+	LightTheme     *themeProperties
+	DarkTheme      *themeProperties
 	ThemeMode      string
 	ManualThemeKey string
 	LightThemeKey  string
@@ -542,7 +544,19 @@ func (a *application) populateTemplateRequestData(data *templateRequestData, r *
 		themeState = a.getThemeSelectionState(r)
 	}
 
+	lightTheme, ok := a.getThemeByKey(themeState.LightKey)
+	if !ok {
+		lightTheme = themeState.ActiveTheme
+	}
+
+	darkTheme, ok := a.getThemeByKey(themeState.DarkKey)
+	if !ok {
+		darkTheme = themeState.ActiveTheme
+	}
+
 	data.Theme = themeState.ActiveTheme
+	data.LightTheme = lightTheme
+	data.DarkTheme = darkTheme
 	data.ThemeMode = themeState.Mode
 	data.ManualThemeKey = themeState.ManualKey
 	data.LightThemeKey = themeState.LightKey
