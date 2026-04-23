@@ -670,123 +670,37 @@ body {
 
 .branch-switcher {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 13px;
-  position: relative;
-  cursor: pointer;
-  transition: color 0.12s, background 0.12s;
-  background: transparent;
-}
-
-.branch-switcher:hover {
-  color: var(--text);
-  background: var(--surface-hover);
-}
-
-.branch-switcher:has(.branch-select:focus) {
-  color: var(--text);
-  background: var(--surface-hover);
-}
-
-.branch-icon {
-  flex-shrink: 0;
-}
-
-.branch-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: none;
-  border: none;
-  color: inherit;
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-  padding: 0;
-  padding-right: 16px;
-  flex: 1;
-  min-width: 0;
-}
-
-.branch-select:focus {
-  outline: none;
-}
-
-/* Style the dropdown options */
-.branch-select option {
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.branch-pill {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+}
+
+.branch-pill:hover:not([aria-pressed="true"]) {
   color: var(--text);
-  padding: 4px 8px;
-  border-radius: 2px;
+  background: var(--surface-hover);
 }
 
-.branch-select option:hover {
+.branch-pill[aria-pressed="true"] {
   background: var(--accent-dim);
-}
-
-.branch-select option:checked {
-  background: var(--accent);
-  color: #fff;
-}
-
-.branch-chevron {
-  position: absolute;
-  right: 10px;
-  pointer-events: none;
-  flex-shrink: 0;
-}
-
-/* Desktop: custom styled dropdown */
-@media (min-width: 769px) {
-  .branch-switcher {
-    display: flex;
-    border: 1px solid transparent;
-    transition: border-color 0.12s, color 0.12s, background 0.12s;
-  }
-
-  .branch-switcher:hover,
-  .branch-switcher:has(.branch-select:focus) {
-    border-color: var(--border-subtle);
-  }
-
-  .branch-select {
-    appearance: none;
-    -webkit-appearance: none;
-  }
-
-  .branch-select option {
-    background: var(--surface);
-    color: var(--text);
-    padding: 8px 12px;
-  }
-
-  .branch-select option:hover {
-    background: var(--surface-hover);
-  }
-
-  .branch-select option:checked {
-    background: var(--accent);
-    color: #fff;
-  }
-}
-
-/* Mobile: native system picker */
-@media (max-width: 768px) {
-  .branch-switcher {
-    display: flex;
-  }
-
-  .branch-select {
-    appearance: auto;
-    -webkit-appearance: auto;
-  }
-
-  .branch-chevron {
-    display: none;
-  }
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* ─── Main area ──────────────────────────────────────────────────────────── */

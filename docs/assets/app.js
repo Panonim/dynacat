@@ -416,14 +416,15 @@ themeToggleEl.addEventListener('click', toggleTheme);
 
 /* ─── Branch switcher ────────────────────────────────────────────────────── */
 
-const branchSelectEl = document.getElementById('branch-select');
-
 (function initBranchSwitcher() {
-  const path = window.location.pathname;
-  branchSelectEl.value = path.startsWith('/beta') ? '/beta/' : '/';
-  branchSelectEl.addEventListener('change', function () {
-    const hash = window.location.hash || '';
-    window.location.href = this.value + hash;
+  const isBeta       = window.location.pathname.startsWith('/beta');
+  const activeBranch = isBeta ? '/beta/' : '/';
+
+  document.querySelectorAll('.branch-pill').forEach(function (pill) {
+    pill.setAttribute('aria-pressed', pill.dataset.branch === activeBranch ? 'true' : 'false');
+    pill.addEventListener('click', function () {
+      window.location.href = this.dataset.branch + (window.location.hash || '');
+    });
   });
 })();
 
