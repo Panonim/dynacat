@@ -671,17 +671,23 @@ body {
 .branch-switcher {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 13px;
   position: relative;
   cursor: pointer;
   transition: color 0.12s, background 0.12s;
+  background: transparent;
 }
 
 .branch-switcher:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.branch-switcher:has(.branch-select:focus) {
   color: var(--text);
   background: var(--surface-hover);
 }
@@ -709,6 +715,23 @@ body {
   outline: none;
 }
 
+/* Style the dropdown options */
+.branch-select option {
+  background: var(--surface);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 2px;
+}
+
+.branch-select option:hover {
+  background: var(--accent-dim);
+}
+
+.branch-select option:checked {
+  background: var(--accent);
+  color: #fff;
+}
+
 .branch-chevron {
   position: absolute;
   right: 10px;
@@ -720,11 +743,33 @@ body {
 @media (min-width: 769px) {
   .branch-switcher {
     display: flex;
+    border: 1px solid transparent;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+  }
+
+  .branch-switcher:hover,
+  .branch-switcher:has(.branch-select:focus) {
+    border-color: var(--border-subtle);
   }
 
   .branch-select {
     appearance: none;
     -webkit-appearance: none;
+  }
+
+  .branch-select option {
+    background: var(--surface);
+    color: var(--text);
+    padding: 8px 12px;
+  }
+
+  .branch-select option:hover {
+    background: var(--surface-hover);
+  }
+
+  .branch-select option:checked {
+    background: var(--accent);
+    color: #fff;
   }
 }
 
