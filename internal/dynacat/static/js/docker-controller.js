@@ -263,7 +263,7 @@
         const key = widgetId + ':' + type + ':' + id;
 
         if (confirmingItems.has(key)) {
-            // Second click — perform the removal
+            // Second click - perform the removal
             const state = confirmingItems.get(key);
             clearTimeout(state.timeoutId);
             confirmingItems.delete(key);

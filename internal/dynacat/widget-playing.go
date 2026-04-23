@@ -85,7 +85,7 @@ type playingWidget struct {
 	widgetBase  `yaml:",inline"`
 	Hosts       []PlayingHostConfig `yaml:"hosts"`
 	SmallColumn bool                `yaml:"small-column"`
-	// `compact` option removed — layouts use the default (non-compact) sizing
+	// `compact` option removed - layouts use the default (non-compact) sizing
 	PlayState               string `yaml:"play-state"`
 	ShowThumbnail           *bool  `yaml:"show-thumbnail"`
 	ShowPaused              bool   `yaml:"show-paused"`
@@ -161,7 +161,7 @@ func (widget *playingWidget) initialize() error {
 		widget.EpisodeTitleFormat = "series"
 	}
 
-	// Boolean defaults — only applied when not explicitly set by the user
+	// Boolean defaults - only applied when not explicitly set by the user
 	t := true
 	if widget.ShowThumbnail == nil {
 		widget.ShowThumbnail = &t

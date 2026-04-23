@@ -110,7 +110,7 @@
     border-top-width: 0;
 }
 
-/* Dropdown base — positioned + sized by JS */
+/* Dropdown base - positioned + sized by JS */
 .search-autocomplete {
     position: fixed;
     z-index: 200;
