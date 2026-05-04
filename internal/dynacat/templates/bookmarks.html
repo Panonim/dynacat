@@ -1,25 +1,27 @@
 {{ template "widget-base.html" . }}
 
 {{ define "widget-content" }}
-<div class="dynamic-columns list-gap-24 list-with-separator">
+<div class="dynamic-columns list-gap-24 list-with-separator{{ if .MobileGrid }} bookmarks-mobile-grid{{ if .HideMobileBookmarkTitle }} bookmarks-hide-mobile-title{{ end }}{{ end }}"{{ if .MobileGrid }} style="--mobile-icons-per-row: {{ .MobileIconsPerRow }}"{{ end }}>
     {{- range .Groups }}
     <div class="bookmarks-group"{{ if .Color }} style="--bookmarks-group-color: {{ .Color.String | safeCSS }}"{{ end }}>
         {{- if ne .Title "" }}
         <div class="bookmarks-group-title size-h3 margin-bottom-3">{{ .Title }}</div>
         {{- end }}
-        <ul class="list list-gap-2">
+        <ul class="list list-gap-2 bookmarks-list">
         {{- range .Links }}
-        <li>
-            <div class="flex items-center gap-10">
+        <li class="bookmarks-item">
+            <a href="{{ .URL | safeURL }}" class="bookmarks-link flex items-center gap-10 {{ if .HideArrow }}bookmarks-link-no-arrow {{ end }}color-highlight size-h4" {{ if .Target }}target="{{ .Target }}"{{ end }} rel="noreferrer"{{ if $.MobileGrid }} title="{{ .Title }}"{{ end }}>
                 {{- if ne "" .Icon.URL }}
                 <div class="bookmarks-icon-container">
                     <img class="bookmarks-icon{{ if .Icon.AutoInvert }} flat-icon{{ end }}" src="{{ .Icon.URL }}" alt="" loading="lazy">
                 </div>
+                {{- else }}
+                <div class="bookmarks-icon-container bookmarks-icon-fallback" aria-hidden="true">{{ .FirstLetter }}</div>
                 {{- end }}
-                <a href="{{ .URL | safeURL }}" class="bookmarks-link {{ if .HideArrow }}bookmarks-link-no-arrow {{ end }}color-highlight size-h4" {{ if .Target }}target="{{ .Target }}"{{ end }} rel="noreferrer">{{ .Title }}</a>
-            </div>
+                <span class="bookmarks-link-title">{{ .Title }}</span>
+            </a>
             {{- if .Description }}
-            <div class="margin-bottom-5">{{ .Description }}</div>
+            <div class="bookmarks-link-description margin-bottom-5">{{ .Description }}</div>
             {{- end }}
         </li>
         {{- end }}

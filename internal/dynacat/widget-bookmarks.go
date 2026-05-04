@@ -7,9 +7,12 @@ import (
 var bookmarksWidgetTemplate = mustParseTemplate("bookmarks.html", "widget-base.html")
 
 type bookmarksWidget struct {
-	widgetBase `yaml:",inline"`
-	cachedHTML template.HTML `yaml:"-"`
-	Groups     []struct {
+	widgetBase              `yaml:",inline"`
+	cachedHTML              template.HTML `yaml:"-"`
+	MobileGrid              bool          `yaml:"mobile-grid"`
+	MobileIconsPerRow       int           `yaml:"mobile-icons-per-row"`
+	HideMobileBookmarkTitle bool          `yaml:"hide-mobile-bookmark-title"`
+	Groups                  []struct {
 		Title     string         `yaml:"title"`
 		Color     *hslColorField `yaml:"color"`
 		SameTab   bool           `yaml:"same-tab"`
@@ -20,6 +23,7 @@ type bookmarksWidget struct {
 			URL         string          `yaml:"url"`
 			Description string          `yaml:"description"`
 			Icon        customIconField `yaml:"icon"`
+			FirstLetter string          `yaml:"-"`
 			// we need a pointer to bool to know whether a value was provided,
 			// however there's no way to dereference a pointer in a template so
 			// {{ if not .SameTab }} would return true for any non-nil pointer
@@ -37,10 +41,26 @@ type bookmarksWidget struct {
 func (widget *bookmarksWidget) initialize() error {
 	widget.withTitle("Bookmarks").withError(nil)
 
+	if widget.MobileIconsPerRow == 0 {
+		widget.MobileIconsPerRow = 6
+	}
+	if widget.MobileIconsPerRow < 1 {
+		widget.MobileIconsPerRow = 1
+	}
+	if widget.MobileIconsPerRow > 8 {
+		widget.MobileIconsPerRow = 8
+	}
+
 	for g := range widget.Groups {
 		group := &widget.Groups[g]
 		for l := range group.Links {
 			link := &group.Links[l]
+
+			if link.Title != "" {
+				runes := []rune(link.Title)
+				link.FirstLetter = string(runes[0])
+			}
+
 			if link.SameTabRaw == nil {
 				link.SameTab = group.SameTab
 			} else {

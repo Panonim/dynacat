@@ -6,7 +6,7 @@
     color: var(--bookmarks-group-color);
 }
 
-.bookmarks-link:not(.bookmarks-link-no-arrow)::after {
+.bookmarks-link:not(.bookmarks-link-no-arrow) .bookmarks-link-title::after {
     content: '↗' / "";
     margin-left: 0.5em;
     display: inline-block;
@@ -28,4 +28,77 @@
     width: 20px;
     height: 20px;
     opacity: 0.8;
+}
+
+.bookmarks-icon-fallback {
+    display: none;
+}
+
+@media (max-width: 1190px) {
+    .bookmarks-mobile-grid .bookmarks-list {
+        display: grid;
+        grid-template-columns: repeat(var(--mobile-icons-per-row, 6), minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-list > .bookmarks-item:not(:first-child) {
+        margin-top: 0;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-link {
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+        container-type: inline-size;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-link:not(.bookmarks-link-no-arrow) .bookmarks-link-title::after {
+        display: none;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-icon-container {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        padding: 0;
+        margin-block: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 1;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-icon {
+        width: 60%;
+        height: 60%;
+        opacity: 1;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-icon-fallback {
+        display: flex;
+        font-weight: 600;
+        font-size: 60cqw;
+        line-height: 1;
+        text-transform: uppercase;
+        color: var(--color-text-highlight);
+    }
+
+    .bookmarks-mobile-grid .bookmarks-link-title {
+        display: block;
+        font-size: 0.85rem;
+        line-height: 1.2;
+        text-align: center;
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .bookmarks-mobile-grid.bookmarks-hide-mobile-title .bookmarks-link-title {
+        display: none;
+    }
+
+    .bookmarks-mobile-grid .bookmarks-link-description {
+        display: none;
+    }
 }
