@@ -69,6 +69,7 @@ type application struct {
 	sseMu                sync.RWMutex
 	sseClients           map[*sseClient]struct{}
 	DynamicUpdateEnabled bool
+	NarrowLayoutEnabled  bool
 
 	imageProxyMu   sync.RWMutex
 	imageProxyURLs map[string]imageProxyInfo
@@ -900,7 +901,8 @@ func (a *application) isRequestHTTPS(r *http.Request) bool {
 	return false
 }
 
-func (a *application) server() (func() error, func() error) {
+// handler builds and returns the http.Handler for this application's routes.
+func (a *application) handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", a.handlePageRequest)
@@ -989,7 +991,6 @@ func (a *application) server() (func() error, func() error) {
 		assetsPath = "/app/assets"
 	}
 
-	absAssetsPath, _ := filepath.Abs(assetsPath)
 	assetsFS := fileServerWithCache(http.Dir(assetsPath), 2*time.Hour)
 	assetsHandler := http.StripPrefix("/assets/", assetsFS)
 	if a.RequiresAuth {
@@ -1004,13 +1005,37 @@ func (a *application) server() (func() error, func() error) {
 		mux.Handle("/assets/{path...}", assetsHandler)
 	}
 
+	return mux
+}
+
+// startAuxiliaryLoops starts the SSE update loop and optional OIDC session sweeper.
+// It returns a cancel function that stops both.
+func (a *application) startAuxiliaryLoops() func() {
+	ctx, cancel := context.WithCancel(context.Background())
+	go a.sseUpdateLoop(ctx)
+	if a.oidcSessions != nil {
+		go a.oidcSessions.runSweeper(ctx, 15*time.Minute, OIDC_SESSION_VALID_PERIOD)
+	}
+	return cancel
+}
+
+func (a *application) server() (func() error, func() error) {
+	h := a.handler()
+	cancelLoops := a.startAuxiliaryLoops()
+
+	assetsPath := a.Config.Server.AssetsPath
+	if assetsPath == "" {
+		assetsPath = "/app/assets"
+	}
+	absAssetsPath, _ := filepath.Abs(assetsPath)
+
 	server := http.Server{
 		Addr:    fmt.Sprintf("%s:%d", a.Config.Server.Host, a.Config.Server.Port),
-		Handler: a.securityHeadersMiddleware(mux),
+		Handler: a.securityHeadersMiddleware(h),
 	}
 
 	start := func() error {
-		log.Printf("Starting server on %s:%d (base-url: \"%s\", assets-path: \"%s\")\n",
+		log.Printf("Starting server on %s:%d (base-url: %q, assets-path: %q)\n",
 			a.Config.Server.Host,
 			a.Config.Server.Port,
 			a.Config.Server.BaseURL,
@@ -1024,14 +1049,8 @@ func (a *application) server() (func() error, func() error) {
 		return nil
 	}
 
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	go a.sseUpdateLoop(ctx)
-	if a.oidcSessions != nil {
-		go a.oidcSessions.runSweeper(ctx, 15*time.Minute, OIDC_SESSION_VALID_PERIOD)
-	}
-
 	stop := func() error {
-		cancelCtx()
+		cancelLoops()
 		return server.Close()
 	}
 

@@ -458,6 +458,81 @@ theme:
 
 To override the default dark and light themes, use the key names `default-dark` and `default-light`.
 
+## Layout
+
+The `layout` block controls optional layout switching behaviour. Currently it exposes a single option for loading a separate config file when the browser viewport is taller than it is wide (portrait / vertical monitor).
+
+```yaml
+layout:
+  narrow-viewport-config: dynacat-vertical.yml
+```
+
+### Properties
+
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| narrow-viewport-config | string | no | |
+
+#### `narrow-viewport-config`
+
+Path to a second Dynacat YAML file to use when a visitor's browser viewport is in portrait orientation (`innerWidth < innerHeight`). Relative paths are resolved relative to the primary config file's directory; absolute paths are used as-is.
+
+When set, both config files are loaded and kept in memory. Each browser session is independently routed to the correct layout: Dynacat sets a `dynacat-layout` cookie (values `primary` or `narrow`) and automatically reloads the page whenever the viewport aspect changes. No browser extension or server restart is required to switch between orientations at runtime.
+
+##### Setting up a narrow config
+
+Create a second YAML file (e.g. `dynacat-vertical.yml`) with whatever pages, columns, and widgets suit a vertical screen, then reference it from your primary config:
+
+```yaml
+# dynacat.yml (primary — landscape / wide)
+layout:
+  narrow-viewport-config: dynacat-vertical.yml
+
+pages:
+  - name: Home
+    columns:
+      - size: small
+        widgets: ...
+      - size: full
+        widgets: ...
+```
+
+```yaml
+# dynacat-vertical.yml (narrow / portrait)
+pages:
+  - name: Home
+    columns:
+      - size: full
+        widgets: ...
+```
+
+Use `$include` directives to share widgets, themes, or any other block between the two files and avoid duplication.
+
+##### Docker, `$include`, and narrow-viewport-config
+
+> [!IMPORTANT]
+>
+> In Docker, mount the **whole directory** that holds your primary config, the narrow config file, and **every** file referenced via `$include` (for example `- ./config:/app/config`). The image expects [`dynacat.yml` under `/app/config`](installation.md#docker-compose-manual) by default; includes and `narrow-viewport-config` paths are resolved **inside the container**. If you only bind-mount a single file (e.g. only `dynacat.yml`), sibling YAML files will not exist at `/app/config/` and parsing will fail with “no such file or directory”.
+
+##### Constraints
+
+The following settings **must be identical** in both files. Dynacat will refuse to start if they differ:
+
+- `server.host`, `server.port`, `server.base-url`, `server.https`, `server.proxied`
+- `server.trusted-proxies` — must list the **same** entries as in the primary config (order may differ); otherwise client IP / `X-Forwarded-For` handling can differ per layout profile
+- `server.allowed-embed-hosts` — must match the primary config (order may differ); **only the primary file is used** for `Content-Security-Policy: frame-ancestors`, but mismatched values in the narrow file would be misleading
+- `server.assets-path`, `server.cache-dir`, `server.db-path`
+- `auth.secret-key`
+- `auth.disable-password`, `auth.require-auth`
+- `auth.oidc` — if either file defines `auth.oidc`, both must define it with the **same** `issuer-url`, `client-id`, `client-secret`, `redirect-url`, `scopes`, `username-claim`, `groups-claim`, `allowed-groups`, and `allowed-users` (list order for slices may differ)
+- `auth.users` — the **same set of usernames** must appear in both files (password hashes or plaintext entries should match how you maintain configs; copy the same `users` block or share it via `$include`)
+
+Everything else (`pages`, `theme`, `branding`, `document`) may differ freely.
+
+##### First-load behaviour
+
+On the very first page load the browser may briefly render the primary layout before the JS detects a portrait viewport and reloads to the narrow layout. This is a single reload and only happens once per browser session when the cookie is not yet set or has expired.
+
 ## Pages & Columns
 ![illustration of pages and columns](images/pages-and-columns-illustration.png)
 

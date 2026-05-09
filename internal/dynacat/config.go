@@ -76,6 +76,10 @@ type config struct {
 	} `yaml:"branding"`
 
 	Pages []page `yaml:"pages"`
+
+	Layout struct {
+		NarrowViewportConfig string `yaml:"narrow-viewport-config"`
+	} `yaml:"layout"`
 }
 
 type oidcConfig struct {
@@ -703,6 +707,213 @@ func (self *orderedYAMLMap[K, V]) Merge(other *orderedYAMLMap[K, V]) *orderedYAM
 	maps.Copy(merged.data, other.data)
 
 	return merged
+}
+
+// extractNarrowConfigPath reads the layout.narrow-viewport-config field from a raw
+// primary config YAML without performing full widget initialisation.
+func extractNarrowConfigPath(rawContents []byte) (string, error) {
+	processed, err := parseConfigVariables(rawContents)
+	if err != nil {
+		return "", fmt.Errorf("parsing config variables: %w", err)
+	}
+	var c struct {
+		Layout struct {
+			NarrowViewportConfig string `yaml:"narrow-viewport-config"`
+		} `yaml:"layout"`
+	}
+	if err := yaml.Unmarshal(processed, &c); err != nil {
+		return "", err
+	}
+	return c.Layout.NarrowViewportConfig, nil
+}
+
+// resolveNarrowConfigPath resolves narrowRelPath relative to the directory of
+// primaryPath. Absolute paths are returned unchanged.
+func resolveNarrowConfigPath(primaryPath, narrowRelPath string) (string, error) {
+	if filepath.IsAbs(narrowRelPath) {
+		return narrowRelPath, nil
+	}
+	absPath, err := filepath.Abs(primaryPath)
+	if err != nil {
+		return "", fmt.Errorf("resolving primary config path: %w", err)
+	}
+	return filepath.Join(filepath.Dir(absPath), narrowRelPath), nil
+}
+
+// dualConfigFilesWatcher watches both the primary config tree and an optional narrow
+// config tree. Whenever any watched file changes it re-parses both trees, extracts
+// the current narrow path from the primary YAML (so mode transitions are handled),
+// and calls onReload with the new content. initialNarrowPath must be a fully
+// resolved absolute path, or empty when no narrow config is currently set.
+func dualConfigFilesWatcher(
+	primaryPath string,
+	lastPrimaryContents []byte,
+	lastPrimaryIncludes map[string]struct{},
+	initialNarrowPath string,
+	lastNarrowContents []byte,
+	lastNarrowIncludes map[string]struct{},
+	onReload func(primaryContents []byte, narrowPath string, narrowContents []byte),
+	onErr func(error),
+) (func() error, error) {
+	primaryAbsPath, err := filepath.Abs(primaryPath)
+	if err != nil {
+		return nil, fmt.Errorf("getting absolute path of primary file: %w", err)
+	}
+	lastPrimaryIncludes[primaryAbsPath] = struct{}{}
+
+	if lastNarrowIncludes == nil {
+		lastNarrowIncludes = make(map[string]struct{})
+	}
+	if initialNarrowPath != "" {
+		lastNarrowIncludes[initialNarrowPath] = struct{}{}
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("creating watcher: %w", err)
+	}
+
+	lastAllIncludes := make(map[string]struct{})
+	maps.Copy(lastAllIncludes, lastPrimaryIncludes)
+	maps.Copy(lastAllIncludes, lastNarrowIncludes)
+
+	lastNarrowPath := initialNarrowPath
+
+	updateWatchedFiles := func(prev, next map[string]struct{}) {
+		for f := range prev {
+			if _, ok := next[f]; !ok {
+				watcher.Remove(f)
+			}
+		}
+		for f := range next {
+			if _, ok := prev[f]; !ok {
+				if err := watcher.Add(f); err != nil {
+					log.Printf(
+						"Could not add file to watcher, changes to this file will not trigger a reload. path: %s, error: %v",
+						f, err,
+					)
+				}
+			}
+		}
+	}
+	updateWatchedFiles(nil, lastAllIncludes)
+
+	mu := sync.Mutex{}
+
+	parseAndCompare := func() {
+		primaryContents, primaryIncludes, err := parseYAMLIncludes(primaryPath)
+		if err != nil {
+			onErr(fmt.Errorf("parsing primary config: %w", err))
+			return
+		}
+		primaryIncludes[primaryAbsPath] = struct{}{}
+
+		newNarrowRelPath, err := extractNarrowConfigPath(primaryContents)
+		if err != nil {
+			onErr(fmt.Errorf("extracting narrow config path: %w", err))
+			return
+		}
+
+		var newNarrowPath string
+		if newNarrowRelPath != "" {
+			newNarrowPath, err = resolveNarrowConfigPath(primaryPath, newNarrowRelPath)
+			if err != nil {
+				onErr(fmt.Errorf("resolving narrow config path: %w", err))
+				return
+			}
+		}
+
+		var narrowContents []byte
+		narrowIncludes := make(map[string]struct{})
+		if newNarrowPath != "" {
+			narrowContents, narrowIncludes, err = parseYAMLIncludes(newNarrowPath)
+			if err != nil {
+				onErr(fmt.Errorf("parsing narrow config: %w", err))
+				return
+			}
+			narrowIncludes[newNarrowPath] = struct{}{}
+		}
+
+		newAllIncludes := make(map[string]struct{})
+		maps.Copy(newAllIncludes, primaryIncludes)
+		maps.Copy(newAllIncludes, narrowIncludes)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		if !maps.Equal(newAllIncludes, lastAllIncludes) {
+			updateWatchedFiles(lastAllIncludes, newAllIncludes)
+			lastAllIncludes = newAllIncludes
+		}
+
+		primaryChanged := !bytes.Equal(primaryContents, lastPrimaryContents)
+		narrowChanged := newNarrowPath != lastNarrowPath || !bytes.Equal(narrowContents, lastNarrowContents)
+
+		if primaryChanged || narrowChanged {
+			lastPrimaryContents = primaryContents
+			lastNarrowPath = newNarrowPath
+			lastNarrowContents = narrowContents
+			onReload(primaryContents, newNarrowPath, narrowContents)
+		}
+	}
+
+	const debounceDuration = 500 * time.Millisecond
+	var debounceTimer *time.Timer
+	debouncedParseAndCompare := func() {
+		if debounceTimer != nil {
+			debounceTimer.Stop()
+			debounceTimer.Reset(debounceDuration)
+		} else {
+			debounceTimer = time.AfterFunc(debounceDuration, parseAndCompare)
+		}
+	}
+
+	deleteFromLastIncludes := func(filePath string) {
+		mu.Lock()
+		defer mu.Unlock()
+		absPath, _ := filepath.Abs(filePath)
+		delete(lastAllIncludes, absPath)
+	}
+
+	go func() {
+		for {
+			select {
+			case event, isOpen := <-watcher.Events:
+				if !isOpen {
+					return
+				}
+				if event.Has(fsnotify.Write) {
+					debouncedParseAndCompare()
+				} else if event.Has(fsnotify.Rename) {
+					deleteFromLastIncludes(event.Name)
+					for range 10 {
+						if _, err := os.Stat(event.Name); err == nil {
+							break
+						}
+						time.Sleep(200 * time.Millisecond)
+					}
+					debouncedParseAndCompare()
+				} else if event.Has(fsnotify.Remove) {
+					deleteFromLastIncludes(event.Name)
+					debouncedParseAndCompare()
+				}
+			case err, isOpen := <-watcher.Errors:
+				if !isOpen {
+					return
+				}
+				onErr(fmt.Errorf("watcher error: %w", err))
+			}
+		}
+	}()
+
+	onReload(lastPrimaryContents, lastNarrowPath, lastNarrowContents)
+
+	return func() error {
+		if debounceTimer != nil {
+			debounceTimer.Stop()
+		}
+		return watcher.Close()
+	}, nil
 }
 
 func (om *orderedYAMLMap[K, V]) UnmarshalYAML(node *yaml.Node) error {

@@ -42,9 +42,32 @@ func Main() int {
 			return 1
 		}
 
-		if _, err := newConfigFromYAML(contents); err != nil {
+		primaryConfig, err := newConfigFromYAML(contents)
+		if err != nil {
 			fmt.Printf("Config file is invalid: %v\n", err)
 			return 1
+		}
+
+		if narrowRelPath := primaryConfig.Layout.NarrowViewportConfig; narrowRelPath != "" {
+			narrowPath, err := resolveNarrowConfigPath(options.configPath, narrowRelPath)
+			if err != nil {
+				fmt.Printf("Could not resolve narrow-viewport-config path: %v\n", err)
+				return 1
+			}
+			narrowContents, _, err := parseYAMLIncludes(narrowPath)
+			if err != nil {
+				fmt.Printf("Could not parse narrow config file: %v\n", err)
+				return 1
+			}
+			narrowConfig, err := newConfigFromYAML(narrowContents)
+			if err != nil {
+				fmt.Printf("Narrow config file is invalid: %v\n", err)
+				return 1
+			}
+			if err := validateLayoutPairConfigs(primaryConfig, narrowConfig); err != nil {
+				fmt.Printf("Layout pair validation failed: %v\n", err)
+				return 1
+			}
 		}
 	case cliIntentConfigPrint:
 		contents, _, err := parseYAMLIncludes(options.configPath)
@@ -116,38 +139,60 @@ func resolveConfigPath(primaryPath string) string {
 }
 
 func serveApp(configPath string) error {
-	// TODO: refactor if this gets any more complex, the current implementation is
-	// difficult to reason about due to all of the callbacks and simultaneous operations,
-	// use a single goroutine and a channel to initiate synchronous changes to the server
 	exitChannel := make(chan struct{})
 	hadValidConfigOnStartup := false
 	var stopServer func() error
 
-	onChange := func(newContents []byte) {
+	// onReload handles both single-layout (narrowPath == "") and dual-layout modes.
+	// It is called by the file watcher whenever either config tree changes.
+	onReload := func(primaryContents []byte, narrowPath string, narrowContents []byte) {
 		if stopServer != nil {
 			log.Println("Config file changed, reloading...")
 		}
 
-		config, err := newConfigFromYAML(newContents)
+		primaryConfig, err := newConfigFromYAML(primaryContents)
 		if err != nil {
 			log.Printf("Config has errors: %v", err)
-
 			if !hadValidConfigOnStartup {
 				close(exitChannel)
 			}
-
 			return
 		}
 
-		app, err := newApplication(config)
+		primaryApp, err := newApplication(primaryConfig)
 		if err != nil {
 			log.Printf("Failed to create application: %v", err)
-
 			if !hadValidConfigOnStartup {
 				close(exitChannel)
 			}
-
 			return
+		}
+
+		var narrowApp *application
+		if narrowPath != "" {
+			narrowConfig, err := newConfigFromYAML(narrowContents)
+			if err != nil {
+				log.Printf("Narrow config has errors: %v", err)
+				if !hadValidConfigOnStartup {
+					close(exitChannel)
+				}
+				return
+			}
+			if err := validateLayoutPairConfigs(primaryConfig, narrowConfig); err != nil {
+				log.Printf("Layout pair config error: %v", err)
+				if !hadValidConfigOnStartup {
+					close(exitChannel)
+				}
+				return
+			}
+			narrowApp, err = newApplication(narrowConfig)
+			if err != nil {
+				log.Printf("Failed to create narrow application: %v", err)
+				if !hadValidConfigOnStartup {
+					close(exitChannel)
+				}
+				return
+			}
 		}
 
 		if !hadValidConfigOnStartup {
@@ -161,10 +206,15 @@ func serveApp(configPath string) error {
 		}
 
 		go func() {
-			var startServer func() error
-			startServer, stopServer = app.server()
-
-			if err := startServer(); err != nil {
+			var startFn func() error
+			if narrowApp != nil {
+				primaryApp.NarrowLayoutEnabled = true
+				narrowApp.NarrowLayoutEnabled = true
+				startFn, stopServer = buildDualServer(primaryApp, narrowApp)
+			} else {
+				startFn, stopServer = primaryApp.server()
+			}
+			if err := startFn(); err != nil {
 				log.Printf("Failed to start server: %v", err)
 			}
 		}()
@@ -174,29 +224,74 @@ func serveApp(configPath string) error {
 		log.Printf("Error watching config files: %v", err)
 	}
 
-	configContents, configIncludes, err := parseYAMLIncludes(configPath)
+	primaryContents, primaryIncludes, err := parseYAMLIncludes(configPath)
 	if err != nil {
 		return fmt.Errorf("parsing config: %w", err)
 	}
 
-	stopWatching, err := configFilesWatcher(configPath, configContents, configIncludes, onChange, onErr)
+	// Extract the narrow config path from the raw primary YAML (before full parse).
+	narrowRelPath, err := extractNarrowConfigPath(primaryContents)
+	if err != nil {
+		return fmt.Errorf("extracting narrow config path: %w", err)
+	}
+
+	var narrowPath string
+	var narrowContents []byte
+	var narrowIncludes map[string]struct{}
+	if narrowRelPath != "" {
+		narrowPath, err = resolveNarrowConfigPath(configPath, narrowRelPath)
+		if err != nil {
+			return fmt.Errorf("resolving narrow config path: %w", err)
+		}
+		narrowContents, narrowIncludes, err = parseYAMLIncludes(narrowPath)
+		if err != nil {
+			return fmt.Errorf("parsing narrow config: %w", err)
+		}
+	}
+
+	// dualConfigFilesWatcher handles both single and dual mode; it will dynamically
+	// switch mode if narrow-viewport-config is added or removed at runtime.
+	stopWatching, err := dualConfigFilesWatcher(
+		configPath, primaryContents, primaryIncludes,
+		narrowPath, narrowContents, narrowIncludes,
+		onReload, onErr,
+	)
 	if err == nil {
 		defer stopWatching()
 	} else {
 		log.Printf("Error starting file watcher, config file changes will require a manual restart. (%v)", err)
 
-		config, err := newConfigFromYAML(configContents)
+		// No watcher — start directly (blocking call, no hot-reload).
+		primaryConfig, err := newConfigFromYAML(primaryContents)
 		if err != nil {
 			return fmt.Errorf("validating config file: %w", err)
 		}
-
-		app, err := newApplication(config)
+		primaryApp, err := newApplication(primaryConfig)
 		if err != nil {
 			return fmt.Errorf("creating application: %w", err)
 		}
 
-		startServer, _ := app.server()
-		if err := startServer(); err != nil {
+		var startFn func() error
+		if narrowPath != "" {
+			narrowConfig, err := newConfigFromYAML(narrowContents)
+			if err != nil {
+				return fmt.Errorf("validating narrow config file: %w", err)
+			}
+			if err := validateLayoutPairConfigs(primaryConfig, narrowConfig); err != nil {
+				return fmt.Errorf("layout pair config: %w", err)
+			}
+			narrowApp, err := newApplication(narrowConfig)
+			if err != nil {
+				return fmt.Errorf("creating narrow application: %w", err)
+			}
+			primaryApp.NarrowLayoutEnabled = true
+			narrowApp.NarrowLayoutEnabled = true
+			startFn, _ = buildDualServer(primaryApp, narrowApp)
+		} else {
+			startFn, _ = primaryApp.server()
+		}
+
+		if err := startFn(); err != nil {
 			return fmt.Errorf("starting server: %w", err)
 		}
 	}

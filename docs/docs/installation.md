@@ -53,6 +53,8 @@ services:
     image: panonim/dynacat
     restart: unless-stopped
     volumes:
+      # Mount the full config directory (not only dynacat.yml) so $include files,
+      # narrow-viewport-config peers, and secrets resolve correctly inside the container.
       - ./config:/app/config
       - ./assets:/app/assets
       - /etc/localtime:/etc/localtime:ro

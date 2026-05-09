@@ -1999,6 +1999,64 @@ function fetchLazyWidgets() {
     });
 }
 
+function setupLayoutProfileSwitching() {
+    if (!pageData.narrowLayoutEnabled) return;
+
+    const COOKIE_NAME = 'dynacat-layout';
+    const PROFILE_NARROW = 'narrow';
+    const PROFILE_PRIMARY = 'primary';
+
+    function readLayoutCookie() {
+        const pattern = new RegExp('(?:^|;)\\s*' + COOKIE_NAME + '=([^;]*)');
+        const match = document.cookie.match(pattern);
+        return match ? decodeURIComponent(match[1]) : PROFILE_PRIMARY;
+    }
+
+    function getDesiredProfile() {
+        return window.innerWidth < window.innerHeight ? PROFILE_NARROW : PROFILE_PRIMARY;
+    }
+
+    async function syncLayoutProfile() {
+        const current = readLayoutCookie();
+        const desired = getDesiredProfile();
+        if (current === desired) return;
+
+        try {
+            const response = await fetch(`${pageData.baseURL}/api/set-layout-profile/${desired}`, {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                console.error(
+                    'Failed to switch layout profile:',
+                    response.status,
+                    response.statusText,
+                );
+                return;
+            }
+            window.location.reload();
+        } catch (e) {
+            console.error('Failed to switch layout profile:', e);
+        }
+    }
+
+    // Check immediately on page load
+    syncLayoutProfile();
+
+    // Re-check on resize with debounce
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(syncLayoutProfile, 300);
+    });
+
+    // Re-check on orientation change (allow dimensions to update first)
+    window.addEventListener('orientationchange', () => {
+        setTimeout(syncLayoutProfile, 100);
+    });
+}
+
+setupLayoutProfileSwitching();
 setupPage().then(() => {
     startPolling();
     setupWidgetPolling();
