@@ -12,6 +12,7 @@ var clockWidgetTemplate = mustParseTemplate("clock.html", "widget-base.html")
 type clockWidget struct {
 	widgetBase `yaml:",inline"`
 	cachedHTML template.HTML `yaml:"-"`
+	Frameless  bool          `yaml:"frameless"`
 	HourFormat string        `yaml:"hour-format"`
 	Timezones  []struct {
 		Timezone string `yaml:"timezone"`

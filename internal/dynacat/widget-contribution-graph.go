@@ -30,6 +30,7 @@ type contributionWeek struct {
 
 type contributionGraphWidget struct {
 	widgetBase  `yaml:",inline"`
+	Frameless   bool   `yaml:"frameless"`
 	User        string `yaml:"user"`
 	Token       string `yaml:"token"`
 	GitLabToken string `yaml:"gitlab-token"`

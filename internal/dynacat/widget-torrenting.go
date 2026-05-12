@@ -34,6 +34,7 @@ type TorrentingHostConfig struct {
 
 type torrentingWidget struct {
 	widgetBase    `yaml:",inline"`
+	Frameless     bool                   `yaml:"frameless"`
 	Hosts         []TorrentingHostConfig `yaml:"hosts"`
 	HideCompleted bool                   `yaml:"hide-completed"`
 	HideInactive  bool                   `yaml:"hide-inactive"`

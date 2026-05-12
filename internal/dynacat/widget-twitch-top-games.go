@@ -15,6 +15,7 @@ var twitchGamesWidgetTemplate = mustParseTemplate("twitch-games-list.html", "wid
 
 type twitchGamesWidget struct {
 	widgetBase    `yaml:",inline"`
+	Frameless     bool             `yaml:"frameless"`
 	Categories    []twitchCategory `yaml:"-"`
 	Exclude       []string         `yaml:"exclude"`
 	Limit         int              `yaml:"limit"`

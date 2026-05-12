@@ -20,6 +20,7 @@ var (
 
 type redditWidget struct {
 	widgetBase          `yaml:",inline"`
+	Frameless           bool              `yaml:"frameless"`
 	Posts               forumPostList     `yaml:"-"`
 	Subreddit           string            `yaml:"subreddit"`
 	Proxy               proxyOptionsField `yaml:"proxy"`

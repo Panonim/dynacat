@@ -1,5 +1,7 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
 {{ define "widget-content" }}
 <a class="size-h4 color-highlight" href="https://github.com/{{ $.Repository.Name }}" target="_blank" rel="noreferrer">{{ .Repository.Name }}</a>
 <ul class="list-horizontal-text">

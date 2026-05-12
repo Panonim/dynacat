@@ -14,6 +14,7 @@ var repositoryWidgetTemplate = mustParseTemplate("repository.html", "widget-base
 
 type repositoryWidget struct {
 	widgetBase          `yaml:",inline"`
+	Frameless           bool       `yaml:"frameless"`
 	RequestedRepository string     `yaml:"repository"`
 	Token               string     `yaml:"token"`
 	PullRequestsLimit   int        `yaml:"pull-requests-limit"`

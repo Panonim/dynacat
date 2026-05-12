@@ -22,6 +22,7 @@ var (
 
 type videosWidget struct {
 	widgetBase        `yaml:",inline"`
+	Frameless         bool      `yaml:"frameless"`
 	Videos            videoList `yaml:"-"`
 	VideoUrlTemplate  string    `yaml:"video-url-template"`
 	Style             string    `yaml:"style"`

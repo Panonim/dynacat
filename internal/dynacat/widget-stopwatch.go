@@ -6,7 +6,8 @@ var stopwatchWidgetTemplate = mustParseTemplate("stopwatch.html", "widget-base.h
 
 type stopwatchWidget struct {
 	widgetBase   `yaml:",inline"`
-	StartOnOpen  bool            `yaml:"start-on-open"`
+	Frameless    bool          `yaml:"frameless"`
+	StartOnOpen  bool          `yaml:"start-on-open"`
 	cachedHTML   template.HTML `yaml:"-"`
 }
 

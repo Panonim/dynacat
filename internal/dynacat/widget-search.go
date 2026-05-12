@@ -18,6 +18,7 @@ type SearchBang struct {
 type searchWidget struct {
 	widgetBase          `yaml:",inline"`
 	cachedHTML          template.HTML `yaml:"-"`
+	Frameless           bool          `yaml:"frameless"`
 	SearchEngine        string        `yaml:"search-engine"`
 	Bangs               []SearchBang  `yaml:"bangs"`
 	NewTab              bool          `yaml:"new-tab"`

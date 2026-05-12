@@ -17,6 +17,7 @@ var marketsWidgetTemplate = mustParseTemplate("markets.html", "widget-base.html"
 
 type marketsWidget struct {
 	widgetBase         `yaml:",inline"`
+	Frameless          bool            `yaml:"frameless"`
 	StocksRequests     []marketRequest `yaml:"stocks"`
 	MarketRequests     []marketRequest `yaml:"markets"`
 	ChartLinkTemplate  string          `yaml:"chart-link-template"`

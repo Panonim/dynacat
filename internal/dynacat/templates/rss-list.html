@@ -1,5 +1,7 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
 {{ define "widget-content" }}
 <ul class="list list-gap-14 collapsible-container{{ if .SingleLineTitles }} single-line-titles{{ end }}" data-collapse-after="{{ .CollapseAfter }}">
     {{ range .Items }}

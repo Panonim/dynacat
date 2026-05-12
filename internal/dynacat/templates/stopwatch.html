@@ -1,5 +1,7 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
 {{ define "widget-content" }}
 <div class="stopwatch" data-stopwatch-start-on-open="{{ .StartOnOpen }}">
     <div class="stopwatch-display color-highlight" data-stopwatch-display>0:00:00</div>

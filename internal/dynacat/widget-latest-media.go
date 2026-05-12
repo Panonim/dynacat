@@ -18,6 +18,7 @@ var latestMediaWidgetTemplate = mustParseTemplate("latest-media.html", "widget-b
 
 type latestMediaWidget struct {
 	widgetBase  `yaml:",inline"`
+	Frameless   bool                    `yaml:"frameless"`
 	Hosts       []latestMediaHostConfig `yaml:"hosts"`
 	ItemCount   int                     `yaml:"item-count"`
 	Columns     int                     `yaml:"columns"`

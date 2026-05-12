@@ -296,10 +296,22 @@ func newApplication(c *config) (*application, error) {
 			}
 		}
 
-		registerWidget := func(widget widget) {
+		var registerWidget func(widget widget)
+		registerWidget = func(widget widget) {
 			app.widgetByID[widget.GetID()] = widget
 			app.widgetToPage[widget.GetID()] = page
 			widget.setProviders(providers)
+
+			switch v := widget.(type) {
+			case *groupWidget:
+				for i := range v.Widgets {
+					registerWidget(v.Widgets[i])
+				}
+			case *splitColumnWidget:
+				for i := range v.Widgets {
+					registerWidget(v.Widgets[i])
+				}
+			}
 		}
 
 		for i := range page.HeadWidgets {

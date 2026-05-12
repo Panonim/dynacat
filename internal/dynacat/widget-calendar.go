@@ -23,6 +23,7 @@ type calendarWidget struct {
 	FirstDayOfWeek string        `yaml:"first-day-of-week"`
 	FirstDay       int           `yaml:"-"`
 	cachedHTML     template.HTML `yaml:"-"`
+	Frameless      bool          `yaml:"frameless"`
 }
 
 func (widget *calendarWidget) initialize() error {

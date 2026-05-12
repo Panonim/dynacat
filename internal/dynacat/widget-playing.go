@@ -83,6 +83,7 @@ type navidromeNowPlayingResponse struct {
 
 type playingWidget struct {
 	widgetBase  `yaml:",inline"`
+	Frameless   bool                `yaml:"frameless"`
 	Hosts       []PlayingHostConfig `yaml:"hosts"`
 	SmallColumn bool                `yaml:"small-column"`
 	// `compact` option removed — layouts use the default (non-compact) sizing

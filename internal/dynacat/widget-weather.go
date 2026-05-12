@@ -19,6 +19,7 @@ var weatherWidgetTemplate = mustParseTemplate("weather.html", "widget-base.html"
 
 type weatherWidget struct {
 	widgetBase   `yaml:",inline"`
+	Frameless    bool                        `yaml:"frameless"`
 	Location     string                      `yaml:"location"`
 	ShowAreaName bool                        `yaml:"show-area-name"`
 	HideLocation bool                        `yaml:"hide-location"`

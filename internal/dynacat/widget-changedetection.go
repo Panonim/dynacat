@@ -15,6 +15,7 @@ var changeDetectionWidgetTemplate = mustParseTemplate("change-detection.html", "
 
 type changeDetectionWidget struct {
 	widgetBase       `yaml:",inline"`
+	Frameless        bool                     `yaml:"frameless"`
 	ChangeDetections changeDetectionWatchList `yaml:"-"`
 	WatchUUIDs       []string                 `yaml:"watches"`
 	InstanceURL      string                   `yaml:"instance-url"`

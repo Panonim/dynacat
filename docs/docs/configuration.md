@@ -1891,6 +1891,7 @@ Example:
     - title: Jellyfin
       url: https://jellyfin.yourdomain.com
       icon: /assets/jellyfin-logo.png
+      method: HEAD
     - title: Gitea
       url: https://gitea.yourdomain.com
       icon: /assets/gitea-logo.png
@@ -1941,6 +1942,7 @@ Properties for each site:
 | description | string | no | |
 | check-url | string | no | |
 | error-url | string | no | |
+| method | string | no | GET |
 | icon | string | no | |
 | timeout | string | no | 3s |
 | allow-insecure | boolean | no | false |
@@ -1967,6 +1969,10 @@ If the monitored service returns an error, the user will be redirected here. If 
 `icon`
 
 See [Icons](#icons) for more information on how to specify icons.
+
+`method`
+
+The HTTP method used for the status check. Possible values are `GET`, `HEAD` and `OPTIONS`. Useful for endpoints that don't support `GET` or where a lighter request is preferred.
 
 `timeout`
 

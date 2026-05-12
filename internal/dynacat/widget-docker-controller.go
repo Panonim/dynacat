@@ -61,6 +61,7 @@ func (p *dockerActivePull) percent() int {
 
 type dockerControllerWidget struct {
 	widgetBase    `yaml:",inline"`
+	Frameless     bool                  `yaml:"frameless"`
 	SockPath      string                `yaml:"sock-path"`
 	Show          string                `yaml:"show"`
 	FormatNames   bool                  `yaml:"format-container-names"`

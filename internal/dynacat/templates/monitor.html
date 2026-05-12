@@ -1,5 +1,6 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
 
 {{ define "widget-content" }}
 {{ if not (and .ShowFailingOnly (not .HasFailing)) }}

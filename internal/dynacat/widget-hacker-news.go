@@ -13,6 +13,7 @@ import (
 
 type hackerNewsWidget struct {
 	widgetBase          `yaml:",inline"`
+	Frameless           bool          `yaml:"frameless"`
 	Posts               forumPostList `yaml:"-"`
 	Limit               int           `yaml:"limit"`
 	SortBy              string        `yaml:"sort-by"`

@@ -19,6 +19,7 @@ var releasesWidgetTemplate = mustParseTemplate("releases.html", "widget-base.htm
 
 type releasesWidget struct {
 	widgetBase     `yaml:",inline"`
+	Frameless      bool              `yaml:"frameless"`
 	Releases       appReleaseList    `yaml:"-"`
 	Repositories   []*releaseRequest `yaml:"repositories"`
 	Token          string            `yaml:"token"`

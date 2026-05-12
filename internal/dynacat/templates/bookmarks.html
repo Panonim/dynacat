@@ -1,5 +1,7 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
 {{ define "widget-content" }}
 <div class="dynamic-columns list-gap-24 list-with-separator{{ if .MobileGrid }} bookmarks-mobile-grid{{ if .HideMobileBookmarkTitle }} bookmarks-hide-mobile-title{{ end }}{{ end }}"{{ if .MobileGrid }} style="--mobile-icons-per-row: {{ .MobileIconsPerRow }}"{{ end }}>
     {{- range .Groups }}

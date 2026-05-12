@@ -9,6 +9,7 @@ var todoWidgetTemplate = mustParseTemplate("todo.html", "widget-base.html")
 
 type todoWidget struct {
 	widgetBase `yaml:",inline"`
+	Frameless  bool          `yaml:"frameless"`
 	cachedHTML template.HTML `yaml:"-"`
 	TodoID     string        `yaml:"id"`
 	Storage    string        `yaml:"storage"`

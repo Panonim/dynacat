@@ -18,6 +18,7 @@ var dockerContainersWidgetTemplate = mustParseTemplate("docker-containers.html",
 
 type dockerContainersWidget struct {
 	widgetBase           `yaml:",inline"`
+	Frameless            bool                         `yaml:"frameless"`
 	HideByDefault        bool                         `yaml:"hide-by-default"`
 	RunningOnly          bool                         `yaml:"running-only"`
 	Category             string                       `yaml:"category"`

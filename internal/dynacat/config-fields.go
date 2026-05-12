@@ -230,13 +230,16 @@ func (i *customIconField) cacheURL(cache *imageCache) {
 
 	cachedURL, err := cache.CacheURL(context.Background(), currentURL)
 	if err != nil || cachedURL == "" {
-		fallbackURL, hasFallback := dashboardIconWebpFallbackURL(currentURL)
-		if !hasFallback {
-			return
+		fallbackURLs := iconFallbackURLs(currentURL)
+		cachedURL = ""
+		for _, fallbackURL := range fallbackURLs {
+			candidate, fallbackErr := cache.CacheURL(context.Background(), fallbackURL)
+			if fallbackErr == nil && candidate != "" {
+				cachedURL = candidate
+				break
+			}
 		}
-
-		cachedURL, err = cache.CacheURL(context.Background(), fallbackURL)
-		if err != nil || cachedURL == "" {
+		if cachedURL == "" {
 			return
 		}
 	}
@@ -271,25 +274,43 @@ func (i *customIconField) prepare(providers *widgetProviders) {
 	i.cacheURL(providers.imageCache)
 }
 
-func dashboardIconWebpFallbackURL(rawURL string) (string, bool) {
+func iconFallbackURLs(rawURL string) []string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return "", false
+		return nil
 	}
 
 	if !strings.EqualFold(parsed.Hostname(), "cdn.jsdelivr.net") {
-		return "", false
+		return nil
+	}
+
+	path := parsed.EscapedPath()
+	if !strings.HasSuffix(path, ".svg") {
+		return nil
+	}
+
+	rewrite := func(svgSegment, newSegment, newExt string) string {
+		p := strings.Replace(parsed.Path, svgSegment, newSegment, 1)
+		p = strings.TrimSuffix(p, ".svg") + newExt
+		clone := *parsed
+		clone.Path = p
+		return clone.String()
 	}
 
 	const dashboardIconsPrefix = "/gh/homarr-labs/dashboard-icons/svg/"
-	if !strings.HasPrefix(parsed.EscapedPath(), dashboardIconsPrefix) || !strings.HasSuffix(parsed.EscapedPath(), ".svg") {
-		return "", false
+	if strings.HasPrefix(path, dashboardIconsPrefix) {
+		return []string{rewrite("/dashboard-icons/svg/", "/dashboard-icons/webp/", ".webp")}
 	}
 
-	parsed.Path = strings.Replace(parsed.Path, "/dashboard-icons/svg/", "/dashboard-icons/webp/", 1)
-	parsed.Path = strings.TrimSuffix(parsed.Path, ".svg") + ".webp"
+	const selfhstIconsPrefix = "/gh/selfhst/icons/svg/"
+	if strings.HasPrefix(path, selfhstIconsPrefix) {
+		return []string{
+			rewrite("/selfhst/icons/svg/", "/selfhst/icons/webp/", ".webp"),
+			rewrite("/selfhst/icons/svg/", "/selfhst/icons/png/", ".png"),
+		}
+	}
 
-	return parsed.String(), true
+	return nil
 }
 
 func (i *customIconField) UnmarshalYAML(node *yaml.Node) error {

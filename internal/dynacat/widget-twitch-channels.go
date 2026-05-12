@@ -16,6 +16,7 @@ var twitchChannelsWidgetTemplate = mustParseTemplate("twitch-channels.html", "wi
 
 type twitchChannelsWidget struct {
 	widgetBase      `yaml:",inline"`
+	Frameless       bool            `yaml:"frameless"`
 	ChannelsRequest []string        `yaml:"channels"`
 	Channels        []twitchChannel `yaml:"-"`
 	CollapseAfter   int             `yaml:"collapse-after"`

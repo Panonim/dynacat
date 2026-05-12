@@ -7,6 +7,7 @@ import (
 
 type htmlWidget struct {
 	widgetBase    `yaml:",inline"`
+	Frameless     bool          `yaml:"frameless"`
 	Source        template.HTML `yaml:"source"`
 	processedHTML template.HTML `yaml:"-"`
 }

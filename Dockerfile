@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.21
 
+RUN apk add --no-cache zfs
+
 WORKDIR /app
 COPY --from=builder /app/dynacat .
 RUN mkdir -p /app/config

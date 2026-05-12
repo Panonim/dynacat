@@ -10,6 +10,7 @@ import (
 
 type lobstersWidget struct {
 	widgetBase     `yaml:",inline"`
+	Frameless      bool          `yaml:"frameless"`
 	Posts          forumPostList `yaml:"-"`
 	InstanceURL    string        `yaml:"instance-url"`
 	CustomURL      string        `yaml:"custom-url"`

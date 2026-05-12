@@ -18,6 +18,7 @@ var serverStatsWidgetTemplate = mustParseTemplate("server-stats.html", "widget-b
 
 type serverStatsWidget struct {
 	widgetBase `yaml:",inline"`
+	Frameless  bool                 `yaml:"frameless"`
 	Servers    []serverStatsRequest `yaml:"servers"`
 }
 

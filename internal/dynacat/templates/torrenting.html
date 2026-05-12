@@ -1,5 +1,7 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
 {{ define "torrenting-client-icon" }}
 {{- if eq . "qbittorrent" -}}
 <span class="torrenting-client-icon" title="qBittorrent">

@@ -43,6 +43,7 @@ type dnsStatsWidget struct {
 	Token          string `yaml:"token"`
 	Username       string `yaml:"username"`
 	Password       string `yaml:"password"`
+	Frameless      bool   `yaml:"frameless"`
 }
 
 const (

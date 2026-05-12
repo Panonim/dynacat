@@ -30,6 +30,7 @@ var feedParser = gofeed.NewParser()
 
 type rssWidget struct {
 	widgetBase       `yaml:",inline"`
+	Frameless        bool             `yaml:"frameless"`
 	FeedRequests     []rssFeedRequest `yaml:"feeds"`
 	Style            string           `yaml:"style"`
 	ThumbnailHeight  float64          `yaml:"thumbnail-height"`

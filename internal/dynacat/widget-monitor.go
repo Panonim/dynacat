@@ -3,12 +3,16 @@ package dynacat
 import (
 	"context"
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
+
+var allowedMonitorMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions}
 
 var (
 	monitorWidgetTemplate        = mustParseTemplate("monitor.html", "widget-base.html")
@@ -17,6 +21,7 @@ var (
 
 type monitorWidget struct {
 	widgetBase `yaml:",inline"`
+	Frameless  bool   `yaml:"frameless"`
 	Sites      []struct {
 		*SiteStatusRequest `yaml:",inline"`
 		Status             *siteStatus     `yaml:"-"`
@@ -46,6 +51,18 @@ func (widget *monitorWidget) initialize() error {
 
 	if *widget.UpdateInterval <= 0 {
 		return errors.New("update-interval must be greater than 0")
+	}
+
+	for i := range widget.Sites {
+		req := widget.Sites[i].SiteStatusRequest
+		if req == nil || req.Method == "" {
+			continue
+		}
+		method := strings.ToUpper(req.Method)
+		if !slices.Contains(allowedMonitorMethods, method) {
+			return fmt.Errorf("site %q: invalid method %q, must be one of %v", widget.Sites[i].Title, req.Method, allowedMonitorMethods)
+		}
+		req.Method = method
 	}
 
 	return nil
@@ -157,6 +174,7 @@ func monitorStatusLabel(status *siteStatus, statusText string, altStatusCodes []
 type SiteStatusRequest struct {
 	DefaultURL    string        `yaml:"url"`
 	CheckURL      string        `yaml:"check-url"`
+	Method        string        `yaml:"method"`
 	AllowInsecure bool          `yaml:"allow-insecure"`
 	Timeout       durationField `yaml:"timeout"`
 	BasicAuth     struct {
@@ -184,7 +202,12 @@ func fetchSiteStatusTask(statusRequest *SiteStatusRequest) (siteStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	method := statusRequest.Method
+	if method == "" {
+		method = http.MethodGet
+	}
+
+	request, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return siteStatus{
 			Error: err,

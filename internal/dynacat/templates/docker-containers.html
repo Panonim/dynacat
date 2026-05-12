@@ -1,5 +1,6 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
 
 {{- define "widget-content" }}
 <ul class="dynamic-columns list-gap-20 list-with-separator">

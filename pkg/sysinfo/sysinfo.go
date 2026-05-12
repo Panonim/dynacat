@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -244,12 +246,28 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 
 		usage, err := disk.Usage(requestedPath)
 		if err == nil {
+			totalMB := usage.Total / 1024 / 1024
+			usedMB := usage.Used / 1024 / 1024
+			usedPercent := uint8(math.Min(usage.UsedPercent, 100))
+
+			// ZFS pool roots return Used=0 via statfs(2) when data is stored in child
+			// datasets (e.g. TrueNAS SCALE). Override with accurate values from `zfs list`.
+			if usage.Fstype == "zfs" {
+				if zfsTotal, zfsUsed, zfsErr := getZFSUsage(requestedPath); zfsErr == nil {
+					totalMB = zfsTotal / 1024 / 1024
+					usedMB = zfsUsed / 1024 / 1024
+					if zfsTotal > 0 {
+						usedPercent = uint8(math.Min(float64(zfsUsed)/float64(zfsTotal)*100, 100))
+					}
+				}
+			}
+
 			mpInfo := MountpointInfo{
 				Path:        requestedPath,
 				Name:        mpReq.Name,
-				TotalMB:     usage.Total / 1024 / 1024,
-				UsedMB:      usage.Used / 1024 / 1024,
-				UsedPercent: uint8(math.Min(usage.UsedPercent, 100)),
+				TotalMB:     totalMB,
+				UsedMB:      usedMB,
+				UsedPercent: usedPercent,
 			}
 
 			info.Mountpoints = append(info.Mountpoints, mpInfo)
@@ -279,6 +297,34 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 	})
 
 	return info, errs
+}
+
+// getZFSUsage returns accurate (totalBytes, usedBytes) for a ZFS mountpoint by
+// invoking `zfs list`. This is necessary because statfs(2) on a ZFS pool root
+// returns Used=0 when all data lives in child datasets (e.g. TrueNAS SCALE).
+// Returns an error if the `zfs` binary is unavailable or the mountpoint is not
+// found, so callers can fall back to the statfs values.
+func getZFSUsage(mountpoint string) (totalBytes, usedBytes uint64, err error) {
+	cmd := exec.Command("zfs", "list", "-H", "-p", "-o", "used,available,mountpoint")
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("zfs list: %w", err)
+	}
+
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 3 || fields[2] != mountpoint {
+			continue
+		}
+		used, err1 := strconv.ParseUint(fields[0], 10, 64)
+		avail, err2 := strconv.ParseUint(fields[1], 10, 64)
+		if err1 != nil || err2 != nil {
+			return 0, 0, fmt.Errorf("parsing zfs list output for %s", mountpoint)
+		}
+		return used + avail, used, nil
+	}
+
+	return 0, 0, fmt.Errorf("no ZFS dataset found for mountpoint %s", mountpoint)
 }
 
 func inferCPUTempSensor(sensors []sensors.TemperatureStat) *sensors.TemperatureStat {

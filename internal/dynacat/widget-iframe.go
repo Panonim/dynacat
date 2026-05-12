@@ -11,6 +11,7 @@ var iframeWidgetTemplate = mustParseTemplate("iframe.html", "widget-base.html")
 
 type iframeWidget struct {
 	widgetBase `yaml:",inline"`
+	Frameless  bool          `yaml:"frameless"`
 	cachedHTML template.HTML `yaml:"-"`
 	Source     string        `yaml:"source"`
 	Height     int           `yaml:"height"`

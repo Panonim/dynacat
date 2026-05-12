@@ -12,7 +12,8 @@ type bookmarksWidget struct {
 	MobileGrid              bool          `yaml:"mobile-grid"`
 	MobileIconsPerRow       int           `yaml:"mobile-icons-per-row"`
 	HideMobileBookmarkTitle bool          `yaml:"hide-mobile-bookmark-title"`
-	Groups                  []struct {
+	Frameless  bool          `yaml:"frameless"`
+	Groups     []struct {
 		Title     string         `yaml:"title"`
 		Color     *hslColorField `yaml:"color"`
 		SameTab   bool           `yaml:"same-tab"`

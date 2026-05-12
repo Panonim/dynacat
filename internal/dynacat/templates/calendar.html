@@ -1,5 +1,7 @@
 {{ template "widget-base.html" . }}
 
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
 {{ define "widget-content" }}
 <div class="widget-small-content-bounds">
     <div class="calendar" data-first-day-of-week="{{ .FirstDay }}"></div>
