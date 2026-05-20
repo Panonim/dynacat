@@ -43,6 +43,8 @@ type application struct {
 	Version   string
 	CreatedAt time.Time
 	Config    config
+	ctx       context.Context
+	cancelCtx context.CancelFunc
 
 	parsedManifest []byte
 
@@ -77,13 +79,16 @@ type application struct {
 }
 
 func newApplication(c *config) (*application, error) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	app := &application{
-		Version:        buildVersion,
-		CreatedAt:      time.Now(),
-		Config:         *c,
-		slugToPage:     make(map[string]*page),
-		widgetByID:     make(map[uint64]widget),
-		widgetToPage:   make(map[uint64]*page),
+		Version:          buildVersion,
+		CreatedAt:        time.Now(),
+		Config:           *c,
+		ctx:              ctx,
+		cancelCtx:        cancelCtx,
+		slugToPage:       make(map[string]*page),
+		widgetByID:       make(map[uint64]widget),
+		widgetToPage:     make(map[uint64]*page),
 		sseClients:       make(map[*sseClient]struct{}),
 		imageProxyURLs:   make(map[string]imageProxyInfo),
 		todoListIDToPage: make(map[string]*page),
@@ -428,11 +433,10 @@ func (a *application) sseBroadcast(msg string) {
 	}
 }
 
-func (p *page) updateOutdatedWidgets() {
+func (p *page) updateOutdatedWidgets(ctx context.Context) {
 	now := time.Now()
 
 	var wg sync.WaitGroup
-	context := context.Background()
 
 	for w := range p.HeadWidgets {
 		widget := p.HeadWidgets[w]
@@ -444,7 +448,7 @@ func (p *page) updateOutdatedWidgets() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			widget.update(context)
+			widget.update(ctx)
 		}()
 	}
 
@@ -459,7 +463,7 @@ func (p *page) updateOutdatedWidgets() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				widget.update(context)
+				widget.update(ctx)
 			}()
 		}
 	}
@@ -635,7 +639,7 @@ func (a *application) handlePageContentRequest(w http.ResponseWriter, r *http.Re
 
 		// Determine cache-build status after widgets have had a chance to queue
 		// image fetches to avoid missing the initial "building cache" response.
-		page.updateOutdatedWidgets()
+		page.updateOutdatedWidgets(a.ctx)
 		if a.imageCache != nil {
 			isCacheBuilding = a.imageCache.IsBuildingCache()
 		}
@@ -1025,14 +1029,13 @@ func (a *application) server() (func() error, func() error) {
 		return nil
 	}
 
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	go a.sseUpdateLoop(ctx)
+	go a.sseUpdateLoop(a.ctx)
 	if a.oidcSessions != nil {
-		go a.oidcSessions.runSweeper(ctx, 15*time.Minute, OIDC_SESSION_VALID_PERIOD)
+		go a.oidcSessions.runSweeper(a.ctx, 15*time.Minute, OIDC_SESSION_VALID_PERIOD)
 	}
 
 	stop := func() error {
-		cancelCtx()
+		a.cancelCtx()
 		return server.Close()
 	}
 

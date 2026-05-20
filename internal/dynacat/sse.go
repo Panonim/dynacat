@@ -92,6 +92,17 @@ func (a *application) handleImageProxyRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if a.imageCache != nil {
+		cachedURL, streamed, err := a.imageCache.ServeCachedOrInFlight(r.Context(), info.URL, info.AllowInsecure, w)
+		if streamed {
+			return
+		}
+		if err == nil && cachedURL != "" {
+			http.Redirect(w, r, cachedURL, http.StatusFound)
+			return
+		}
+	}
+
 	// Fetch the image using the stored URL with the appropriate client
 	client := ternary(info.AllowInsecure, defaultInsecureHTTPClient, defaultHTTPClient)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, info.URL, nil)

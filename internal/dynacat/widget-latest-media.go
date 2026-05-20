@@ -597,70 +597,25 @@ func (widget *latestMediaWidget) setProviders(providers *widgetProviders) {
 }
 
 func (widget *latestMediaWidget) cacheImageURLs() {
+	if widget.Providers == nil {
+		return
+	}
+
 	widget.mu.Lock()
 	defer widget.mu.Unlock()
 
-	ctx := context.Background()
 	for i := range widget.Items {
 		item := &widget.Items[i]
 		allowInsecure := widget.hostAllowInsecure[item.ServerURL]
 
 		// Process cover URL
 		if item.CoverURL != "" {
-			originalURL := item.CoverURL
-			hash := hashString(originalURL)
-
-			// Register with the application's image proxy
-			if widget.Providers != nil && widget.Providers.app != nil {
-				widget.Providers.app.registerImageProxy(hash, originalURL, allowInsecure)
-			}
-
-			// Try to cache the image
-			if widget.Providers != nil && widget.Providers.imageCache != nil {
-				cachedURL, err := widget.Providers.imageCache.CacheURLWithClient(ctx, originalURL, allowInsecure)
-				if err == nil && cachedURL != "" {
-					// Successfully cached, use the cached URL
-					item.CoverURL = cachedURL
-				} else {
-					// Failed to cache, use a proxy URL that doesn't expose the API key
-					item.CoverURL = fmt.Sprintf("/api/image-proxy/%s", hash)
-					if err != nil {
-						slog.Debug("failed to cache cover image, using proxy", "hash", hash, "error", stripAPIKeysFromError(err))
-					}
-				}
-			} else {
-				// No cache available, use proxy URL
-				item.CoverURL = fmt.Sprintf("/api/image-proxy/%s", hash)
-			}
+			item.CoverURL = widget.Providers.SecureImageURL(context.Background(), item.CoverURL, allowInsecure)
 		}
 
 		// Process thumbnail URL
 		if item.ThumbnailURL != "" {
-			originalURL := item.ThumbnailURL
-			hash := hashString(originalURL)
-
-			// Register with the application's image proxy
-			if widget.Providers != nil && widget.Providers.app != nil {
-				widget.Providers.app.registerImageProxy(hash, originalURL, allowInsecure)
-			}
-
-			// Try to cache the image
-			if widget.Providers != nil && widget.Providers.imageCache != nil {
-				cachedURL, err := widget.Providers.imageCache.CacheURLWithClient(ctx, originalURL, allowInsecure)
-				if err == nil && cachedURL != "" {
-					// Successfully cached, use the cached URL
-					item.ThumbnailURL = cachedURL
-				} else {
-					// Failed to cache, use a proxy URL that doesn't expose the API key
-					item.ThumbnailURL = fmt.Sprintf("/api/image-proxy/%s", hash)
-					if err != nil {
-						slog.Debug("failed to cache thumbnail image, using proxy", "hash", hash, "error", stripAPIKeysFromError(err))
-					}
-				}
-			} else {
-				// No cache available, use proxy URL
-				item.ThumbnailURL = fmt.Sprintf("/api/image-proxy/%s", hash)
-			}
+			item.ThumbnailURL = widget.Providers.SecureImageURL(context.Background(), item.ThumbnailURL, allowInsecure)
 		}
 	}
 }

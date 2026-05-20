@@ -211,12 +211,18 @@ func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, a
 		p.app.registerImageProxy(hash, imageURL, allowInsecure)
 	}
 
-	// Try to cache the image
+	// Try to cache the image without blocking widget rendering.
 	if p.imageCache != nil {
-		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure)
+		cacheCtx := ctx
+		if p.app != nil {
+			cacheCtx = p.app.ctx
+		}
+		cachedURL, err := p.imageCache.CachedURLOrQueue(cacheCtx, imageURL, allowInsecure)
 		if err == nil && cachedURL != "" {
-			// Successfully cached, return the cached URL
 			return cachedURL
+		}
+		if err != nil {
+			slog.Debug("failed to queue image cache, using proxy", "hash", hash, "error", stripAPIKeysFromError(err))
 		}
 	}
 
