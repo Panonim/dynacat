@@ -14,6 +14,8 @@ type forumPost struct {
 	TargetUrl       string
 	TargetUrlDomain string
 	ThumbnailUrl    string
+	PreviewImageUrl string
+	PreviewVideoUrl string
 	CommentCount    int
 	Score           int
 	Engagement      float64

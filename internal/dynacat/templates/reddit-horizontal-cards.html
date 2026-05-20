@@ -10,6 +10,11 @@
             {{ if ne "" .ThumbnailUrl }}
             <div class="reddit-card-thumbnail-container">
                 <img class="reddit-card-thumbnail" loading="lazy" src="{{ .ThumbnailUrl }}" alt="">
+                {{ if ne "" .PreviewVideoUrl }}
+                <video class="reddit-hover-media" data-src="{{ .PreviewVideoUrl }}" muted loop playsinline></video>
+                {{ else if ne "" .PreviewImageUrl }}
+                <img class="reddit-hover-media" data-src="{{ .PreviewImageUrl }}" alt="">
+                {{ end }}
             </div>
             {{ end }}
             <div class="padding-widget flex flex-column grow relative">

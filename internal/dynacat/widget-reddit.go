@@ -112,16 +112,23 @@ func (widget *redditWidget) update(ctx context.Context) {
 		posts.sortByEngagement()
 	}
 
-	if widget.Providers != nil {
+	if widget.needsImages() && widget.Providers != nil {
 		for i := range posts {
-			if posts[i].ThumbnailUrl == "" {
-				continue
+			if posts[i].ThumbnailUrl != "" {
+				posts[i].ThumbnailUrl = widget.Providers.SecureImageURL(ctx, posts[i].ThumbnailUrl, false)
 			}
-			posts[i].ThumbnailUrl = widget.Providers.SecureImageURL(ctx, posts[i].ThumbnailUrl, false)
+
+			if posts[i].PreviewImageUrl != "" {
+				posts[i].PreviewImageUrl = widget.Providers.SecureImageURL(ctx, posts[i].PreviewImageUrl, false)
+			}
 		}
 	}
 
 	widget.Posts = posts
+}
+
+func (widget *redditWidget) needsImages() bool {
+	return widget.ShowThumbnails || widget.Style == "horizontal-cards" || widget.Style == "vertical-cards"
 }
 
 func (widget *redditWidget) Render() template.HTML {
@@ -134,7 +141,6 @@ func (widget *redditWidget) Render() template.HTML {
 	}
 
 	return widget.renderTemplate(widget, forumPostsTemplate)
-
 }
 
 type subredditResponseJson struct {
@@ -154,7 +160,44 @@ type subredditResponseJson struct {
 				IsSelf        bool    `json:"is_self"`
 				Thumbnail     string  `json:"thumbnail"`
 				Flair         string  `json:"link_flair_text"`
-				ParentList    []struct {
+				Media         struct {
+					RedditVideo struct {
+						FallbackUrl string `json:"fallback_url"`
+					} `json:"reddit_video"`
+				} `json:"media"`
+				SecureMedia struct {
+					RedditVideo struct {
+						FallbackUrl string `json:"fallback_url"`
+					} `json:"reddit_video"`
+				} `json:"secure_media"`
+				Preview struct {
+					Images []struct {
+						Source struct {
+							Url string `json:"url"`
+						} `json:"source"`
+						Variants struct {
+							Gif struct {
+								Source struct {
+									Url string `json:"url"`
+								} `json:"source"`
+							} `json:"gif"`
+						} `json:"variants"`
+					} `json:"images"`
+				} `json:"preview"`
+				GalleryData struct {
+					Items []struct {
+						MediaId string `json:"media_id"`
+					} `json:"items"`
+				} `json:"gallery_data"`
+				MediaMetadata map[string]struct {
+					Previews []struct {
+						Url string `json:"u"`
+					} `json:"p"`
+					Source struct {
+						Url string `json:"u"`
+					} `json:"s"`
+				} `json:"media_metadata"`
+				ParentList []struct {
 					Id        string `json:"id"`
 					Subreddit string `json:"subreddit"`
 					Permalink string `json:"permalink"`
@@ -180,6 +223,17 @@ func buildRedditRequestURL(baseURL, path string, query url.Values) string {
 	}
 
 	return baseURL + path + "?" + encodedQuery
+}
+
+func redditDirectImageURL(postURL string) string {
+	lowerURL := strings.ToLower(postURL)
+	lowerURL = strings.Split(lowerURL, "?")[0]
+
+	if strings.HasSuffix(lowerURL, ".jpg") || strings.HasSuffix(lowerURL, ".jpeg") || strings.HasSuffix(lowerURL, ".png") || strings.HasSuffix(lowerURL, ".webp") || strings.HasSuffix(lowerURL, ".gif") {
+		return postURL
+	}
+
+	return ""
 }
 
 func (widget *redditWidget) fetchSubredditPosts() (forumPostList, error) {
@@ -293,6 +347,52 @@ func (widget *redditWidget) fetchSubredditPosts() (forumPostList, error) {
 
 		if post.Thumbnail != "" && post.Thumbnail != "self" && post.Thumbnail != "default" && post.Thumbnail != "nsfw" {
 			forumPost.ThumbnailUrl = html.UnescapeString(post.Thumbnail)
+		}
+
+		if len(post.GalleryData.Items) > 0 {
+			media := post.MediaMetadata[post.GalleryData.Items[0].MediaId]
+			if media.Source.Url != "" {
+				forumPost.PreviewImageUrl = html.UnescapeString(media.Source.Url)
+			}
+			if len(media.Previews) > 0 && media.Previews[0].Url != "" {
+				forumPost.ThumbnailUrl = html.UnescapeString(media.Previews[0].Url)
+			}
+		}
+
+		for _, media := range post.MediaMetadata {
+			if forumPost.PreviewImageUrl != "" {
+				break
+			}
+
+			if forumPost.ThumbnailUrl == "" || strings.Contains(forumPost.ThumbnailUrl, "external-preview.redd.it") {
+				if len(media.Previews) > 0 && media.Previews[0].Url != "" {
+					forumPost.ThumbnailUrl = html.UnescapeString(media.Previews[0].Url)
+				}
+			}
+
+			if media.Source.Url != "" {
+				forumPost.PreviewImageUrl = html.UnescapeString(media.Source.Url)
+				break
+			}
+		}
+
+		if forumPost.PreviewImageUrl == "" {
+			forumPost.PreviewImageUrl = html.UnescapeString(redditDirectImageURL(post.Url))
+		}
+
+		if forumPost.PreviewImageUrl == "" && len(post.Preview.Images) > 0 {
+			image := post.Preview.Images[0]
+			if image.Variants.Gif.Source.Url != "" {
+				forumPost.PreviewImageUrl = html.UnescapeString(image.Variants.Gif.Source.Url)
+			} else if image.Source.Url != "" {
+				forumPost.PreviewImageUrl = html.UnescapeString(image.Source.Url)
+			}
+		}
+
+		if post.SecureMedia.RedditVideo.FallbackUrl != "" {
+			forumPost.PreviewVideoUrl = html.UnescapeString(post.SecureMedia.RedditVideo.FallbackUrl)
+		} else if post.Media.RedditVideo.FallbackUrl != "" {
+			forumPost.PreviewVideoUrl = html.UnescapeString(post.Media.RedditVideo.FallbackUrl)
 		}
 
 		if !post.IsSelf {

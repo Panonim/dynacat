@@ -20,3 +20,53 @@
     inset: 0;
     background: linear-gradient(0deg, var(--color-widget-background) 10%, transparent);
 }
+
+.reddit-hover-media {
+    display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .reddit-thumbnail-preview {
+        flex-shrink: 0;
+    }
+
+    .reddit-hover-media.reddit-hover-media-visible {
+        position: fixed;
+        display: block;
+        top: 0;
+        left: 0;
+        --reddit-hover-max-width: 82rem;
+        --reddit-hover-max-height: 52rem;
+        width: auto;
+        max-width: min(var(--reddit-hover-max-width), calc(100vw - 1rem));
+        max-height: min(var(--reddit-hover-max-height), calc(100vh - 1rem));
+        height: auto;
+        object-fit: contain;
+        border: 1px solid var(--color-separator);
+        border-radius: var(--border-radius);
+        background: var(--color-widget-background);
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+        transform: translate(var(--reddit-hover-x), var(--reddit-hover-y));
+        z-index: 20;
+    }
+
+    .reddit-hover-media.reddit-hover-media-wide {
+        --reddit-hover-max-width: 96rem;
+        --reddit-hover-max-height: 42rem;
+    }
+
+    .reddit-hover-media.reddit-hover-media-tall {
+        --reddit-hover-max-width: 42rem;
+        --reddit-hover-max-height: 62rem;
+    }
+
+    .reddit-card-thumbnail-container:hover {
+        overflow: visible;
+        z-index: 20;
+    }
+
+    .reddit-card-thumbnail-container:hover::after {
+        display: none;
+    }
+}

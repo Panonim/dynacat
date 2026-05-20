@@ -708,6 +708,81 @@ function setupLazyImages() {
     }
 }
 
+function setupRedditImagePreviews() {
+    if (!document.querySelector(".reddit-hover-media")) {
+        return;
+    }
+
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+        return;
+    }
+
+    const containers = document.querySelectorAll(".reddit-thumbnail-preview, .reddit-card-thumbnail-container");
+
+    for (const container of containers) {
+        if (container.dataset.redditPreviewInitialized) continue;
+
+        const media = container.querySelector(".reddit-hover-media");
+        if (!media) continue;
+
+        container.dataset.redditPreviewInitialized = "true";
+
+        const positionMedia = () => {
+            const gap = 16;
+            const padding = 8;
+            const containerRect = container.getBoundingClientRect();
+            const mediaRect = media.getBoundingClientRect();
+            let x = containerRect.right + gap;
+            let y = containerRect.top + containerRect.height / 2 - mediaRect.height / 2;
+
+            if (x + mediaRect.width > window.innerWidth - padding) {
+                x = containerRect.left - mediaRect.width - gap;
+            }
+
+            if (y + mediaRect.height > window.innerHeight - padding) {
+                y = window.innerHeight - mediaRect.height - padding;
+            }
+
+            media.style.setProperty("--reddit-hover-x", Math.max(padding, x) + "px");
+            media.style.setProperty("--reddit-hover-y", Math.max(padding, y) + "px");
+        };
+
+        container.addEventListener("mouseenter", () => {
+            if (!media.src) {
+                media.src = media.dataset.src;
+            }
+
+            media.classList.add("reddit-hover-media-visible");
+            positionMedia();
+
+            if (media.tagName === "VIDEO") {
+                media.play().catch(() => {});
+            }
+        });
+
+        const updateMediaShape = () => {
+            const width = media.videoWidth || media.naturalWidth;
+            const height = media.videoHeight || media.naturalHeight;
+            if (!width || !height) return;
+
+            media.classList.toggle("reddit-hover-media-wide", width / height >= 2);
+            media.classList.toggle("reddit-hover-media-tall", height / width >= 1.6);
+            positionMedia();
+        };
+
+        media.addEventListener("load", updateMediaShape);
+        media.addEventListener("loadedmetadata", updateMediaShape);
+
+        container.addEventListener("mouseleave", () => {
+            media.classList.remove("reddit-hover-media-visible");
+            if (media.tagName === "VIDEO") {
+                media.pause();
+                media.currentTime = 0;
+            }
+        });
+    }
+}
+
 function getCollapsibleContainerStates(element) {
     const allContainers = [...element.querySelectorAll('.collapsible-container')];
     return allContainers.map((container) => container.classList.contains('container-expanded'));
@@ -1347,6 +1422,7 @@ async function setupPage() {
         setupDynamicRelativeTime();
         setupImageFallbacks();
         setupLazyImages();
+        setupRedditImagePreviews();
         setupPlayingProgressUpdater();
     } finally {
         pageElement.classList.add("content-ready");
@@ -1450,6 +1526,7 @@ async function updateWidget(widgetElement) {
             setupDynamicRelativeTime();
             setupImageFallbacks();
             setupLazyImages();
+            setupRedditImagePreviews();
             setupTruncatedElementTitles();
 
             const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
