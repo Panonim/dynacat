@@ -1808,7 +1808,7 @@ The sort order in which posts are returned. Possible options are `hot` and `new`
 Limit to posts containing one of the given tags. **You cannot specify a sort order when filtering by tags, it will default to `hot`.**
 
 ### Markets
-Display a list of markets, their current value, change for the day and a small 21d chart. Data is taken from Yahoo Finance.
+Display a list of markets, their current value, change for the day and a small chart. Data is taken from Yahoo Finance.
 
 Example:
 
@@ -1837,14 +1837,23 @@ Preview:
 | ---- | ---- | -------- |
 | markets | array | yes |
 | sort-by | string | no |
+| chart-days | integer | no |
+| minimal | boolean | no |
 | chart-link-template | string | no |
 | symbol-link-template | string | no |
+| proxy | string | no |
 
 ##### `markets`
 An array of markets for which to display information about.
 
 ##### `sort-by`
 By default the markets are displayed in the order they were defined. You can customize their ordering by setting the `sort-by` property to `change` for descending order based on the stock's percentage change (e.g. 1% would be sorted higher than -1%) or `absolute-change` for descending order based on the stock's absolute price change (e.g. -1% would be sorted higher than +0.5%).
+
+##### `chart-days`
+How many daily close prices to show in the chart. This is based on available trading/data days, not calendar days. The default is `21`.
+
+##### `minimal`
+When set to `true`, shows only the configured name and percentage in a more compact layout. Hovering the name shows the symbol, and hovering the percentage shows the current price.
 
 ##### `chart-link-template`
 A template for the link to go to when clicking on the chart that will be applied to all markets. The value `{SYMBOL}` will be replaced with the symbol of the market. You can override this on a per-market basis by specifying a `chart-link` property. Example:
@@ -1859,6 +1868,9 @@ A template for the link to go to when clicking on the symbol that will be applie
 ```yaml
 symbol-link-template: https://www.google.com/search?tbm=nws&q={SYMBOL}
 ```
+
+##### `proxy`
+Proxy URL to use for Yahoo Finance requests.
 
 ###### Properties for each market
 | Name | Type | Required |

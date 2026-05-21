@@ -2,6 +2,8 @@ package dynacat
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -15,6 +17,8 @@ import (
 
 var marketsWidgetTemplate = mustParseTemplate("markets.html", "widget-base.html")
 
+const defaultMarketChartDays = 21
+
 type marketsWidget struct {
 	widgetBase         `yaml:",inline"`
 	Frameless          bool            `yaml:"frameless"`
@@ -22,10 +26,35 @@ type marketsWidget struct {
 	MarketRequests     []marketRequest `yaml:"markets"`
 	ChartLinkTemplate  string          `yaml:"chart-link-template"`
 	SymbolLinkTemplate string          `yaml:"symbol-link-template"`
+	ChartDays          int             `yaml:"chart-days"`
+	Minimal            bool            `yaml:"minimal"`
 	Sort               string          `yaml:"sort-by"`
 	Proxy              string          `yaml:"proxy"`
 	Markets            marketList      `yaml:"-"`
 	httpClient         *http.Client    `yaml:"-"`
+}
+
+func (widget *marketsWidget) MinimalNameWidth() string {
+	width := 0
+
+	for i := range widget.Markets {
+		name := widget.Markets[i].CustomName
+		if name == "" {
+			name = widget.Markets[i].Symbol
+		}
+
+		width = max(width, len([]rune(name)))
+	}
+
+	if width > 12 {
+		width = 12
+	}
+
+	if width < 3 {
+		width = 3
+	}
+
+	return fmt.Sprintf("%dch", width)
 }
 
 func (widget *marketsWidget) initialize() error {
@@ -35,6 +64,13 @@ func (widget *marketsWidget) initialize() error {
 	if widget.UpdateInterval == nil {
 		interval := updateIntervalField(10 * time.Minute)
 		widget.UpdateInterval = &interval
+	}
+
+	switch {
+	case widget.ChartDays == 0:
+		widget.ChartDays = defaultMarketChartDays
+	case widget.ChartDays < 2:
+		return errors.New("chart-days must be greater than 1")
 	}
 
 	transport := &http.Transport{
@@ -60,8 +96,21 @@ func (widget *marketsWidget) initialize() error {
 		widget.MarketRequests = widget.StocksRequests
 	}
 
+	if len(widget.MarketRequests) == 0 {
+		return errors.New("markets must contain at least one market")
+	}
+
+	if widget.Sort != "" && widget.Sort != "change" && widget.Sort != "absolute-change" {
+		return errors.New("sort-by must be one of: change, absolute-change")
+	}
+
 	for i := range widget.MarketRequests {
 		m := &widget.MarketRequests[i]
+
+		if strings.TrimSpace(m.Symbol) == "" {
+			return errors.New("market symbol is required")
+		}
+		m.Symbol = strings.TrimSpace(m.Symbol)
 
 		if widget.ChartLinkTemplate != "" && m.ChartLink == "" {
 			m.ChartLink = strings.ReplaceAll(widget.ChartLinkTemplate, "{SYMBOL}", m.Symbol)
@@ -76,7 +125,7 @@ func (widget *marketsWidget) initialize() error {
 }
 
 func (widget *marketsWidget) update(ctx context.Context) {
-	markets, err := fetchMarketsDataFromYahoo(widget.MarketRequests, widget.httpClient)
+	markets, err := fetchMarketsDataFromYahoo(ctx, widget.MarketRequests, widget.ChartDays, widget.httpClient)
 
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
@@ -140,21 +189,75 @@ type marketResponseJson struct {
 			} `json:"meta"`
 			Indicators struct {
 				Quote []struct {
-					Close []float64 `json:"close,omitempty"`
+					Close marketClosePrices `json:"close,omitempty"`
 				} `json:"quote"`
 			} `json:"indicators"`
 		} `json:"result"`
 	} `json:"chart"`
 }
 
-// TODO: allow changing chart time frame
-const marketChartDays = 21
+type marketClosePrices []float64
 
-func fetchMarketsDataFromYahoo(marketRequests []marketRequest, client *http.Client) (marketList, error) {
-	requests := make([]*http.Request, 0, len(marketRequests))
+func (prices *marketClosePrices) UnmarshalJSON(data []byte) error {
+	var values []*float64
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+
+	closePrices := make([]float64, 0, len(values))
+	seenPrice := false
+	for i := range values {
+		if values[i] == nil && !seenPrice {
+			continue
+		}
+
+		if values[i] != nil {
+			seenPrice = true
+			closePrices = append(closePrices, *values[i])
+		} else {
+			closePrices = append(closePrices, 0)
+		}
+	}
+
+	*prices = closePrices
+	return nil
+}
+
+func fetchMarketsDataFromYahoo(ctx context.Context, marketRequests []marketRequest, chartDays int, client requestDoer) (marketList, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if chartDays == 0 {
+		chartDays = defaultMarketChartDays
+	}
+
+	symbols := make([]string, 0, len(marketRequests))
+	seenSymbols := make(map[string]struct{}, len(marketRequests))
 
 	for i := range marketRequests {
-		request, _ := http.NewRequest("GET", fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?range=1mo&interval=1d", marketRequests[i].Symbol), nil)
+		symbol := strings.TrimSpace(marketRequests[i].Symbol)
+		if symbol == "" {
+			continue
+		}
+
+		if _, ok := seenSymbols[symbol]; ok {
+			continue
+		}
+
+		seenSymbols[symbol] = struct{}{}
+		symbols = append(symbols, symbol)
+	}
+
+	requests := make([]*http.Request, 0, len(symbols))
+	rangeParam := yahooChartRangeForDays(chartDays)
+
+	for i := range symbols {
+		request, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?range=%s&interval=1d", url.PathEscape(symbols[i]), rangeParam), nil)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", errNoContent, err)
+		}
+
 		setBrowserUserAgentHeader(request)
 		requests = append(requests, request)
 	}
@@ -165,62 +268,46 @@ func fetchMarketsDataFromYahoo(marketRequests []marketRequest, client *http.Clie
 		return nil, fmt.Errorf("%w: %v", errNoContent, err)
 	}
 
-	markets := make(marketList, 0, len(responses))
+	responsesBySymbol := make(map[string]marketResponseJson, len(responses))
+	errsBySymbol := make(map[string]error, len(responses))
 	var failed int
 
 	for i := range responses {
 		if errs[i] != nil {
-			failed++
-			slog.Error("Failed to fetch market data", "symbol", marketRequests[i].Symbol, "error", errs[i])
+			errsBySymbol[symbols[i]] = errs[i]
+			slog.Error("Failed to fetch market data", "symbol", symbols[i], "error", errs[i])
 			continue
 		}
 
-		response := responses[i]
+		responsesBySymbol[symbols[i]] = responses[i]
+	}
 
-		if len(response.Chart.Result) == 0 {
+	markets := make(marketList, 0, len(marketRequests))
+
+	for i := range marketRequests {
+		request := marketRequests[i]
+		symbol := strings.TrimSpace(request.Symbol)
+
+		if err := errsBySymbol[symbol]; err != nil {
 			failed++
-			slog.Error("Market response contains no data", "symbol", marketRequests[i].Symbol)
 			continue
 		}
 
-		result := &response.Chart.Result[0]
-		prices := result.Indicators.Quote[0].Close
-
-		if len(prices) > marketChartDays {
-			prices = prices[len(prices)-marketChartDays:]
+		response, ok := responsesBySymbol[symbol]
+		if !ok {
+			failed++
+			slog.Error("Market response contains no data", "symbol", symbol)
+			continue
 		}
 
-		previous := result.Meta.ChartPreviousClose
-		if previous == 0 {
-			previous = result.Meta.RegularMarketPrice
+		market, err := marketFromYahooResponse(request, response, chartDays)
+		if err != nil {
+			failed++
+			slog.Error("Failed to parse market data", "symbol", symbol, "error", err)
+			continue
 		}
 
-		if len(prices) >= 2 && prices[len(prices)-2] != 0 {
-			previous = prices[len(prices)-2]
-		}
-
-		points := svgPolylineCoordsFromYValues(100, 50, maybeCopySliceWithoutZeroValues(prices))
-
-		currency, exists := currencyToSymbol[strings.ToUpper(result.Meta.Currency)]
-		if !exists {
-			currency = result.Meta.Currency
-		}
-
-		markets = append(markets, market{
-			marketRequest: marketRequests[i],
-			Price:         result.Meta.RegularMarketPrice,
-			Currency:      currency,
-			PriceHint:     result.Meta.PriceHint,
-			Name: ternary(marketRequests[i].CustomName == "",
-				result.Meta.ShortName,
-				marketRequests[i].CustomName,
-			),
-			PercentChange: percentChange(
-				result.Meta.RegularMarketPrice,
-				previous,
-			),
-			SvgChartPoints: points,
-		})
+		markets = append(markets, market)
 	}
 
 	if len(markets) == 0 {
@@ -232,6 +319,85 @@ func fetchMarketsDataFromYahoo(marketRequests []marketRequest, client *http.Clie
 	}
 
 	return markets, nil
+}
+
+func yahooChartRangeForDays(days int) string {
+	switch {
+	case days <= 21:
+		return "1mo"
+	case days <= 63:
+		return "3mo"
+	case days <= 126:
+		return "6mo"
+	case days <= 252:
+		return "1y"
+	case days <= 504:
+		return "2y"
+	case days <= 1260:
+		return "5y"
+	default:
+		return "max"
+	}
+}
+
+func marketFromYahooResponse(request marketRequest, response marketResponseJson, chartDays int) (market, error) {
+	if chartDays < 2 {
+		chartDays = 2
+	}
+
+	if len(response.Chart.Result) == 0 {
+		return market{}, errors.New("response contains no result")
+	}
+
+	result := &response.Chart.Result[0]
+	if len(result.Indicators.Quote) == 0 {
+		return market{}, errors.New("response contains no quote")
+	}
+
+	prices := result.Indicators.Quote[0].Close
+	if len(prices) == 0 {
+		return market{}, errors.New("response contains no prices")
+	}
+
+	if len(prices) > chartDays {
+		prices = prices[len(prices)-chartDays:]
+	}
+
+	previous := result.Meta.ChartPreviousClose
+	if previous == 0 {
+		previous = result.Meta.RegularMarketPrice
+	}
+
+	// Yahoo can insert null daily bars before the current price, so use the nearest real close.
+	for i := len(prices) - 2; i >= 0; i-- {
+		if prices[i] != 0 {
+			previous = prices[i]
+			break
+		}
+	}
+
+	points := svgPolylineCoordsFromYValues(100, 50, maybeCopySliceWithoutZeroValues(prices))
+
+	currency, exists := currencyToSymbol[strings.ToUpper(result.Meta.Currency)]
+	if !exists {
+		currency = result.Meta.Currency
+	}
+
+	return market{
+		marketRequest: request,
+		Price:         result.Meta.RegularMarketPrice,
+		Currency:      currency,
+		PriceHint:     result.Meta.PriceHint,
+		Name: ternary(request.CustomName == "",
+			result.Meta.ShortName,
+			request.CustomName,
+		),
+		PercentChange: percentChange(
+			result.Meta.RegularMarketPrice,
+			previous,
+		),
+		SvgChartPoints: points,
+	}, nil
 }
 
 var currencyToSymbol = map[string]string{

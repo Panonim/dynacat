@@ -3,23 +3,37 @@
 {{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
 
 {{ define "widget-content" }}
-<div class="dynamic-columns list-gap-20 list-with-separator">
+<div class="dynamic-columns list-gap-20 list-with-separator market-list{{ if .Minimal }} market-list-minimal{{ end }}"{{ if .Minimal }} style="--market-name-width: {{ .MinimalNameWidth }};"{{ end }}>
     {{ range .Markets }}
-    <div class="flex items-center gap-15">
-        <div class="min-width-0">
+    <div class="market-row">
+        <div class="market-info">
+            {{ if $.Minimal }}
+            {{ if .CustomName }}
+            <a{{ if ne "" .SymbolLink }} href="{{ .SymbolLink }}" target="_blank" rel="noreferrer"{{ end }} class="color-highlight size-h3 block text-truncate cursor-help" data-popover-type="text" data-popover-position="above" data-popover-text="{{ .Symbol }}" aria-label="{{ .Symbol }}">{{ .CustomName }}</a>
+            {{ else }}
+            <a{{ if ne "" .SymbolLink }} href="{{ .SymbolLink }}" target="_blank" rel="noreferrer"{{ end }} class="color-highlight size-h3 block text-truncate">{{ .Symbol }}</a>
+            {{ end }}
+            {{ else }}
             <a{{ if ne "" .SymbolLink }} href="{{ .SymbolLink }}" target="_blank" rel="noreferrer"{{ end }} class="color-highlight size-h3 block text-truncate">{{ .Symbol }}</a>
             <div class="text-truncate">{{ .Name }}</div>
+            {{ end }}
         </div>
 
-        <a class="market-chart" {{ if ne "" .ChartLink }} href="{{ .ChartLink }}" target="_blank" rel="noreferrer"{{ end }}>
+        {{ if ne "" .SvgChartPoints }}
+        <a class="market-chart-link" {{ if ne "" .ChartLink }} href="{{ .ChartLink }}" target="_blank" rel="noreferrer"{{ end }}>
             <svg class="market-chart shrink-0" viewBox="0 0 100 50">
                 <polyline fill="none" stroke="var(--color-text-subdue)" stroke-linejoin="round" stroke-width="1.5px" points="{{ .SvgChartPoints }}" vector-effect="non-scaling-stroke"></polyline>
             </svg>
         </a>
+        {{ else }}
+        <div class="market-chart-link"></div>
+        {{ end }}
 
         <div class="market-values shrink-0">
-            <div class="size-h3 text-right {{ if eq .PercentChange 0.0 }}{{ else if gt .PercentChange 0.0 }}{{ if .InvertColors }}color-negative{{ else }}color-positive{{ end }}{{ else }}{{ if .InvertColors }}color-positive{{ else }}color-negative{{ end }}{{ end }}">{{ printf "%+.2f" .PercentChange }}%</div>
+            <div class="size-h3 text-right {{ if $.Minimal }}cursor-help {{ end }}{{ if eq .PercentChange 0.0 }}{{ else if gt .PercentChange 0.0 }}{{ if .InvertColors }}color-negative{{ else }}color-positive{{ end }}{{ else }}{{ if .InvertColors }}color-positive{{ else }}color-negative{{ end }}{{ end }}"{{ if $.Minimal }} data-popover-type="text" data-popover-position="above" data-popover-text="{{ .Currency }}{{ .Price | formatPriceWithPrecision .PriceHint }}" aria-label="{{ .Currency }}{{ .Price | formatPriceWithPrecision .PriceHint }}"{{ end }}>{{ printf "%+.2f" .PercentChange }}%</div>
+            {{ if not $.Minimal }}
             <div class="text-right">{{ .Currency }}{{ .Price | formatPriceWithPrecision .PriceHint }}</div>
+            {{ end }}
         </div>
     </div>
     {{ end }}
