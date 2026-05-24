@@ -1148,6 +1148,21 @@ async function setupTodos() {
     }
 }
 
+function setupFrontendWidgetSync() {
+    const widgets = document.querySelectorAll(".widget[data-widget-frontend-sync-key]");
+    const keyCounts = {};
+
+    for (let i = 0; i < widgets.length; i++) {
+        const key = widgets[i].dataset.widgetFrontendSyncKey;
+        keyCounts[key] = (keyCounts[key] || 0) + 1;
+    }
+
+    for (let i = 0; i < widgets.length; i++) {
+        const key = widgets[i].dataset.widgetFrontendSyncKey;
+        if (keyCounts[key] < 2) widgets[i].removeAttribute("data-widget-frontend-sync-key");
+    }
+}
+
 async function setupStopwatches() {
     const elems = document.getElementsByClassName("stopwatch");
     if (elems.length == 0) return;
@@ -1332,6 +1347,7 @@ async function setupPage() {
     pageContentElement.innerHTML = pageContent;
 
     try {
+        setupFrontendWidgetSync();
         setupPopovers();
         setupClocks()
         await setupCalendars();
