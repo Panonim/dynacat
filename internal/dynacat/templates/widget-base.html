@@ -1,5 +1,6 @@
 <div class="widget widget-type-{{ .GetType }}{{ if .CSSClass }} {{ .CSSClass }}{{ end }}"
      data-widget-id="{{ .GetID }}"
+     {{ if .GetFrontendSyncKey }}data-widget-frontend-sync-key="{{ .GetFrontendSyncKey }}"{{ end }}
      {{ if and .UpdateInterval (.IsDynamicUpdateEnabled) }}
      data-update-interval="{{ .UpdateInterval.Milliseconds }}"
      {{ end }}

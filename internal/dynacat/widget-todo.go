@@ -8,18 +8,20 @@ import (
 var todoWidgetTemplate = mustParseTemplate("todo.html", "widget-base.html")
 
 type todoWidget struct {
-	widgetBase `yaml:",inline"`
-	Frameless  bool          `yaml:"frameless"`
-	cachedHTML template.HTML `yaml:"-"`
-	TodoID     string        `yaml:"id"`
-	Storage    string        `yaml:"storage"`
-	CollapseAfter *int       `yaml:"collapse-after"`
+	widgetBase    `yaml:",inline"`
+	Frameless     bool          `yaml:"frameless"`
+	cachedHTML    template.HTML `yaml:"-"`
+	TodoID        string        `yaml:"id"`
+	Storage       string        `yaml:"storage"`
+	CollapseAfter *int          `yaml:"collapse-after"`
 }
 
 func (widget *todoWidget) initialize() error {
 	widget.withTitle("To-do").withError(nil)
 
-	if widget.Storage != "" && widget.Storage != "local" && widget.Storage != "server" {
+	if widget.Storage == "" {
+		widget.Storage = "local"
+	} else if widget.Storage != "local" && widget.Storage != "server" {
 		return fmt.Errorf("storage must be either \"local\" or \"server\", got %q", widget.Storage)
 	}
 
@@ -31,6 +33,7 @@ func (widget *todoWidget) initialize() error {
 		return fmt.Errorf("collapse-after must be -1 or greater, got %d", *widget.CollapseAfter)
 	}
 
+	widget.frontendSyncKey = "to-do|" + widget.Storage + "|" + widget.TodoID
 	widget.cachedHTML = widget.renderTemplate(widget, todoWidgetTemplate)
 	return nil
 }

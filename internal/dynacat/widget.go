@@ -181,6 +181,7 @@ type widgetBase struct {
 	cacheType           cacheType            `yaml:"-"`
 	nextUpdate          time.Time            `yaml:"-"`
 	updateRetriedTimes  int                  `yaml:"-"`
+	frontendSyncKey     string               `yaml:"-"`
 }
 
 type widgetProviders struct {
@@ -254,6 +255,14 @@ func (w *widgetBase) update(ctx context.Context) {
 
 func (w *widgetBase) GetID() uint64 {
 	return w.ID
+}
+
+func (w *widgetBase) GetFrontendSyncKey() string {
+	if w.frontendSyncKey == "" {
+		return ""
+	}
+
+	return hashString(w.frontendSyncKey)[:12]
 }
 
 func (w *widgetBase) setID(id uint64) {

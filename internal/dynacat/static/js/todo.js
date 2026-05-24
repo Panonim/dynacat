@@ -10,11 +10,13 @@ const dragIconSvg = `<svg fill="currentColor" xmlns="http://www.w3.org/2000/svg"
 </svg>`;
 
 export default function(element) {
+    const widget = element.closest(".widget");
     element.swapWith(
         Todo(
             element.dataset.todoId,
             element.dataset.todoStorage,
-            element.dataset.todoCollapseAfter
+            element.dataset.todoCollapseAfter,
+            widget ? widget.dataset.widgetFrontendSyncKey : ""
         )
     )
 }
@@ -176,7 +178,7 @@ function Item(unserialize = {}, onTextUpdate, onCheckUpdate, onDelete, onEscape,
     });
 }
 
-function Todo(id, storageType, collapseAfterConfig) {
+function Todo(id, storageType, collapseAfterConfig, frontendSyncKey) {
     const useServer = storageType === "server";
     const parsedCollapseAfter = collapseAfterConfig === undefined
         ? NaN
@@ -184,11 +186,13 @@ function Todo(id, storageType, collapseAfterConfig) {
     const shouldCollapse = Number.isInteger(parsedCollapseAfter) && parsedCollapseAfter >= 0;
     const collapseAfter = shouldCollapse ? parsedCollapseAfter : 0;
     let items, input, inputArea, inputContainer, lastAddedItem;
+    let todoElement;
     let expandButton, expandButtonTextNode;
     let queuedForRemoval = 0;
     let reorderable;
     let isDragging = false;
     let isExpanded = false;
+    let stateVersion = 0;
 
     const applyCollapsibleState = () => {
         if (!shouldCollapse) {
@@ -237,15 +241,21 @@ function Todo(id, storageType, collapseAfterConfig) {
     };
 
     const serializeItems = () => items.children.map(item => item.component.serialize());
+    const broadcastSync = (data) => {
+        if (!frontendSyncKey) return;
+        window.dispatchEvent(new CustomEvent("dynacat-widget-sync", { detail: { frontendSyncKey, source: todoElement, data } }));
+    };
     const saveItems = () => {
         if (isDragging) return;
 
+        stateVersion++;
         const data = serializeItems();
         if (useServer) {
             saveToServer(id, data);
         } else {
             saveToLocalStorage(id, data);
         }
+        broadcastSync(data);
     };
     const renderItems = (data) => {
         items.replaceChildren(...data.map(d => newItem(d)));
@@ -344,7 +354,7 @@ function Todo(id, storageType, collapseAfterConfig) {
             });
     }
 
-    const todoElement = fragment().append(
+    todoElement = fragment().append(
         inputContainer = elem()
             .classes("todo-input", "flex", "gap-10", "items-center")
             .classesIf(items.children.length > 0, "margin-bottom-15")
@@ -371,8 +381,18 @@ function Todo(id, storageType, collapseAfterConfig) {
 
     applyCollapsibleState();
 
+    if (frontendSyncKey) {
+        window.addEventListener("dynacat-widget-sync", (event) => {
+            if (event.detail.frontendSyncKey !== frontendSyncKey || event.detail.source === todoElement) return;
+            stateVersion++;
+            renderItems(event.detail.data);
+        });
+    }
+
     if (useServer) {
+        const loadVersion = stateVersion;
         loadFromServer(id).then(data => {
+            if (stateVersion !== loadVersion) return;
             renderItems(data);
         });
     }
