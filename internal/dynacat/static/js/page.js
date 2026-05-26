@@ -1,5 +1,6 @@
 import { setupPopovers } from './popover.js';
 import { setupMasonries } from './masonry.js';
+import { setupMobileSwipes } from './mobile-swipes.js';
 import { throttledDebounce, isElementVisible, openURLInNewTab } from './utils.js';
 import { elem, find, findAll } from './templating.js';
 
@@ -1343,6 +1344,7 @@ async function setupPage() {
         setupCollapsibleLists();
         setupCollapsibleGrids();
         setupGroups();
+        setupMobileSwipes();
         setupMasonries();
         setupDynamicRelativeTime();
         setupImageFallbacks();
