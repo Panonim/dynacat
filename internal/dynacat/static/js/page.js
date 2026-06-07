@@ -102,6 +102,91 @@ function updateRelativeTimeForElements(elements)
     }
 }
 
+let keybindState = { pressedKeys: [], chordTimeout: null };
+
+function normalizedEventKey(event) {
+    const key = event.key.toLowerCase();
+    if (/^[a-z0-9]$/.test(key)) return key;
+    // Use physical key codes so existing binds still work on non-English keyboard layouts
+    if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
+    if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5);
+    return "";
+}
+
+function setupKeybinds() {
+    const nav = document.querySelector("nav.nav");
+    if (!nav) return;
+
+    const CHORD_TIMEOUT_MS = 1500;
+
+    function getLinks() {
+        return Array.from(nav.querySelectorAll("a[data-key-bind]"));
+    }
+
+    function normalizedBind(link) {
+        return link.dataset.keyBind.trim().toLowerCase();
+    }
+
+    function resetKeybindState() {
+        keybindState.pressedKeys = [];
+        getLinks().forEach(link => {
+            const hint = link.querySelector(".nav-keybind-hint");
+            if (hint) hint.classList.remove("is-active");
+        });
+    }
+
+    function activateMatchingHints(prefix) {
+        const p = prefix.join(" ");
+        getLinks().forEach(link => {
+            const bind = normalizedBind(link);
+            const hint = link.querySelector(".nav-keybind-hint");
+            if (!hint) return;
+            const isMatching = bind.startsWith(p);
+            hint.classList.toggle("is-active", isMatching);
+            if (isMatching && bind.includes(" ")) {
+                const parts = bind.split(" ");
+                hint.textContent = parts.slice(1).join(" ");
+            }
+        });
+    }
+
+    document.addEventListener("keydown", (event) => {
+        const tag = document.activeElement.tagName;
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+        if (document.activeElement.isContentEditable) return;
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+        const key = normalizedEventKey(event);
+        if (!key) return;
+
+        clearTimeout(keybindState.chordTimeout);
+
+        const candidate = [...keybindState.pressedKeys, key];
+        const candidateStr = candidate.join(" ");
+
+        const links = getLinks();
+        const exactMatch = links.find(l => normalizedBind(l) === candidateStr);
+        const partialMatch = links.some(l => normalizedBind(l).startsWith(candidateStr + " "));
+
+        if (exactMatch) {
+            event.preventDefault();
+            resetKeybindState();
+            window.location.href = exactMatch.href;
+            return;
+        }
+
+        if (partialMatch) {
+            event.preventDefault();
+            keybindState.pressedKeys = candidate;
+            activateMatchingHints(keybindState.pressedKeys);
+            keybindState.chordTimeout = setTimeout(resetKeybindState, CHORD_TIMEOUT_MS);
+            return;
+        }
+
+        resetKeybindState();
+    }, true);
+}
+
 function setupSearchBoxes() {
     const searchWidgets = document.getElementsByClassName("search");
 
@@ -230,81 +315,6 @@ function setupSearchBoxes() {
             document.removeEventListener("keydown", handleKeyDown);
             document.removeEventListener("input", handleInput);
         });
-
-        // Setup keybinds early so they take priority over search
-        let keybindState = { pressedKeys: [], chordTimeout: null };
-        const nav = document.querySelector("nav.nav");
-
-        if (nav) {
-            const CHORD_TIMEOUT_MS = 1500;
-
-            function getLinks() {
-                return Array.from(nav.querySelectorAll("a[data-key-bind]"));
-            }
-
-            function normalizedBind(link) {
-                return link.dataset.keyBind.trim().toLowerCase();
-            }
-
-            function resetKeybindState() {
-                keybindState.pressedKeys = [];
-                getLinks().forEach(link => {
-                    const hint = link.querySelector(".nav-keybind-hint");
-                    if (hint) hint.classList.remove("is-active");
-                });
-            }
-
-            function activateMatchingHints(prefix) {
-                const p = prefix.join(" ");
-                getLinks().forEach(link => {
-                    const bind = normalizedBind(link);
-                    const hint = link.querySelector(".nav-keybind-hint");
-                    if (!hint) return;
-                    const isMatching = bind.startsWith(p);
-                    hint.classList.toggle("is-active", isMatching);
-                    if (isMatching && bind.includes(" ")) {
-                        const parts = bind.split(" ");
-                        hint.textContent = parts.slice(1).join(" ");
-                    }
-                });
-            }
-
-            document.addEventListener("keydown", (event) => {
-                const tag = document.activeElement.tagName;
-                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-                if (document.activeElement.isContentEditable) return;
-                if (event.ctrlKey || event.metaKey || event.altKey) return;
-
-                const key = event.key.toLowerCase();
-                if (!/^[a-z0-9]$/.test(key)) return;
-
-                clearTimeout(keybindState.chordTimeout);
-
-                const candidate = [...keybindState.pressedKeys, key];
-                const candidateStr = candidate.join(" ");
-
-                const links = getLinks();
-                const exactMatch = links.find(l => normalizedBind(l) === candidateStr);
-                const partialMatch = links.some(l => normalizedBind(l).startsWith(candidateStr + " "));
-
-                if (exactMatch) {
-                    event.preventDefault();
-                    resetKeybindState();
-                    window.location.href = exactMatch.href;
-                    return;
-                }
-
-                if (partialMatch) {
-                    event.preventDefault();
-                    keybindState.pressedKeys = candidate;
-                    activateMatchingHints(keybindState.pressedKeys);
-                    keybindState.chordTimeout = setTimeout(resetKeybindState, CHORD_TIMEOUT_MS);
-                    return;
-                }
-
-                resetKeybindState();
-            }, true); // Capture phase so it runs before search handler
-        }
 
         document.addEventListener("keydown", (event) => {
             if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
@@ -552,7 +562,35 @@ function setupGroups() {
 
         const titles = headerEl.children;
         const tabs = group.getElementsByClassName("widget-group-contents")[0].children;
-        let current = 0;
+        let current = parseInt(group.dataset.currentTab ?? "0", 10);
+
+        if (Number.isNaN(current) || current < 0 || current >= titles.length) {
+            current = 0;
+        }
+
+        const setCurrentTab = (nextCurrent) => {
+            group.dataset.currentTab = String(nextCurrent);
+
+            for (let i = 0; i < titles.length; i++) {
+                titles[i].classList.remove("widget-group-title-current");
+                titles[i].setAttribute("aria-selected", "false");
+                tabs[i].classList.remove("widget-group-content-current");
+                tabs[i].setAttribute("aria-hidden", "true");
+            }
+
+            const title = titles[nextCurrent];
+            const tab = tabs[nextCurrent];
+
+            if (!title || !tab) {
+                return;
+            }
+
+            title.classList.add("widget-group-title-current");
+            title.setAttribute("aria-selected", "true");
+            tab.classList.add("widget-group-content-current");
+            tab.style.animation = '';
+            tab.setAttribute("aria-hidden", "false");
+        };
 
         for (let t = 0; t < titles.length; t++) {
             const title = titles[t];
@@ -592,13 +630,11 @@ function setupGroups() {
 
                 current = t;
 
-                title.classList.add("widget-group-title-current");
-                title.setAttribute("aria-selected", "true");
-                tabs[t].classList.add("widget-group-content-current");
-                tabs[t].style.animation = '';
-                tabs[t].setAttribute("aria-hidden", "false");
+                setCurrentTab(t);
             });
         }
+
+        setCurrentTab(current);
     }
 }
 
@@ -702,6 +738,27 @@ function restoreCollapsibleContainerStates(element, containerStates) {
                 button.click();
             }
         }
+    }
+}
+
+function getGroupTabStates(element) {
+    const groups = [...element.querySelectorAll('.widget-type-group')];
+    return groups.map((group) => {
+        const currentTab = parseInt(group.dataset.currentTab ?? "0", 10);
+        return Number.isNaN(currentTab) ? 0 : currentTab;
+    });
+}
+
+function restoreGroupTabStates(element, groupTabStates) {
+    if (!groupTabStates.length) return;
+
+    const groups = [...element.querySelectorAll('.widget-type-group')];
+
+    for (let index = 0; index < groupTabStates.length; index++) {
+        const group = groups[index];
+        if (!group) continue;
+
+        group.dataset.currentTab = String(groupTabStates[index]);
     }
 }
 
@@ -1191,7 +1248,58 @@ function initThemePicker() {
     })
 }
 
+function initDesktopNavigationAutoshow() {
+    const navContainer = document.querySelector(".header-container-navigation-hover");
+    if (!navContainer) {
+        return;
+    }
+
+    const navAutoshowKey = "dynacat-nav-autoshow";
+    const navLinks = navContainer.querySelectorAll(".nav-item");
+
+    let shouldAutoshow = false;
+    try {
+        shouldAutoshow = sessionStorage.getItem(navAutoshowKey) === "1";
+        if (shouldAutoshow) {
+            sessionStorage.removeItem(navAutoshowKey);
+        }
+    } catch (e) {
+        shouldAutoshow = false;
+    }
+
+    if (shouldAutoshow) {
+        navContainer.classList.add("nav-autoshow");
+
+        const hide = () => {
+            navContainer.classList.remove("nav-autoshow");
+            window.removeEventListener("mousemove", hide, { capture: true });
+            window.removeEventListener("scroll", hide, { capture: true });
+            navContainer.removeEventListener("mouseleave", hide, { capture: true });
+        }
+
+        window.addEventListener("mousemove", hide, { passive: true, once: true, capture: true });
+        window.addEventListener("scroll", hide, { passive: true, once: true, capture: true });
+        navContainer.addEventListener("mouseleave", hide, { once: true, capture: true });
+        setTimeout(() => {
+            hide();
+        }, 1800);
+    }
+
+    for (let i = 0; i < navLinks.length; i++) {
+        const navLink = navLinks[i];
+        navLink.addEventListener("click", () => {
+            try {
+                sessionStorage.setItem(navAutoshowKey, "1");
+            } catch (e) {
+                return;
+            }
+        });
+    }
+}
+
 async function setupPage() {
+    initDesktopNavigationAutoshow();
+
     initThemePicker();
 
     const pageElement = document.getElementById("page");
@@ -1230,6 +1338,7 @@ async function setupPage() {
         await setupTodos();
         await setupStopwatches();
         setupCarousels();
+        setupKeybinds();
         setupSearchBoxes();
         setupCollapsibleLists();
         setupCollapsibleGrids();
@@ -1294,6 +1403,7 @@ async function updateWidget(widgetElement) {
     const refreshStartedAt = nowMs();
     const widgetTopBefore = widgetElement.getBoundingClientRect().top;
     const collapsibleContainerStates = getCollapsibleContainerStates(widgetElement);
+    const groupTabStates = getGroupTabStates(widgetElement);
     const newWidget = await fetchWidgetContent(widgetElement);
 
     if (newWidget) {
@@ -1320,6 +1430,8 @@ async function updateWidget(widgetElement) {
                 const input = newContent.querySelector('#' + id);
                 if (input) input.value = value;
             }
+
+            restoreGroupTabStates(widgetElement, groupTabStates);
 
             const oldHeader = widgetElement.querySelector('.widget-header');
             const newHeader = newWidget.querySelector('.widget-header');
@@ -1729,6 +1841,7 @@ async function applyContentUpdate() {
 
     let anyReplaced = false;
     const collapsibleStatesMap = new Map();
+    const groupTabStatesMap = new Map();
     const updatedWidgets = [];
 
     for (let i = 0; i < Math.min(realContainers.length, tempContainers.length); i++) {
@@ -1740,6 +1853,7 @@ async function applyContentUpdate() {
             const tempWidget = tempWidgets[j];
 
             collapsibleStatesMap.set(realWidget, getCollapsibleContainerStates(realWidget));
+            groupTabStatesMap.set(realWidget, getGroupTabStates(realWidget));
 
             if (realWidget.dataset.updateInterval && realWidget.outerHTML !== tempWidget.outerHTML) {
                 const oldContent = realWidget.querySelector('.widget-content');
@@ -1769,6 +1883,10 @@ async function applyContentUpdate() {
 
     if (anyReplaced) {
         const callbacksIndexBefore = contentReadyCallbacks.length;
+
+        for (const [widget, states] of groupTabStatesMap) {
+            restoreGroupTabStates(widget, states);
+        }
 
         setupPopovers();
         setupCarousels();
@@ -1899,6 +2017,7 @@ function _applyWidgetUpdate(widgetId, html) {
     if (!target) return;
 
     const collapsibleContainerStates = getCollapsibleContainerStates(target);
+    const groupTabStates = getGroupTabStates(target);
     const htmlElem = document.documentElement;
     const prevAnchor = htmlElem.style.overflowAnchor;
     htmlElem.style.overflowAnchor = 'none';
@@ -1924,6 +2043,8 @@ function _applyWidgetUpdate(widgetId, html) {
                 img.dataset.lazyInitialized = 'true';
             }
         }
+
+        restoreGroupTabStates(liveTarget, groupTabStates);
 
         const groupContents = liveTarget.querySelectorAll('.widget-group-content');
         for (let i = 0; i < groupContents.length; i++) {

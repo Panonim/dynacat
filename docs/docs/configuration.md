@@ -66,7 +66,7 @@ Alternatively, you can load the contents of a file who's path is provided by an 
 ```yaml
 services:
   dynacat:
-    image: Panonim/dynacat
+    image: panonim/dynacat
     environment:
       - TOKEN_FILE=/home/user/token
     volumes:
@@ -299,11 +299,14 @@ You can adjust the various parts of the branding through a top level `branding` 
 branding:
   custom-footer: |
     <p>Powered by <a href="https://github.com/Panonim/dynacat">Dynacat</a></p>
+  hide-logo: true
   logo-url: /assets/logo.png
   favicon-url: /assets/logo.png
   app-name: "My Dashboard"
   app-icon-url: "/assets/app-icon.svg"
   app-background-color: "#151519"
+  show-desktop-navigation-on-hover: true
+  center-desktop-navigation: true
 ```
 
 ### Properties
@@ -311,6 +314,7 @@ branding:
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | hide-footer | bool | no | false |
+| hide-logo | bool | no | false |
 | custom-footer | string | no |  |
 | logo-text | string | no | G |
 | logo-url | string | no | |
@@ -318,9 +322,14 @@ branding:
 | app-name | string | no | Dynacat |
 | app-icon-url | string | no | Dynacat's default icon |
 | app-background-color | string | no | Dynacat's default background color |
+| show-desktop-navigation-on-hover | boolean | no | false |
+| center-desktop-navigation | boolean | no | false |
 
 #### `hide-footer`
 Hides the footer when set to `true`.
+
+#### `hide-logo`
+Hides the logo in the navigation when set to `true`.
 
 #### `custom-footer`
 Specify custom HTML to use for the footer.
@@ -342,6 +351,12 @@ Specify URL for PWA and browser tab icon (512x512 PNG).
 
 #### `app-background-color`
 Specify background color for PWA. Must be a valid CSS color.
+
+#### `show-desktop-navigation-on-hover`
+When set to `true`, hides the desktop navigation at the top edge of the page until the top edge is hovered or the navigation receives focus. Has no effect on mobile navigation.
+
+#### `center-desktop-navigation`
+When set to `true`, centers desktop navigation links instead of aligning them from the start.
 
 ## Theme
 Theming is done through a top level `theme` property. Values for the colors are in [HSL](https://giggster.com/guide/basics/hue-saturation-lightness/) (hue, saturation, lightness) format. You can use a color picker [like this one](https://hslpicker.com/) to convert colors from other formats to HSL. The values are separated by a space and `%` is not required for any of the numbers.
@@ -1345,7 +1360,7 @@ Display the status of your Docker containers along with an icon and an optional 
 > ```yaml
 > services:
 >   dynacat:
->     image: Panonim/dynacat
+>     image: panonim/dynacat
 >     volumes:
 >       - /var/run/docker.sock:/var/run/docker.sock
 > ```
@@ -1526,18 +1541,14 @@ Example:
 > ```yaml
 > services:
 >   dynacat:
->     image: Panonim/dynacat
+>     image: panonim/dynacat
 >     volumes:
 >       - /var/run/docker.sock:/var/run/docker.sock
 > ```
 
-#### Features
+Preview:
 
-- **Container Management**: Start, stop, restart, or remove containers with a single click
-- **Image Management**: Pull images and remove unused images directly from the dashboard
-- **State Visualization**: Visual indicators show container and image status (running, stopped, error, etc.)
-- **Responsive Design**: Action buttons appear on hover; two-click confirmation for destructive actions
-- **Filtering**: Display containers only, images only, or both
+![](images/docker-controller-preview.png)
 
 #### Properties
 
@@ -2246,7 +2257,7 @@ You can also specify the value for this token through an ENV variable using the 
 ```yaml
 services:
   dynacat:
-    image: Panonim/dynacat
+    image: panonim/dynacat
     environment:
       - GITHUB_TOKEN=<your token>
 ```
@@ -2800,7 +2811,7 @@ Just like the `group` widget, you can insert any widget type, you can even inser
 
 ### Stopwatch
 
-A browser-based stopwatch widget. 
+A browser-based stopwatch widget.
 
 Example:
 
@@ -3138,6 +3149,9 @@ Example:
   show-progress-bar: true
   group-by-host: false
 ```
+Preview:
+
+![](images/currently-playing-preview.png)
 
 #### Properties
 | Name | Type | Required | Default |
@@ -3361,6 +3375,9 @@ Example:
       username: admin
       password: adminadmin
 ```
+Preview:
+
+![](images/torrenting-preview.png)
 
 #### Properties
 | Name | Type | Required | Default |

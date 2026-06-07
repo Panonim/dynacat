@@ -91,6 +91,12 @@ All you have to do is replace your current image (`glanceapp/glance:latest`) wit
 panonim/dynacat:latest
 ```
 
+<details>
+<summary>I get the following error: dynacat.yml: no such file or directory</summary>
+
+<br>
+Make sure to rename your `glance.yml` file into `dynacat.yml`.
+</details>
 
 ### Disable automatic updates
 

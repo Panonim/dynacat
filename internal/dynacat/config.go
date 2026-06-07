@@ -30,17 +30,17 @@ const (
 
 type config struct {
 	Server struct {
-		Host           string   `yaml:"host"`
-		Port           uint16   `yaml:"port"`
-		Proxied        bool     `yaml:"proxied"`
-		TrustedProxies []string `yaml:"trusted-proxies"`
-		HTTPS          bool     `yaml:"https"`
-		AssetsPath     string   `yaml:"assets-path"`
-		CacheDir       string   `yaml:"cache-dir"`
-		BaseURL        string   `yaml:"base-url"`
-		DBPath              string   `yaml:"db-path"`
-		AllowedEmbedHosts   []string `yaml:"allowed-embed-hosts"`
-		trustedProxyNets []*net.IPNet `yaml:"-"`
+		Host              string       `yaml:"host"`
+		Port              uint16       `yaml:"port"`
+		Proxied           bool         `yaml:"proxied"`
+		TrustedProxies    []string     `yaml:"trusted-proxies"`
+		HTTPS             bool         `yaml:"https"`
+		AssetsPath        string       `yaml:"assets-path"`
+		CacheDir          string       `yaml:"cache-dir"`
+		BaseURL           string       `yaml:"base-url"`
+		DBPath            string       `yaml:"db-path"`
+		AllowedEmbedHosts []string     `yaml:"allowed-embed-hosts"`
+		trustedProxyNets  []*net.IPNet `yaml:"-"`
 	} `yaml:"server"`
 
 	Auth struct {
@@ -64,15 +64,18 @@ type config struct {
 	} `yaml:"theme"`
 
 	Branding struct {
-		HideFooter         bool          `yaml:"hide-footer"`
-		CustomFooter       template.HTML `yaml:"custom-footer"`
-		LogoText           string        `yaml:"logo-text"`
-		LogoURL            string        `yaml:"logo-url"`
-		FaviconURL         string        `yaml:"favicon-url"`
-		FaviconType        string        `yaml:"-"`
-		AppName            string        `yaml:"app-name"`
-		AppIconURL         string        `yaml:"app-icon-url"`
-		AppBackgroundColor string        `yaml:"app-background-color"`
+		HideFooter                   bool          `yaml:"hide-footer"`
+		HideLogo                     bool          `yaml:"hide-logo"`
+		CustomFooter                 template.HTML `yaml:"custom-footer"`
+		LogoText                     string        `yaml:"logo-text"`
+		LogoURL                      string        `yaml:"logo-url"`
+		FaviconURL                   string        `yaml:"favicon-url"`
+		FaviconType                  string        `yaml:"-"`
+		AppName                      string        `yaml:"app-name"`
+		AppIconURL                   string        `yaml:"app-icon-url"`
+		AppBackgroundColor           string        `yaml:"app-background-color"`
+		ShowDesktopNavigationOnHover bool          `yaml:"show-desktop-navigation-on-hover"`
+		CenterDesktopNavigation      bool          `yaml:"center-desktop-navigation"`
 	} `yaml:"branding"`
 
 	Pages []page `yaml:"pages"`

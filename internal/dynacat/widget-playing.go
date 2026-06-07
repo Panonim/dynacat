@@ -45,6 +45,7 @@ type jellyfinEmbySessionsResponse []struct {
 		Type              string `json:"Type"`
 		Name              string `json:"Name"`
 		SeriesName        string `json:"SeriesName"`
+		SeriesId          string `json:"SeriesId"`
 		AlbumArtist       string `json:"AlbumArtist"`
 		Album             string `json:"Album"`
 		ParentIndexNumber int    `json:"ParentIndexNumber"`
@@ -650,12 +651,18 @@ func (widget *playingWidget) parseJellyfinEmbySessions(host *PlayingHostConfig, 
 		// Set display title and subtitle based on format preference
 		widget.setDisplayTitles(&session)
 
-		if *widget.ShowThumbnail && item.NowPlayingItem.Id != "" {
-			session.ThumbnailURL = fmt.Sprintf("%s/Items/%s/Images/Primary?api_key=%s",
-				strings.TrimRight(host.BaseURL, "/"),
-				item.NowPlayingItem.Id,
-				host.Token,
-			)
+		if *widget.ShowThumbnail {
+			imageID := item.NowPlayingItem.Id
+			if session.MediaType == "episode" && item.NowPlayingItem.SeriesId != "" {
+				imageID = item.NowPlayingItem.SeriesId
+			}
+			if imageID != "" {
+				session.ThumbnailURL = fmt.Sprintf("%s/Items/%s/Images/Primary?api_key=%s",
+					strings.TrimRight(host.BaseURL, "/"),
+					imageID,
+					host.Token,
+				)
+			}
 		}
 
 		widget.calculateProgress(&session)

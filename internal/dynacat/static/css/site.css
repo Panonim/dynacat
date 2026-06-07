@@ -272,6 +272,33 @@ kbd:active {
     gap: var(--header-items-gap);
 }
 
+.header-container-navigation-hover {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 12;
+    margin-top: 0;
+    padding-top: calc(var(--widget-gap) / 2);
+    transform: translateY(calc(-100% + 22px));
+    opacity: 0;
+    transition: transform .2s .6s, opacity .2s .6s;
+}
+
+.header-container-navigation-hover:hover,
+.header-container-navigation-hover:focus-within {
+    transform: translateY(0);
+    opacity: 1;
+    transition-delay: 0s;
+}
+
+.header-container-navigation-hover.nav-autoshow {
+    transform: translateY(0);
+    opacity: 1;
+    transition: none;
+    transition-delay: 0s;
+}
+
 .logo {
     height: 100%;
     flex-shrink: 0;
@@ -301,6 +328,14 @@ kbd:active {
     min-width: 0;
     height: 100%;
     gap: var(--header-items-gap);
+}
+
+.nav-center .nav-item:first-child {
+    margin-left: auto;
+}
+
+.nav-center .nav-item:last-child {
+    margin-right: auto;
 }
 
 .nav .nav-item {

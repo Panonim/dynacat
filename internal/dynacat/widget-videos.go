@@ -22,16 +22,17 @@ var (
 
 type videosWidget struct {
 	widgetBase        `yaml:",inline"`
-	Frameless         bool      `yaml:"frameless"`
-	Videos            videoList `yaml:"-"`
-	VideoUrlTemplate  string    `yaml:"video-url-template"`
-	Style             string    `yaml:"style"`
-	CollapseAfter     int       `yaml:"collapse-after"`
-	CollapseAfterRows int       `yaml:"collapse-after-rows"`
-	Channels          []string  `yaml:"channels"`
-	Playlists         []string  `yaml:"playlists"`
-	Limit             int       `yaml:"limit"`
-	IncludeShorts     bool      `yaml:"include-shorts"`
+	Frameless         bool                 `yaml:"frameless"`
+	Videos            videoList            `yaml:"-"`
+	VideoUrlTemplate  string               `yaml:"video-url-template"`
+	Style             string               `yaml:"style"`
+	CollapseAfter     int                  `yaml:"collapse-after"`
+	CollapseAfterRows int                  `yaml:"collapse-after-rows"`
+	Channels          []string             `yaml:"channels"`
+	Playlists         []string             `yaml:"playlists"`
+	Limit             int                  `yaml:"limit"`
+	IncludeShorts     bool                 `yaml:"include-shorts"`
+	videoCache        map[string]videoList `yaml:"-"`
 }
 
 func (widget *videosWidget) initialize() error {
@@ -70,7 +71,11 @@ func (widget *videosWidget) initialize() error {
 }
 
 func (widget *videosWidget) update(ctx context.Context) {
-	videos, err := fetchYoutubeChannelUploads(widget.Channels, widget.VideoUrlTemplate, widget.IncludeShorts)
+	if widget.videoCache == nil {
+		widget.videoCache = make(map[string]videoList)
+	}
+
+	videos, err := fetchYoutubeChannelUploads(widget.Channels, widget.VideoUrlTemplate, widget.IncludeShorts, widget.videoCache)
 
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
@@ -153,7 +158,7 @@ func (v videoList) sortByNewest() videoList {
 	return v
 }
 
-func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate string, includeShorts bool) (videoList, error) {
+func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate string, includeShorts bool, cache map[string]videoList) (videoList, error) {
 	requests := make([]*http.Request, 0, len(channelOrPlaylistIDs))
 	uulfIndices := make([]int, 0)
 
@@ -178,6 +183,18 @@ func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate 
 	job := newJob(task, requests).withWorkers(30)
 	responses, errs, err := workerPoolDo(job)
 	if err != nil {
+		if cache != nil {
+			cached := make(videoList, 0)
+			for _, id := range channelOrPlaylistIDs {
+				if v, ok := cache[id]; ok {
+					cached = append(cached, v...)
+				}
+			}
+			if len(cached) > 0 {
+				cached.sortByNewest()
+				return cached, fmt.Errorf("%w: serving cached videos (%v)", errPartialContent, err)
+			}
+		}
 		return nil, fmt.Errorf("%w: %v", errNoContent, err)
 	}
 
@@ -206,16 +223,30 @@ func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate 
 	}
 
 	videos := make(videoList, 0, len(channelOrPlaylistIDs)*15)
-	var failed int
+	var failed, servedFromCache int
 
 	for i := range responses {
+		id := channelOrPlaylistIDs[i]
+
 		if errs[i] != nil {
 			failed++
-			slog.Error("Failed to fetch youtube feed", "channel", channelOrPlaylistIDs[i], "error", errs[i])
+			if strings.Contains(errs[i].Error(), "status code 404") {
+				slog.Error("YouTube channel or playlist not found", "channel", id)
+			} else {
+				slog.Error("Failed to fetch youtube feed", "channel", id, "error", errs[i])
+			}
+
+			if cache != nil {
+				if cached, ok := cache[id]; ok && len(cached) > 0 {
+					videos = append(videos, cached...)
+					servedFromCache++
+				}
+			}
 			continue
 		}
 
 		response := responses[i]
+		channelVideos := make(videoList, 0, len(response.Videos))
 
 		for j := range response.Videos {
 			v := &response.Videos[j]
@@ -233,7 +264,7 @@ func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate 
 				}
 			}
 
-			videos = append(videos, video{
+			channelVideos = append(channelVideos, video{
 				ThumbnailUrl: v.Group.Thumbnail.Url,
 				Title:        v.Title,
 				Url:          videoUrl,
@@ -242,6 +273,11 @@ func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate 
 				TimePosted:   parseYoutubeFeedTime(v.Published),
 			})
 		}
+
+		if cache != nil {
+			cache[id] = channelVideos
+		}
+		videos = append(videos, channelVideos...)
 	}
 
 	if len(videos) == 0 {
@@ -251,7 +287,11 @@ func fetchYoutubeChannelUploads(channelOrPlaylistIDs []string, videoUrlTemplate 
 	videos.sortByNewest()
 
 	if failed > 0 {
-		return videos, fmt.Errorf("%w: missing videos from %d channels", errPartialContent, failed)
+		uncached := failed - servedFromCache
+		if uncached > 0 {
+			return videos, fmt.Errorf("%w: missing videos from %d channels", errPartialContent, uncached)
+		}
+		return videos, fmt.Errorf("%w: serving cached videos for %d channels", errPartialContent, servedFromCache)
 	}
 
 	return videos, nil

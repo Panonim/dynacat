@@ -1,7 +1,6 @@
 {
   "nav": [
     { "id": "home", "title": "Welcome" },
-    { "id": "comparison", "title": "Comparison", "file": "docs/comparison.md" },
     { "id": "search", "title": "Search", "file": "docs/search.md" },
     { "section": "reference" },
     { "id": "authentication", "title": "Authentication", "file": "docs/authentication.md" },
@@ -14,6 +13,7 @@
     { "id": "faq", "title": "Faq", "file": "docs/faq.md" },
     { "id": "installation", "title": "Installation", "file": "docs/installation.md" },
     { "id": "preconfigured-pages", "title": "Preconfigured Pages", "file": "docs/preconfigured-pages.md" },
+    { "id": "shared-widget-options", "title": "Shared Widget Options", "file": "docs/shared-widget-options.md" },
     { "id": "themes", "title": "Themes", "file": "docs/themes.md" },
     { "section": "dynawidgets" },
     { "id": "contributing", "title": "Contributing", "file": "docs/contributing.md" }

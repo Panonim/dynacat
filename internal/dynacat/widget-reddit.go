@@ -2,15 +2,22 @@ package dynacat
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"html"
 	"html/template"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	utls "github.com/refraction-networking/utls"
+	"golang.org/x/net/http2"
 )
 
 var (
@@ -183,7 +190,7 @@ func buildRedditRequestURL(baseURL, path string, query url.Values) string {
 }
 
 func (widget *redditWidget) fetchSubredditPosts() (forumPostList, error) {
-	var client requestDoer = defaultHTTPClient
+	var client requestDoer = redditHTTPClient
 	var requestPath string
 	var baseURLs []string
 	var headers http.Header
@@ -191,9 +198,9 @@ func (widget *redditWidget) fetchSubredditPosts() (forumPostList, error) {
 	app := &widget.AppAuth
 
 	if !app.enabled {
-		baseURLs = []string{"https://api.reddit.com", "https://www.reddit.com", "https://old.reddit.com"}
+		baseURLs = []string{"https://www.reddit.com", "https://api.reddit.com", "https://old.reddit.com"}
 		headers = http.Header{
-			"User-Agent": []string{dynacatUserAgentString},
+			"User-Agent": []string{getBrowserUserAgentHeader()},
 			"Accept":     []string{"application/json"},
 		}
 	} else {
@@ -247,6 +254,15 @@ func (widget *redditWidget) fetchSubredditPosts() (forumPostList, error) {
 		}
 
 		request.Header = headers
+
+		if !app.enabled {
+			loid, loidErr := getRedditLoidCookie()
+			if loidErr != nil {
+				lastErr = fmt.Errorf("could not solve reddit challenge: %w", loidErr)
+				continue
+			}
+			request.AddCookie(&http.Cookie{Name: "loid", Value: loid})
+		}
 
 		responseJson, err = decodeJsonFromRequest[subredditResponseJson](client, request)
 		if err == nil {
@@ -341,7 +357,7 @@ func (widget *redditWidget) fetchNewAppAccessToken() error {
 		ExpiresIn   int    `json:"expires_in"`
 	}
 
-	client := ternary(widget.Proxy.client != nil, widget.Proxy.client, defaultHTTPClient)
+	client := ternary(widget.Proxy.client != nil, widget.Proxy.client, redditHTTPClient)
 	response, err := decodeJsonFromRequest[tokenResponse](client, req)
 	if err != nil {
 		return err
@@ -351,4 +367,135 @@ func (widget *redditWidget) fetchNewAppAccessToken() error {
 	app.tokenExpiresAt = time.Now().Add(time.Duration(response.ExpiresIn) * time.Second)
 
 	return nil
+}
+
+func isRedditHost(host string) bool {
+	host = strings.ToLower(host)
+	return host == "reddit.com" || strings.HasSuffix(host, ".reddit.com")
+}
+
+// Reddit (or its CDN) blocks Go's default TLS fingerprint on Linux with 403,
+// so mimic a real browser handshake via uTLS to bypass the detection.
+var redditHTTPClient = &http.Client{Transport: &http2.Transport{
+	DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		tcpConn, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+
+		uconn := utls.UClient(tcpConn, &utls.Config{
+			ServerName: host,
+		}, utls.HelloFirefox_Auto)
+
+		if err := uconn.HandshakeContext(ctx); err != nil {
+			tcpConn.Close()
+			return nil, err
+		}
+
+		return uconn, nil
+	},
+}}
+
+var (
+	redditChallengePattern = regexp.MustCompile(`await\(async \w+\s*=>\s*\w+\s*\+\s*\w+\)\("([^"]+)"\)`)
+	redditTokenPattern     = regexp.MustCompile(`name="token"\s+value="([^"]+)"`)
+)
+
+// Share one loid cookie across all reddit widgets - the JS-challenge flow
+// that produces it is noisy, so don't run it more than necessary.
+var getRedditLoidCookie = func() func() (string, error) {
+	var lastUpdate time.Time
+	var cachedLoid string
+
+	return NewSingleflight(func() (string, error) {
+		if time.Since(lastUpdate) < 6*time.Hour && cachedLoid != "" {
+			return cachedLoid, nil
+		}
+
+		loid, err := fetchRedditLoidCookie()
+		if err != nil {
+			if cachedLoid != "" {
+				return cachedLoid, nil
+			}
+			return "", err
+		}
+
+		lastUpdate = time.Now()
+		cachedLoid = loid
+		return loid, nil
+	})
+}()
+
+func fetchRedditLoidCookie() (string, error) {
+	request, err := http.NewRequest("GET", "https://www.reddit.com/", nil)
+	if err != nil {
+		return "", err
+	}
+
+	setBrowserUserAgentHeader(request)
+
+	response, err := redditHTTPClient.Do(request)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code %d when requesting challenge page", response.StatusCode)
+	}
+
+	challengeBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	challengeMatches := redditChallengePattern.FindSubmatch(challengeBody)
+	tokenMatches := redditTokenPattern.FindSubmatch(challengeBody)
+
+	if challengeMatches == nil {
+		return "", fmt.Errorf("no JS challenge found")
+	}
+
+	if tokenMatches == nil {
+		return "", fmt.Errorf("no token found in challenge page")
+	}
+
+	challengeStr := string(challengeMatches[1])
+	token := string(tokenMatches[1])
+	solution := challengeStr + challengeStr
+
+	params := url.Values{
+		"solution":     {solution},
+		"js_challenge": {"1"},
+		"token":        {token},
+	}
+	request, err = http.NewRequest("GET", "https://www.reddit.com/?"+params.Encode(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	setBrowserUserAgentHeader(request)
+
+	response, err = redditHTTPClient.Do(request)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code %d when submitting challenge solution", response.StatusCode)
+	}
+
+	for _, cookie := range response.Cookies() {
+		if cookie.Name == "loid" {
+			return cookie.Value, nil
+		}
+	}
+
+	return "", fmt.Errorf("no loid cookie found")
 }

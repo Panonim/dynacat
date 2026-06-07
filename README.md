@@ -11,7 +11,7 @@
   <a href="https://dynacat.artur.zone/themes">Themes</a> 
 </p>
 
-<p align="center">A glance fork that is focused on dynamic updates<br>and easy app integration without the need of writing your own widget's.</p>
+<p align="center">Self-hosted dashboard built for people who want their information in one place.<br>Forked from Glance - it focuses on dynamic content updates and seamless integration with external applications.</p>
 
 ![](docs/docs/images/readme-main-image.png)
 
@@ -204,5 +204,3 @@ You can list multiple origins. Each entry must be a full origin including the sc
  </picture>
 </a>
 </div>
-
-> This is a fork of a ['Glance'](https://github.com/glanceapp/glance) dashboard. 

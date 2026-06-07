@@ -25,7 +25,7 @@ To generate a secret key:
 Or with Docker:
 
 ```sh
-docker run --rm Panonim/dynacat secret:make
+docker run --rm panonim/dynacat secret:make
 ```
 
 ### Hashed passwords
@@ -39,7 +39,7 @@ Avoid storing plain passwords in your config by hashing them first:
 Or with Docker:
 
 ```sh
-docker run --rm Panonim/dynacat password:hash mysecretpassword
+docker run --rm panonim/dynacat password:hash mysecretpassword
 ```
 
 Then use `password-hash` instead of `password`:

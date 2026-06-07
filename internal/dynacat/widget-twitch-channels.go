@@ -2,11 +2,9 @@ package dynacat
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"log/slog"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -38,7 +36,9 @@ func (widget *twitchChannelsWidget) initialize() error {
 		widget.CollapseAfter = 5
 	}
 
-	if widget.SortBy != "viewers" && widget.SortBy != "live" {
+	switch widget.SortBy {
+	case "viewers", "live":
+	default:
 		widget.SortBy = "viewers"
 	}
 
@@ -46,15 +46,16 @@ func (widget *twitchChannelsWidget) initialize() error {
 }
 
 func (widget *twitchChannelsWidget) update(ctx context.Context) {
-	channels, err := fetchChannelsFromTwitch(widget.ChannelsRequest)
+	channels, err := fetchChannelsFromTwitch(ctx, widget.ChannelsRequest)
 
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
 	}
 
-	if widget.SortBy == "viewers" {
+	switch widget.SortBy {
+	case "viewers":
 		channels.sortByViewers()
-	} else if widget.SortBy == "live" {
+	case "live":
 		channels.sortByLive()
 	}
 
@@ -115,29 +116,14 @@ func buildTwitchPreviewURL(login string) string {
 	return fmt.Sprintf("https://static-cdn.jtvnw.net/previews-ttv/live_user_%s-440x248.jpg", login)
 }
 
-type twitchOperationResponse struct {
-	Data       json.RawMessage
-	Extensions struct {
-		OperationName string `json:"operationName"`
-	}
-}
-
-type twitchChannelShellOperationResponse struct {
-	UserOrError struct {
-		Type            string `json:"__typename"`
+type twitchChannelStatusOperationResponse struct {
+	User *struct {
 		DisplayName     string `json:"displayName"`
 		ProfileImageUrl string `json:"profileImageURL"`
 		Stream          *struct {
-			ViewersCount int `json:"viewersCount"`
-		}
-	} `json:"userOrError"`
-}
-
-type twitchStreamMetadataOperationResponse struct {
-	UserOrNull *struct {
-		Stream *struct {
-			StartedAt string `json:"createdAt"`
-			Game      *struct {
+			ViewersCount int    `json:"viewersCount"`
+			StartedAt    string `json:"createdAt"`
+			Game         *struct {
 				Slug string `json:"slug"`
 				Name string `json:"name"`
 			} `json:"game"`
@@ -148,114 +134,192 @@ type twitchStreamMetadataOperationResponse struct {
 	} `json:"user"`
 }
 
-const twitchChannelStatusOperationRequestBody = `[
-{"operationName":"ChannelShell","variables":{"login":"%s"},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"580ab410bcd0c1ad194224957ae2241e5d252b2c5173d8e0cce9d32d5bb14efe"}}},
-{"operationName":"StreamMetadata","variables":{"channelLogin":"%s"},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"676ee2f834ede42eb4514cdb432b3134fefc12590080c9a2c9bb44a2a4a63266"}}}
-]`
+const twitchChannelStatusOperationName = "ChannelStatus"
+const twitchChannelStatusOperationQuery = `query ChannelStatus($login: String!) { user(login: $login) { displayName profileImageURL(width: 70) stream { viewersCount createdAt game { name slug } } lastBroadcast { title } } }`
+const twitchChannelsBatchSize = twitchMaxOperationsPerRequest
+const twitchMaxConcurrentBatches = 3
 
-// TODO: rework
-// The operations for multiple channels can all be sent in a single request
-// rather than sending a separate request for each channel. Need to figure out
-// what the limit is for max operations per request and batch operations in
-// multiple requests if number of channels exceeds allowed limit.
+type twitchChannelStatusOperationVariables struct {
+	Login string `json:"login"`
+}
 
-func fetchChannelFromTwitchTask(channel string) (twitchChannel, error) {
+func newTwitchChannelStatusOperationRequest(channel string) twitchGraphQLOperationRequest {
+	return newTwitchGraphQLQueryRequest(
+		twitchChannelStatusOperationName,
+		twitchChannelStatusOperationVariables{Login: channel},
+		twitchChannelStatusOperationQuery,
+	)
+}
+
+func fetchChannelFromTwitchOperation(channel string, response twitchGraphQLOperationResponse[twitchChannelStatusOperationResponse]) (twitchChannel, error) {
 	result := twitchChannel{
 		Login: strings.ToLower(channel),
 	}
 
-	reader := strings.NewReader(fmt.Sprintf(twitchChannelStatusOperationRequestBody, channel, channel))
-	request, _ := http.NewRequest("POST", twitchGqlEndpoint, reader)
-	request.Header.Add("Client-ID", twitchGqlClientId)
-
-	response, err := decodeJsonFromRequest[[]twitchOperationResponse](defaultHTTPClient, request)
-	if err != nil {
-		return result, err
+	switch response.Extensions.OperationName {
+	case twitchChannelStatusOperationName:
+	default:
+		return result, fmt.Errorf("unknown operation name: %s", response.Extensions.OperationName)
 	}
 
-	if len(response) != 2 {
-		return result, fmt.Errorf("expected 2 operation responses, got %d", len(response))
+	if len(response.Errors) > 0 {
+		return result, fmt.Errorf("twitch operation failed: %s", response.Errors[0].Message)
 	}
 
-	var channelShell twitchChannelShellOperationResponse
-	var streamMetadata twitchStreamMetadataOperationResponse
-
-	for i := range response {
-		switch response[i].Extensions.OperationName {
-		case "ChannelShell":
-			if err = json.Unmarshal(response[i].Data, &channelShell); err != nil {
-				return result, fmt.Errorf("unmarshalling channel shell: %w", err)
-			}
-		case "StreamMetadata":
-			if err = json.Unmarshal(response[i].Data, &streamMetadata); err != nil {
-				return result, fmt.Errorf("unmarshalling stream metadata: %w", err)
-			}
-		default:
-			return result, fmt.Errorf("unknown operation name: %s", response[i].Extensions.OperationName)
-		}
-	}
-
-	if channelShell.UserOrError.Type != "User" {
+	if response.Data.User == nil {
 		result.Name = result.Login
+		result.ViewersCount = -1
 		return result, nil
 	}
 
 	result.Exists = true
-	result.Name = channelShell.UserOrError.DisplayName
-	result.AvatarUrl = channelShell.UserOrError.ProfileImageUrl
+	result.Name = response.Data.User.DisplayName
+	result.AvatarUrl = response.Data.User.ProfileImageUrl
 
-	if channelShell.UserOrError.Stream != nil {
+	if response.Data.User.Stream != nil {
 		result.IsLive = true
-		result.ViewersCount = channelShell.UserOrError.Stream.ViewersCount
+		result.ViewersCount = response.Data.User.Stream.ViewersCount
 
-		if streamMetadata.UserOrNull != nil && streamMetadata.UserOrNull.Stream != nil {
-			if streamMetadata.UserOrNull.LastBroadcast != nil {
-				result.StreamTitle = streamMetadata.UserOrNull.LastBroadcast.Title
-			}
+		if response.Data.User.LastBroadcast != nil {
+			result.StreamTitle = response.Data.User.LastBroadcast.Title
+		}
 
-			if streamMetadata.UserOrNull.Stream.Game != nil {
-				result.Category = streamMetadata.UserOrNull.Stream.Game.Name
-				result.CategorySlug = streamMetadata.UserOrNull.Stream.Game.Slug
-			}
-			startedAt, err := time.Parse("2006-01-02T15:04:05Z", streamMetadata.UserOrNull.Stream.StartedAt)
+		if response.Data.User.Stream.Game != nil {
+			result.Category = response.Data.User.Stream.Game.Name
+			result.CategorySlug = response.Data.User.Stream.Game.Slug
+		}
+		startedAt, err := time.Parse(time.RFC3339, response.Data.User.Stream.StartedAt)
 
-			if err == nil {
-				result.LiveSince = startedAt
-			} else {
-				slog.Warn("Failed to parse Twitch stream started at", "error", err, "started_at", streamMetadata.UserOrNull.Stream.StartedAt)
-			}
+		if err == nil {
+			result.LiveSince = startedAt
+		} else {
+			slog.Warn("Failed to parse Twitch stream started at", "error", err, "started_at", response.Data.User.Stream.StartedAt)
 		}
 	} else {
 		// This prevents live channels with 0 viewers from being
-		// incorrectly sorted lower than offline channels
+		// incorrectly sorted lower than offline channels.
 		result.ViewersCount = -1
 	}
 
 	return result, nil
 }
 
-func fetchChannelsFromTwitch(channelLogins []string) (twitchChannelList, error) {
-	result := make(twitchChannelList, 0, len(channelLogins))
+func fetchChannelsFromTwitchBatch(ctx context.Context, channelLogins []string) (twitchChannelList, error) {
+	operations := make([]twitchGraphQLOperationRequest, 0, len(channelLogins))
 
-	job := newJob(fetchChannelFromTwitchTask, channelLogins).withWorkers(10)
-	channels, errs, err := workerPoolDo(job)
+	for i := range channelLogins {
+		operations = append(operations, newTwitchChannelStatusOperationRequest(channelLogins[i]))
+	}
+
+	response, err := decodeJsonFromTwitchGraphQLRequest[twitchChannelStatusOperationResponse](ctx, operations)
+	if err != nil {
+		return nil, err
+	}
+
+	return fetchChannelsFromTwitchOperations(channelLogins, response)
+}
+
+func fetchChannelsFromTwitchOperations(channelLogins []string, response []twitchGraphQLOperationResponse[twitchChannelStatusOperationResponse]) (twitchChannelList, error) {
+	if len(response) != len(channelLogins) {
+		return nil, fmt.Errorf("expected %d operation responses, got %d", len(channelLogins), len(response))
+	}
+
+	channels := make(twitchChannelList, 0, len(channelLogins))
+	var failed int
+
+	for i := range channelLogins {
+		channel, err := fetchChannelFromTwitchOperation(channelLogins[i], response[i])
+		if err != nil {
+			failed++
+			continue
+		}
+		if !channel.Exists {
+			slog.Warn("Twitch channel not found", "channel", channelLogins[i])
+		}
+		channels = append(channels, channel)
+	}
+
+	if failed > 0 {
+		return channels, fmt.Errorf("%w: failed to fetch %d channels", errPartialContent, failed)
+	}
+
+	return channels, nil
+}
+
+func dedupeTwitchChannelLogins(channelLogins []string) []string {
+	result := make([]string, 0, len(channelLogins))
+	seen := make(map[string]struct{}, len(channelLogins))
+
+	for _, channelLogin := range channelLogins {
+		login := strings.ToLower(strings.TrimSpace(channelLogin))
+		if login == "" {
+			continue
+		}
+
+		if _, ok := seen[login]; ok {
+			continue
+		}
+
+		seen[login] = struct{}{}
+		result = append(result, login)
+	}
+
+	return result
+}
+
+func collectTwitchChannelBatchResults(batches [][]string, batchResults []twitchChannelList, errs []error) (twitchChannelList, int) {
+	result := make(twitchChannelList, 0)
+	var failed int
+
+	for i := range batchResults {
+		result = append(result, batchResults[i]...)
+
+		if errs[i] != nil {
+			failed += len(batches[i]) - len(batchResults[i])
+		}
+	}
+
+	return result, failed
+}
+
+func fetchChannelsFromTwitch(ctx context.Context, channelLogins []string) (twitchChannelList, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// Twitch channel logins are case-insensitive, so normalize before deduping requests.
+	channelLogins = dedupeTwitchChannelLogins(channelLogins)
+	result := make(twitchChannelList, 0, len(channelLogins))
+	total := len(channelLogins)
+
+	if len(channelLogins) == 0 {
+		return result, errNoContent
+	}
+
+	batches := make([][]string, 0, (len(channelLogins)+twitchChannelsBatchSize-1)/twitchChannelsBatchSize)
+	for len(channelLogins) > 0 {
+		batchSize := min(len(channelLogins), twitchChannelsBatchSize)
+		batches = append(batches, channelLogins[:batchSize])
+		channelLogins = channelLogins[batchSize:]
+	}
+
+	job := newJob(func(logins []string) (twitchChannelList, error) {
+		return fetchChannelsFromTwitchBatch(ctx, logins)
+	}, batches).withWorkers(min(len(batches), twitchMaxConcurrentBatches))
+	batchResults, errs, err := workerPoolDo(job)
 	if err != nil {
 		return result, err
 	}
 
 	var failed int
-
-	for i := range channels {
+	result, failed = collectTwitchChannelBatchResults(batches, batchResults, errs)
+	for i := range errs {
 		if errs[i] != nil {
-			failed++
-			slog.Error("Failed to fetch Twitch channel", "channel", channelLogins[i], "error", errs[i])
-			continue
+			slog.Error("Failed to fetch Twitch channels", "channels", strings.Join(batches[i], ","), "error", errs[i])
 		}
-
-		result = append(result, channels[i])
 	}
 
-	if failed == len(channelLogins) {
+	if failed == total {
 		return result, errNoContent
 	}
 

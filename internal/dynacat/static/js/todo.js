@@ -65,7 +65,7 @@ async function saveToServer(id, data) {
     });
 }
 
-function Item(unserialize = {}, onUpdate, onDelete, onEscape, onDragStart) {
+function Item(unserialize = {}, onTextUpdate, onCheckUpdate, onDelete, onEscape, onDragStart) {
     let item, input, inputArea;
 
     const serializeable = {
@@ -80,7 +80,7 @@ function Item(unserialize = {}, onUpdate, onDelete, onEscape, onDragStart) {
             .attrs({ type: "checkbox" })
             .on("change", (e) => {
                 serializeable.checked = e.target.checked;
-                onUpdate();
+                onCheckUpdate();
             })
             .tap(self => self.checked = serializeable.checked),
 
@@ -100,7 +100,7 @@ function Item(unserialize = {}, onUpdate, onDelete, onEscape, onDragStart) {
             })
             .on("input", () => {
                 serializeable.text = inputArea.value;
-                onUpdate();
+                onTextUpdate();
             })
         ).classes("min-width-0", "grow"),
 
@@ -236,15 +236,21 @@ function Todo(id, storageType, collapseAfterConfig) {
         reorderable.component.onDragStart(event, element);
     };
 
+    const serializeItems = () => items.children.map(item => item.component.serialize());
     const saveItems = () => {
         if (isDragging) return;
 
-        const data = items.children.map(item => item.component.serialize());
+        const data = serializeItems();
         if (useServer) {
             saveToServer(id, data);
         } else {
             saveToLocalStorage(id, data);
         }
+    };
+    const renderItems = (data) => {
+        items.replaceChildren(...data.map(d => newItem(d)));
+        inputContainer.classesIf(data.length > 0, "margin-bottom-15");
+        applyCollapsibleState();
     };
 
     const onItemRepositioned = () => saveItems();
@@ -268,6 +274,7 @@ function Todo(id, storageType, collapseAfterConfig) {
     const newItem = (data) => Item(
         data,
         debouncedOnItemUpdate,
+        saveItems,
         onItemDelete,
         () => inputArea.focus(),
         onDragStart
@@ -366,11 +373,7 @@ function Todo(id, storageType, collapseAfterConfig) {
 
     if (useServer) {
         loadFromServer(id).then(data => {
-            items.append(...data.map(d => newItem(d)));
-            if (data.length > 0) {
-                inputContainer.classes("margin-bottom-15");
-            }
-            applyCollapsibleState();
+            renderItems(data);
         });
     }
 

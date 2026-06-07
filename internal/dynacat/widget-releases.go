@@ -235,7 +235,7 @@ func fetchLatestGithubRelease(request *releaseRequest) (*appRelease, error) {
 	if !request.IncludePreleases {
 		requestURL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", request.Repository)
 	} else {
-		requestURL = fmt.Sprintf("https://api.github.com/repos/%s/releases", request.Repository)
+		requestURL = fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=1", request.Repository)
 	}
 
 	httpRequest, err := http.NewRequest("GET", requestURL, nil)

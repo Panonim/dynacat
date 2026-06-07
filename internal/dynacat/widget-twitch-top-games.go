@@ -3,9 +3,7 @@ package dynacat
 import (
 	"context"
 	"errors"
-	"fmt"
 	"html/template"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -45,7 +43,7 @@ func (widget *twitchGamesWidget) initialize() error {
 }
 
 func (widget *twitchGamesWidget) update(ctx context.Context) {
-	categories, err := fetchTopGamesFromTwitch(widget.Exclude, widget.Limit)
+	categories, err := fetchTopGamesFromTwitch(ctx, widget.Exclude, widget.Limit)
 
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
@@ -68,36 +66,52 @@ func (widget *twitchGamesWidget) Render() template.HTML {
 }
 
 type twitchCategory struct {
-	Slug         string `json:"slug"`
-	Name         string `json:"name"`
-	AvatarUrl    string `json:"avatarURL"`
-	ViewersCount int    `json:"viewersCount"`
-	Tags         []struct {
-		Name string `json:"tagName"`
-	} `json:"tags"`
-	GameReleaseDate string `json:"originalReleaseDate"`
-	IsNew           bool   `json:"-"`
+	Slug            string              `json:"slug"`
+	Name            string              `json:"name"`
+	AvatarUrl       string              `json:"avatarURL"`
+	ViewersCount    int                 `json:"viewersCount"`
+	Tags            []twitchCategoryTag `json:"tags"`
+	GameReleaseDate string              `json:"originalReleaseDate"`
+	IsNew           bool                `json:"-"`
+}
+
+type twitchCategoryTag struct {
+	Name string `json:"tagName"`
+}
+
+type twitchCategoryEdge struct {
+	Node twitchCategory `json:"node"`
 }
 
 type twitchDirectoriesOperationResponse struct {
-	Data struct {
-		DirectoriesWithTags struct {
-			Edges []struct {
-				Node twitchCategory `json:"node"`
-			} `json:"edges"`
-		} `json:"directoriesWithTags"`
-	} `json:"data"`
+	DirectoriesWithTags struct {
+		Edges []twitchCategoryEdge `json:"edges"`
+	} `json:"directoriesWithTags"`
 }
 
-const twitchDirectoriesOperationRequestBody = `[
-{"operationName": "BrowsePage_AllDirectories","variables": {"limit": %d,"options": {"sort": "VIEWER_COUNT","tags": []}},"extensions": {"persistedQuery": {"version": 1,"sha256Hash": "2f67f71ba89f3c0ed26a141ec00da1defecb2303595f5cda4298169549783d9e"}}}
-]`
+type twitchDirectoriesOperationVariables struct {
+	Limit   int `json:"limit"`
+	Options struct {
+		Sort string   `json:"sort"`
+		Tags []string `json:"tags"`
+	} `json:"options"`
+}
 
-func fetchTopGamesFromTwitch(exclude []string, limit int) ([]twitchCategory, error) {
-	reader := strings.NewReader(fmt.Sprintf(twitchDirectoriesOperationRequestBody, len(exclude)+limit))
-	request, _ := http.NewRequest("POST", twitchGqlEndpoint, reader)
-	request.Header.Add("Client-ID", twitchGqlClientId)
-	response, err := decodeJsonFromRequest[[]twitchDirectoriesOperationResponse](defaultHTTPClient, request)
+const twitchDirectoriesOperationName = "BrowsePage_AllDirectories"
+const twitchDirectoriesOperationHash = "2f67f71ba89f3c0ed26a141ec00da1defecb2303595f5cda4298169549783d9e"
+
+func newTwitchDirectoriesOperationRequest(limit int) twitchGraphQLOperationRequest {
+	variables := twitchDirectoriesOperationVariables{Limit: limit}
+	variables.Options.Sort = "VIEWER_COUNT"
+	variables.Options.Tags = []string{}
+
+	return newTwitchGraphQLPersistedQueryRequest(twitchDirectoriesOperationName, variables, twitchDirectoriesOperationHash)
+}
+
+func fetchTopGamesFromTwitch(ctx context.Context, exclude []string, limit int) ([]twitchCategory, error) {
+	response, err := decodeJsonFromTwitchGraphQLRequest[twitchDirectoriesOperationResponse](ctx, []twitchGraphQLOperationRequest{
+		newTwitchDirectoriesOperationRequest(len(exclude) + limit),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +120,17 @@ func fetchTopGamesFromTwitch(exclude []string, limit int) ([]twitchCategory, err
 		return nil, errors.New("no categories could be retrieved")
 	}
 
-	edges := (response)[0].Data.DirectoriesWithTags.Edges
+	if len(response[0].Errors) > 0 {
+		return nil, errors.New(response[0].Errors[0].Message)
+	}
+	if response[0].Extensions.OperationName != twitchDirectoriesOperationName {
+		return nil, errors.New("unknown operation name: " + response[0].Extensions.OperationName)
+	}
+
+	return buildTwitchCategories(response[0].Data.DirectoriesWithTags.Edges, exclude, limit), nil
+}
+
+func buildTwitchCategories(edges []twitchCategoryEdge, exclude []string, limit int) []twitchCategory {
 	categories := make([]twitchCategory, 0, len(edges))
 
 	for i := range edges {
@@ -136,5 +160,5 @@ func fetchTopGamesFromTwitch(exclude []string, limit int) ([]twitchCategory, err
 		categories = categories[:limit]
 	}
 
-	return categories, nil
+	return categories
 }

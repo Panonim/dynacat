@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,6 +18,13 @@ func Main() int {
 	if err != nil {
 		fmt.Println(err)
 		return 1
+	}
+
+	if options.envFile != "" {
+		if err := loadEnvFile(options.envFile); err != nil {
+			fmt.Printf("Failed to load env file: %v\n", err)
+			return 1
+		}
 	}
 
 	// Resolve config path with fallback to glance.yml for backward compatibility
@@ -93,25 +101,24 @@ func Main() int {
 	return 0
 }
 
-// resolveConfigPath falls back to glance.yml if dynacat.yml (the default) doesn't exist,
+// resolveConfigPath falls back to glance.yml if dynacat.yml doesn't exist,
 // for backward compatibility with legacy Glance configurations
 func resolveConfigPath(primaryPath string) string {
-	// user explicitly sets config
-	if primaryPath != "dynacat.yml" {
+	if stat, err := os.Stat(primaryPath); err == nil && !stat.IsDir() && stat.Size() > 0 {
 		return primaryPath
 	}
 
-	// checks if dynacat.yml or glance.yml exists
-	if _, err := os.Stat("dynacat.yml"); err == nil {
+	// Only fall back to glance.yml when the primary path ends with dynacat.yml
+	if filepath.Base(primaryPath) != "dynacat.yml" {
 		return primaryPath
 	}
 
-	if _, err := os.Stat("glance.yml"); err == nil {
+	glancePath := filepath.Join(filepath.Dir(primaryPath), "glance.yml")
+	if stat, err := os.Stat(glancePath); err == nil && !stat.IsDir() && stat.Size() > 0 {
 		log.Println("Warning: Using legacy glance.yml config file. Please rename it to dynacat.yml to avoid deprecation issues.")
-		return "glance.yml"
+		return glancePath
 	}
 
-	// If neither exists, just return the original path
 	return primaryPath
 }
 

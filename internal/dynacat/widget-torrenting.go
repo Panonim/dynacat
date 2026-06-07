@@ -315,13 +315,19 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 	}
 
 	switch {
+	// Active seeding - show upload icon even at 100% progress
+	case t.State == "uploading" || t.State == "forcedUP" || t.State == "stalledUP":
+		info.Icon = "↑"
+	case t.State == "Seeding":
+		info.Icon = "↑"
+	case t.State == "tr-seeding":
+		info.Icon = "↑"
+	// Completed but not actively seeding
 	case info.IsCompleted:
 		info.Icon = "✔"
 	// qBittorrent states
 	case t.State == "downloading" || t.State == "forcedDL":
 		info.Icon = "↓"
-	case t.State == "uploading" || t.State == "forcedUP":
-		info.Icon = "↑"
 	case t.State == "error" || t.State == "missingFiles":
 		info.Icon = "!"
 	case t.State == "checkingDL" || t.State == "checkingUP" || t.State == "allocating":
@@ -331,8 +337,6 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 	// Deluge states
 	case t.State == "Downloading":
 		info.Icon = "↓"
-	case t.State == "Seeding":
-		info.Icon = "↑"
 	case t.State == "Error":
 		info.Icon = "!"
 	case t.State == "Checking":
@@ -346,8 +350,6 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 	// Transmission states
 	case t.State == "tr-downloading":
 		info.Icon = "↓"
-	case t.State == "tr-seeding":
-		info.Icon = "↑"
 	case t.State == "tr-error":
 		info.Icon = "!"
 	case t.State == "tr-checking" || t.State == "tr-check-wait":

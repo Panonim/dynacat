@@ -52,12 +52,7 @@ func (a *application) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pkceVerifier, err := makeAuthSecretKey(32)
-	if err != nil {
-		log.Printf("OIDC: could not generate PKCE verifier: %v", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	pkceVerifier := oauth2.GenerateVerifier()
 
 	secure := a.isRequestHTTPS(r)
 

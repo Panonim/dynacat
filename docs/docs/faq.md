@@ -26,3 +26,20 @@ The title of all widgets can be changed by specifying the `title` property in th
 
 # and so on for all widgets...
 ```
+
+## I get an error: dynacat.yml: no such file or directory
+
+Rename your file `glance.yml` into `dynacat.yml` if you are transitioning from Glance. 
+
+If you're not make sure you copied the installation command correctly:
+
+```bash
+mkdir dynacat && cd dynacat && \
+curl -sL https://github.com/glanceapp/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2 && \
+sed -i \
+  -e 's/^  glance:/  dynacat:/' \
+  -e 's/^    container_name: glance/    container_name: dynacat/' \
+  -e 's/^    image: glanceapp\/glance/    image: panonim\/dynacat/' \
+  docker-compose.yml && \
+mv config/glance.yml config/dynacat.yml
+```

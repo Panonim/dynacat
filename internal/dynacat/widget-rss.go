@@ -20,11 +20,29 @@ import (
 )
 
 var (
-	rssWidgetTemplate                 = mustParseTemplate("rss-list.html", "widget-base.html")
-	rssWidgetDetailedListTemplate     = mustParseTemplate("rss-detailed-list.html", "widget-base.html")
-	rssWidgetHorizontalCardsTemplate  = mustParseTemplate("rss-horizontal-cards.html", "widget-base.html")
-	rssWidgetHorizontalCards2Template = mustParseTemplate("rss-horizontal-cards-2.html", "widget-base.html")
+	rssWidgetTemplate = mustParseTemplate("rss-list.html", "widget-base.html")
+	rssWidgetStyles   = map[string]rssWidgetStyle{
+		"detailed-list": {
+			template:    mustParseTemplate("rss-detailed-list.html", "widget-base.html"),
+			needsImages: true,
+			isDetailed:  true,
+		},
+		"horizontal-cards": {
+			template:    mustParseTemplate("rss-horizontal-cards.html", "widget-base.html"),
+			needsImages: true,
+		},
+		"horizontal-cards-2": {
+			template:    mustParseTemplate("rss-horizontal-cards-2.html", "widget-base.html"),
+			needsImages: true,
+		},
+	}
 )
+
+type rssWidgetStyle struct {
+	template    *template.Template
+	needsImages bool
+	isDetailed  bool
+}
 
 var feedParser = gofeed.NewParser()
 
@@ -70,7 +88,7 @@ func (widget *rssWidget) initialize() error {
 		widget.CardHeight = 0
 	}
 
-	if widget.Style == "detailed-list" {
+	if widget.style().isDetailed {
 		for i := range widget.FeedRequests {
 			widget.FeedRequests[i].IsDetailed = true
 		}
@@ -97,7 +115,7 @@ func (widget *rssWidget) update(ctx context.Context) {
 		items = items[:widget.Limit]
 	}
 
-	if widget.Providers != nil {
+	if widget.needsImages() && widget.Providers != nil {
 		for i := range items {
 			if items[i].ImageURL == "" {
 				continue
@@ -109,20 +127,20 @@ func (widget *rssWidget) update(ctx context.Context) {
 	widget.Items = items
 }
 
+func (widget *rssWidget) needsImages() bool {
+	return widget.style().needsImages
+}
+
+func (widget *rssWidget) style() rssWidgetStyle {
+	if style, ok := rssWidgetStyles[widget.Style]; ok {
+		return style
+	}
+
+	return rssWidgetStyle{template: rssWidgetTemplate}
+}
+
 func (widget *rssWidget) Render() template.HTML {
-	if widget.Style == "horizontal-cards" {
-		return widget.renderTemplate(widget, rssWidgetHorizontalCardsTemplate)
-	}
-
-	if widget.Style == "horizontal-cards-2" {
-		return widget.renderTemplate(widget, rssWidgetHorizontalCards2Template)
-	}
-
-	if widget.Style == "detailed-list" {
-		return widget.renderTemplate(widget, rssWidgetDetailedListTemplate)
-	}
-
-	return widget.renderTemplate(widget, rssWidgetTemplate)
+	return widget.renderTemplate(widget, widget.style().template)
 }
 
 type cachedRSSFeed struct {
@@ -227,7 +245,12 @@ func (widget *rssWidget) fetchItemsFromFeedTask(request rssFeedRequest) ([]rssFe
 		req.Header.Set(key, value)
 	}
 
-	resp, err := defaultHTTPClient.Do(req)
+	client := defaultHTTPClient
+	if isRedditHost(req.URL.Host) {
+		client = redditHTTPClient
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

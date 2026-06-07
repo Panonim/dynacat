@@ -18,11 +18,16 @@
 {{ define "document-body" }}
 <div class="flex flex-column body-content">
     {{ if not .Page.HideDesktopNavigation }}
-    <div class="header-container content-bounds{{ if .Page.DesktopNavigationWidth }} content-bounds-{{ .Page.DesktopNavigationWidth }} {{ end }}">
+    <div class="header-container content-bounds{{ if .Page.DesktopNavigationWidth }} content-bounds-{{ .Page.DesktopNavigationWidth }} {{ end }}{{ if .App.Config.Branding.ShowDesktopNavigationOnHover }} header-container-navigation-hover{{ end }}">
         <div class="header flex padding-inline-widget widget-content-frame">
+            {{ if not .App.Config.Branding.HideLogo }}
             <div class="logo" aria-hidden="true">
                 {{- if .App.Config.Branding.LogoURL }}
+                {{- if hasURLPathSuffixFold .App.Config.Branding.LogoURL ".svg" }}
+                <svg width="512" height="512" viewBox="0 0 1 1" class="logo-svg" aria-hidden="true"><image href="{{ .App.Config.Branding.LogoURL }}" width="1" height="1" preserveAspectRatio="xMidYMid meet"></image></svg>
+                {{- else }}
                 <img src="{{ .App.Config.Branding.LogoURL }}" alt="">
+                {{- end }}
                 {{- else if .App.Config.Branding.LogoText }}
                 {{- .App.Config.Branding.LogoText }}
                 {{- else }}
@@ -43,7 +48,8 @@
                 </svg>
                 {{- end }}
             </div>
-            <nav class="nav flex grow hide-scrollbars">
+            {{ end }}
+            <nav class="nav flex grow hide-scrollbars{{ if .App.Config.Branding.CenterDesktopNavigation }} nav-center{{ end }}">
                 {{ template "navigation-links" . }}
             </nav>
             {{ if not .App.Config.Theme.DisablePicker }}

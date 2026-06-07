@@ -115,7 +115,7 @@ Add the following to your `docker-compose.yml`:
 ```yaml
 services:
   dynacat:
-    image: Panonim/dynacat:latest
+    image: panonim/dynacat:latest
     devices:
       - /dev/zfs:/dev/zfs
     cap_drop:

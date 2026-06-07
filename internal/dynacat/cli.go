@@ -27,6 +27,7 @@ const (
 type cliOptions struct {
 	intent     cliIntent
 	configPath string
+	envFile    string
 	args       []string
 }
 
@@ -58,6 +59,7 @@ func parseCliOptions() (*cliOptions, error) {
 	}
 
 	configPath := flags.String("config", "dynacat.yml", "Set config path")
+	envFile := flags.String("env-file", "", "Path to an env file to load environment variables from")
 	err := flags.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -102,6 +104,7 @@ func parseCliOptions() (*cliOptions, error) {
 	return &cliOptions{
 		intent:     intent,
 		configPath: *configPath,
+		envFile:    *envFile,
 		args:       args,
 	}, nil
 }
