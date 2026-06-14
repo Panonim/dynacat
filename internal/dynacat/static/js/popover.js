@@ -64,6 +64,11 @@ function showPopover() {
     activeTarget = pendingTarget;
     pendingTarget = null;
 
+    if (activeTarget.dataset.popoverIfTruncated !== undefined && !isElementTruncated(activeTarget)) {
+        activeTarget = null;
+        return;
+    }
+
     const popoverType = activeTarget.dataset.popoverType;
 
     if (popoverType === "text") {
@@ -182,6 +187,10 @@ function handleHidePopoverOnEscape(event) {
     if (event.key === "Escape") {
         hidePopover();
     }
+}
+
+function isElementTruncated(element) {
+    return element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight;
 }
 
 export function setupPopovers() {
