@@ -24,6 +24,27 @@
     display: none;
 }
 
+/* show-if can gate any element (e.g. one inside an html widget's source),
+   not only the widget wrapper. */
+[data-show-if][data-widget-hidden="true"] {
+    display: none;
+}
+
+/* Hide links whose [[...]] URL parameter couldn't be resolved. */
+.url-param-hidden {
+    display: none !important;
+}
+
+/* Collapse the container a hidden link leaves empty: the bookmark row, or
+   the whole iframe widget (the iframe is its only content). */
+.bookmarks-group li:has(a.url-param-hidden) {
+    display: none;
+}
+
+.widget-type-iframe:has(iframe.url-param-hidden) {
+    display: none;
+}
+
 .widget-error-header {
     display: flex;
     align-items: center;
@@ -106,6 +127,10 @@
     opacity: 1;
 }
 
-.widget + .widget {
+/* Vertical gap between widgets. Using the general sibling combinator with
+   hidden widgets excluded means a widget gated by show-if or hide, or an iframe
+   widget collapsed by an unresolved URL parameter, is skipped instead of
+   leaving an empty gap (including at the top of a column). */
+.widget:not([data-widget-hidden="true"]):not(.widget-type-iframe:has(iframe.url-param-hidden)) ~ .widget:not([data-widget-hidden="true"]):not(.widget-type-iframe:has(iframe.url-param-hidden)) {
     margin-top: var(--widget-gap);
 }

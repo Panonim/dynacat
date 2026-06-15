@@ -30,17 +30,18 @@ const (
 
 type config struct {
 	Server struct {
-		Host              string       `yaml:"host"`
-		Port              uint16       `yaml:"port"`
-		Proxied           bool         `yaml:"proxied"`
-		TrustedProxies    []string     `yaml:"trusted-proxies"`
-		HTTPS             bool         `yaml:"https"`
-		AssetsPath        string       `yaml:"assets-path"`
-		CacheDir          string       `yaml:"cache-dir"`
-		BaseURL           string       `yaml:"base-url"`
-		DBPath            string       `yaml:"db-path"`
-		AllowedEmbedHosts []string     `yaml:"allowed-embed-hosts"`
-		trustedProxyNets  []*net.IPNet `yaml:"-"`
+		Host                 string       `yaml:"host"`
+		Port                 uint16       `yaml:"port"`
+		Proxied              bool         `yaml:"proxied"`
+		TrustedProxies       []string     `yaml:"trusted-proxies"`
+		HTTPS                bool         `yaml:"https"`
+		AssetsPath           string       `yaml:"assets-path"`
+		CacheDir             string       `yaml:"cache-dir"`
+		BaseURL              string       `yaml:"base-url"`
+		DBPath               string       `yaml:"db-path"`
+		AllowedEmbedHosts    []string     `yaml:"allowed-embed-hosts"`
+		DisableURLParameters bool         `yaml:"disable-url-parameters"`
+		trustedProxyNets     []*net.IPNet `yaml:"-"`
 	} `yaml:"server"`
 
 	Auth struct {

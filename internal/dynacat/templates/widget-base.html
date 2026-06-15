@@ -4,6 +4,7 @@
      data-update-interval="{{ .UpdateInterval.Milliseconds }}"
      {{ end }}
      {{ if .Hidden }}data-widget-hidden="true"{{ end }}
+     {{ if .ShowIf }}data-show-if="{{ .ShowIf }}"{{ end }}
      {{ if .IsLazyLoad }}data-lazy-load="true"{{ end }}
      {{ block "widget-data-attrs" . }}{{ end }}>
     {{- if not .HideHeader }}

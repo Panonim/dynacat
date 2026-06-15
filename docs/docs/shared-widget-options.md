@@ -11,6 +11,7 @@ All widgets share a common set of configuration options that control their appea
 | title-icon | icon | no | |
 | title-url | string | no | |
 | css-class | string | no | |
+| show-if | string | no | |
 | cache | string | no | widget-specific |
 | update-interval | string | no | widget-specific |
 | frameless | boolean | no | false |
@@ -103,6 +104,35 @@ Then in your custom CSS file:
 ```
 
 See the [Theme](configuration.md#theme) section for more information on custom CSS files.
+
+### `show-if`
+
+Shows or hides the entire widget based on a query parameter in the page's URL, evaluated in the browser. This lets one configuration reveal context-specific widgets, such as a group of links that is only useful when you are away from home.
+
+| Parameter | Widget is shown when… |
+| --------- | --------------------- |
+| `code` | `?code` is present (even valueless, e.g. `?code`) |
+| `code!` | `?code` is absent |
+| `code=XYZ789` | `?code` equals `XYZ789` |
+| `code!=XYZ789` | `?code` is anything other than `XYZ789` |
+
+Example:
+
+```yaml
+- type: bookmarks
+  title: Remote access
+  show-if: net=remote
+  groups:
+    - links:
+        - title: Tailscale admin
+          url: https://login.tailscale.com/admin
+```
+
+Open the dashboard with `?net=remote` to show the widget; it stays hidden otherwise.
+
+> [!NOTE]
+>
+> This is a presentation-only toggle, not a security boundary. The widget's content is still delivered to the browser and visible in the page source, and an equality check like `code=SECRET` also exposes `SECRET` there. See [URL Parameters](url-parameters.md) for details and for filling parameter values into links with `[[...]]`.
 
 ### `cache`
 

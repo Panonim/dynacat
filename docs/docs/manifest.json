@@ -14,6 +14,7 @@
     { "id": "installation", "title": "Installation", "file": "docs/installation.md" },
     { "id": "preconfigured-pages", "title": "Preconfigured Pages", "file": "docs/preconfigured-pages.md" },
     { "id": "shared-widget-options", "title": "Shared Widget Options", "file": "docs/shared-widget-options.md" },
+    { "id": "url-parameters", "title": "URL Parameters", "file": "docs/url-parameters.md" },
     { "id": "themes", "title": "Themes", "file": "docs/themes.md" },
     { "section": "dynawidgets" },
     { "id": "contributing", "title": "Contributing", "file": "docs/contributing.md" }

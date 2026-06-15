@@ -1297,6 +1297,209 @@ function initDesktopNavigationAutoshow() {
     }
 }
 
+// URL parameter substitution and widget gating.
+//
+// Substitutes [[...]] tokens found in href/src attributes using the page's
+// URL query parameters, and shows/hides widgets carrying a data-show-if
+// predicate. Everything is client-side; query values are never sent to the
+// server. See the documentation for the grammar.
+
+const urlParameters = new URLSearchParams(window.location.search);
+const URL_PARAM_TOKEN = /\[\[(.+?)\]\]/g;
+const URL_PARAM_ALLOWED_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+function urlParametersEnabled() {
+    return typeof pageData === "undefined" || pageData.urlParametersEnabled !== false;
+}
+
+// Splits a string on a delimiter that is not inside single quotes,
+// keeping quotes and backslash escapes intact for later unquoting.
+function splitTopLevelURLParam(str, delim) {
+    const parts = [];
+    let current = "";
+    let inQuote = false;
+
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+
+        if (inQuote) {
+            if (char === "\\" && i + 1 < str.length) {
+                current += char + str[i + 1];
+                i++;
+                continue;
+            }
+            if (char === "'") inQuote = false;
+            current += char;
+            continue;
+        }
+
+        if (char === "'") {
+            inQuote = true;
+            current += char;
+            continue;
+        }
+        if (char === delim) {
+            parts.push(current);
+            current = "";
+            continue;
+        }
+        current += char;
+    }
+
+    parts.push(current);
+    return parts;
+}
+
+// Strips surrounding single quotes (unescaping \') from a literal
+// segment, or trims an unquoted one.
+function unquoteURLParamLiteral(str) {
+    const trimmed = str.trim();
+    if (trimmed.length >= 2 && trimmed.startsWith("'") && trimmed.endsWith("'")) {
+        return trimmed.slice(1, -1).replace(/\\'/g, "'");
+    }
+    return trimmed;
+}
+
+// Evaluates one decoded token interior against the query params.
+// Returns { value } for a substitution, or { hide: true } when the
+// token has nothing to fall back on.
+function evalURLParamToken(inner, params) {
+    const pipeParts = splitTopLevelURLParam(inner, "|");
+    const core = pipeParts[0];
+    const hasDefault = pipeParts.length > 1;
+    const defaultValue = hasDefault
+        ? unquoteURLParamLiteral(pipeParts.slice(1).join("|"))
+        : null;
+
+    const eqParts = splitTopLevelURLParam(core, "=");
+
+    // Simple form: [[name]] / [[name|default]]
+    if (eqParts.length === 1) {
+        const value = params.get(eqParts[0].trim());
+        if (value !== null && value !== "") {
+            return { value: encodeURIComponent(value) };
+        }
+        return hasDefault ? { value: defaultValue } : { hide: true };
+    }
+
+    // Conditional form: [[name=match:ifTrue:ifFalse|default]]
+    const value = params.get(eqParts[0].trim());
+    const branches = splitTopLevelURLParam(eqParts.slice(1).join("="), ":");
+    if (branches.length !== 3) {
+        return { hide: true }; // malformed
+    }
+    if (value === null || value === "") {
+        return hasDefault ? { value: defaultValue } : { hide: true };
+    }
+
+    const match = unquoteURLParamLiteral(branches[0]);
+    return {
+        value: value === match
+            ? unquoteURLParamLiteral(branches[1])
+            : unquoteURLParamLiteral(branches[2]),
+    };
+}
+
+// Resolves every [[...]] token in an attribute value. Param values are
+// percent-encoded; authored literals are inserted verbatim.
+function resolveURLParamAttr(value, params) {
+    let hide = false;
+
+    const resolved = value.replace(URL_PARAM_TOKEN, (_, raw) => {
+        let inner;
+        try {
+            inner = decodeURIComponent(raw);
+        } catch {
+            inner = raw;
+        }
+        const result = evalURLParamToken(inner, params);
+        if (result.hide) {
+            hide = true;
+            return "";
+        }
+        return result.value;
+    });
+
+    // A leftover [[ means an unmatched/malformed token; fail closed.
+    if (resolved.indexOf("[[") !== -1) hide = true;
+
+    return { value: resolved, hide };
+}
+
+function isAllowedURLParamScheme(url) {
+    try {
+        return URL_PARAM_ALLOWED_SCHEMES.has(new URL(url, document.baseURI).protocol);
+    } catch {
+        return false;
+    }
+}
+
+// Evaluates a data-show-if predicate. Fails open (visible) on anything
+// unrecognized, since client-side hiding is not a security boundary.
+function evalShowIfPredicate(expr, params) {
+    const trimmed = (expr || "").trim();
+    if (trimmed === "") return true;
+
+    let m;
+    if ((m = trimmed.match(/^([A-Za-z0-9_-]+)!=(.*)$/s))) {
+        return (params.get(m[1]) ?? "") !== m[2];
+    }
+    if ((m = trimmed.match(/^([A-Za-z0-9_-]+)!$/))) {
+        return !params.has(m[1]);
+    }
+    if ((m = trimmed.match(/^([A-Za-z0-9_-]+)=(.*)$/s))) {
+        return (params.get(m[1]) ?? "") === m[2];
+    }
+    if ((m = trimmed.match(/^([A-Za-z0-9_-]+)$/))) {
+        return params.has(m[1]);
+    }
+    return true;
+}
+
+function applyShowIf(element, params) {
+    if (evalShowIfPredicate(element.dataset.showIf, params)) {
+        element.removeAttribute("data-widget-hidden");
+    } else {
+        element.dataset.widgetHidden = "true";
+    }
+}
+
+function applyURLParamAttr(element, attr, params) {
+    const raw = element.getAttribute(attr);
+    if (!raw || raw.indexOf("[[") === -1) return;
+
+    const { value, hide } = resolveURLParamAttr(raw, params);
+
+    if (hide || !isAllowedURLParamScheme(value)) {
+        element.classList.add("url-param-hidden");
+        element.removeAttribute(attr);
+        return;
+    }
+
+    if (value !== raw) element.setAttribute(attr, value);
+    element.classList.remove("url-param-hidden");
+}
+
+// Processes a freshly rendered subtree: widget gating, then link/src
+// substitution. Safe to re-run on the same nodes (it's idempotent).
+function applyURLParameters(root) {
+    if (!root || !urlParametersEnabled()) return;
+
+    const params = urlParameters;
+
+    if (root.matches && root.matches("[data-show-if]")) applyShowIf(root, params);
+    for (const element of root.querySelectorAll("[data-show-if]")) {
+        applyShowIf(element, params);
+    }
+
+    for (const attr of ["href", "src"]) {
+        if (root.matches && root.matches(`[${attr}]`)) applyURLParamAttr(root, attr, params);
+        for (const element of root.querySelectorAll(`[${attr}]`)) {
+            applyURLParamAttr(element, attr, params);
+        }
+    }
+}
+
 async function setupPage() {
     initDesktopNavigationAutoshow();
 
@@ -1348,6 +1551,7 @@ async function setupPage() {
         setupImageFallbacks();
         setupLazyImages();
         setupPlayingProgressUpdater();
+        applyURLParameters(pageContentElement);
     } finally {
         pageElement.classList.add("content-ready");
         pageElement.setAttribute("aria-busy", "false");
@@ -1451,6 +1655,7 @@ async function updateWidget(widgetElement) {
             setupImageFallbacks();
             setupLazyImages();
             setupTruncatedElementTitles();
+            applyURLParameters(widgetElement);
 
             const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
             for (const cb of newCallbacks) {
@@ -1898,6 +2103,7 @@ async function applyContentUpdate() {
         setupLazyImages();
         setupTruncatedElementTitles();
         setupPlayingThumbnailCropping();
+        for (const widget of updatedWidgets) applyURLParameters(widget);
 
         const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
         for (const cb of newCallbacks) {
