@@ -59,6 +59,18 @@ jobs:
             echo "APP_VERSION=dev" >> "${GITHUB_ENV}"
           fi
 
+      - name: Check whether beta branch run is latest
+        id: beta_head
+        if: github.ref == 'refs/heads/beta'
+        run: |
+          latest_beta_sha="$(git ls-remote origin refs/heads/beta | cut -f1)"
+          echo "latest_beta_sha=${latest_beta_sha}" >> "${GITHUB_OUTPUT}"
+          if [ "${GITHUB_SHA}" = "${latest_beta_sha}" ]; then
+            echo "is_latest=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "is_latest=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -74,7 +86,8 @@ jobs:
             ghcr.io/${{ env.IMAGE_REPO }}
             ${{ env.DOCKERHUB_USERNAME != '' && format('docker.io/{0}/dynacat', env.DOCKERHUB_USER_LOWER) || '' }}
           tags: |
-            type=ref,event=branch
+            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/beta' }}
+            type=raw,value=beta,enable=${{ github.ref == 'refs/heads/beta' && steps.beta_head.outputs.is_latest == 'true' }}
             type=sha,prefix=beta-,enable=${{ github.ref == 'refs/heads/beta' }}
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
