@@ -1,4 +1,4 @@
-# Changes for 2.X.X
+# Changes for 2.4.0
 - Added Brave Search as an autocompletion engine and normal one
 - Added support for icons in the page title 
 - Fixed issue where todo widget highlight was too short
@@ -15,6 +15,7 @@
 - Fixed an issue where combining subreddits would show incorrect title
 - Fixed an issue with theme syncing
 - Fixed an issue with `latest-media` widgets interfering with each other -> https://github.com/Panonim/dynacat/issues/124
+- Added setting to open stream instead of category if click on category -> https://github.com/Panonim/dynacat/pull/123
 
 # Changes for 2.3.1
 - Added support for loading environment variables from a file via `--env-file`
