@@ -3056,6 +3056,7 @@ Preview:
 | channels | array | yes | |
 | collapse-after | integer | no | 5 |
 | sort-by | string | no | viewers |
+| link-category-to-stream | boolean | no | false |
 
 ##### `channels`
 A list of channels to display.
@@ -3065,6 +3066,9 @@ How many channels are visible before the "SHOW MORE" button appears. Set to `-1`
 
 ##### `sort-by`
 Can be used to specify the order in which the channels are displayed. Possible values are `viewers` and `live`.
+
+##### `link-category-to-stream`
+When set to `true`, clicking a live channel's game name opens the streamer instead of the Twitch game category.
 
 ### Twitch Top Games
 Display a list of games with the most viewers on Twitch.
