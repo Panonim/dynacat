@@ -38,26 +38,26 @@ The following table lists the default update intervals for widgets when `update-
 
 | Widget | Default Update Interval |
 |---|---:|
-| RSS | 15m |
-| Videos | 1h |
-| Hacker News | 5m |
-| Lobsters | 30m |
-| Reddit | 25m |
+| Calendar (With releases configured) | 15m |
+| ChangeDetection.io | 30m |
 | Custom API | 1m |
-| Extension | 5m |
-| Weather | 1h |
-| Monitor | 2m |
-| Releases | 3h |
 | Docker Containers | 2m |
 | Docker Controller | 30s |
 | DNS Stats | 10m |
-| Server Stats | 15s |
-| Repository | 3h |
-| Calendar (legacy) | 1h |
-| ChangeDetection.io | 30m |
+| Extension | 5m |
+| Hacker News | 5m |
+| Lobsters | 30m |
 | Markets | 10m |
+| Monitor | 2m |
+| Reddit | 25m |
+| Releases | 3h |
+| Repository | 3h |
+| RSS | 15m |
+| Server Stats | 15s |
 | Twitch Channels | 15m |
 | Twitch Top Games | 35m |
+| Videos | 1h |
+| Weather | 1h |
 
 | External Integration | Default Update Interval |
 | --- | ---:|

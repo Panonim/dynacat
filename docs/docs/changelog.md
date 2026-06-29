@@ -1,3 +1,22 @@
+# Changes for 2.4.0
+- Added Brave Search as an autocompletion engine and normal one
+- Added support for icons in the page title 
+- Fixed issue where todo widget highlight was too short
+- Fixed issue where in todo widget trash animation icon was slower than highlight
+- Added speedtest widget
+- Fixed issue where incorrect thumbnails were pulled for series
+- Improved endpoint fetching by adding shared cache
+- Fixed issue where testing repo wasnt properly detected in dynawidgets
+- Fixed log level functionality -> https://github.com/Panonim/dynacat/pull/96
+- Fixed incorrect daily percentage in market widget -> https://github.com/Panonim/dynacat/pull/117
+- Added server-stats `compact: true` option -> https://github.com/Panonim/dynacat/pull/104
+- Added support for Sonarr/Radarr releases in the `calendar` widget 
+- Preserve auth redirect -> https://github.com/Panonim/dynacat/pull/120
+- Fixed an issue where combining subreddits would show incorrect title
+- Fixed an issue with theme syncing
+- Fixed an issue with `latest-media` widgets interfering with each other -> https://github.com/Panonim/dynacat/issues/124
+- Added setting to open stream instead of category if click on category -> https://github.com/Panonim/dynacat/pull/123
+
 # Changes for 2.3.1
 - Added support for loading environment variables from a file via `--env-file`
 - Made initial loading faster by fetching data on service start

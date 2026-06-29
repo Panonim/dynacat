@@ -178,7 +178,7 @@ icon: auto-invert sh:dynacat-dark # with a selfh.st icon
 
 This expects the icon to be black and will automatically invert it to white when using a dark theme.
 
-The same icon syntax and prefixes also work for `title-icon`.
+The same icon syntax and prefixes also work for `title-icon` as well as the page `name-icon` (see [Pages](#pages)), which places an icon to the left of the page name in the navigation bar.
 
 If an icon URL cannot be loaded (for example, the file does not exist or the host is unreachable), Dynacat will hide the icon and render the widget as if no icon was configured.
 
@@ -497,6 +497,7 @@ pages:
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | name | string | yes | |
+| name-icon | string | no | |
 | slug | string | no | |
 | dynamic-updates | boolean | no | true |
 | width | string | no | |
@@ -511,6 +512,17 @@ pages:
 
 #### `name`
 The name of the page which gets shown in the navigation bar.
+
+#### `name-icon`
+An icon shown to the left of the page name in the navigation bar (both desktop and mobile). It uses the same syntax and prefixes as every other icon, see [Icons](#icons) for more information. Example:
+
+```yaml
+pages:
+  - name: "News"
+    slug: news
+    name-icon: mdi:newspaper-variant-outline
+    columns: ...
+```
 
 #### `slug`
 The URL friendly version of the title which is used to access the page. For example if the title of the page is "RSS Feeds" you can make the page accessible via `localhost:8080/feeds` by setting the slug to `feeds`. If not defined, it will automatically be generated from the title.
@@ -809,9 +821,60 @@ Preview:
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | first-day-of-week | string | no | monday |
+| hosts | array | no | |
+| update-interval | string | no | 15m |
 
 ##### `first-day-of-week`
 The day of the week that the calendar starts on. All week days are available as possible values.
+
+> [!NOTE]
+>
+> Images will take some time to load since they are fetched once request is made to save data
+
+##### `hosts`
+Optionally pull upcoming releases from your **Sonarr** and **Radarr** instances and show them on the calendar. Days that have releases get a small line under the number in the primary color; hovering anywhere on the day opens a popover listing each release with its source, poster, title and a short description, and clicking a release takes you to it inside the Sonarr/Radarr web interface.
+
+You can configure multiple hosts, including several of the same type (for example two Radarr instances). When the same movie or episode is returned by more than one host it is only shown once.
+
+```yaml
+- type: calendar
+  hosts:
+    - url: radarr:https://radarr.domain.com
+      token: ${RADARR_KEY}
+    - url: radarr:https://radarr-4k.domain.com
+      token: ${RADARR_4K_KEY}
+    - url: sonarr:https://sonarr.domain.com
+      token: ${SONARR_KEY}
+      public-url: https://sonarr.public.com
+      allow-insecure: false
+```
+
+###### Properties for each host
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| url | string | yes | |
+| token | string | yes | |
+| public-url | string | no | value of `url` |
+| allow-insecure | boolean | no | false |
+
+`url`
+
+The base URL of the Sonarr/Radarr instance, prefixed with the service type, for example `radarr:https://radarr.domain.com` or `sonarr:https://sonarr.domain.com`. The instance must be reachable from the server that Dynacat is running on. Used both for the API requests and, unless `public-url` is set, for the links in the popover.
+
+`token`
+
+The API key, found in `Settings -> General -> Security` in Sonarr/Radarr. Optionally specify this using an environment variable with the syntax `${VARIABLE_NAME}`.
+
+`public-url`
+
+Optionally override the URL used for the release links in the popover. Useful when Dynacat reaches the instance via an internal address but you browse it through a different (for example reverse-proxied) address.
+
+`allow-insecure`
+
+Whether to allow invalid/self-signed certificates when making requests to the instance.
+
+##### `update-interval`
+How often the calendar polls for release updates without reloading the page. The value is a string and must be a number followed by one of s (seconds), m (minutes) or h (hours). Only relevant when `hosts` is configured. Default is `15m`.
 
 ### ChangeDetection.io
 Display a list watches from changedetection.io.
@@ -2470,6 +2533,7 @@ Preview:
 | target | string | no | _blank |
 | placeholder | string | no | Type here to search… |
 | autocomplete | boolean | no | true |
+| autocomplete-provider | string | no | duckduckgo |
 | bangs | array | no | |
 
 ##### `search-engine`
@@ -2483,6 +2547,7 @@ Either a value from the table below or a URL to a custom search engine. Use `{QU
 | perplexity | `https://www.perplexity.ai/search?q={QUERY}` |
 | kagi | `https://kagi.com/search?q={QUERY}` |
 | startpage | `https://www.startpage.com/search?q={QUERY}` |
+| qwant | `https://www.qwant.com/?q={QUERY}&t=web` |
 
 ##### `new-tab`
 When set to `true`, swaps the shortcuts for showing results in the same or new tab, defaulting to showing results in a new tab.
@@ -2498,6 +2563,14 @@ When set, modifies the text displayed in the input field before typing.
 
 ##### `autocomplete`
 When set to `true` (default), displays search suggestions as you type. Navigate suggestions with <kbd>↑</kbd> and <kbd>↓</kbd> arrow keys, select with <kbd>Enter</kbd>, or dismiss with <kbd>Escape</kbd>. Set to `false` to disable autocompletion.
+
+##### `autocomplete-provider`
+The provider used for search suggestions. Possible values are `duckduckgo` (default) and `brave`.
+
+| Value | Provider |
+| ----- | -------- |
+| duckduckgo | DuckDuckGo autocomplete |
+| brave | Brave Search autocomplete |
 
 ##### `bangs`
 What now? [Bangs](https://duckduckgo.com/bangs). They're shortcuts that allow you to use the same search box for many different sites. Assuming you have it configured, if for example you start your search input with `!yt` you'd be able to perform a search on YouTube:
@@ -2586,6 +2659,7 @@ If not provided it will display the statistics of the server Dynacat is running 
 | ---- | ---- | -------- | ------- |
 | type | string | yes |  |
 | name | string | no |  |
+| compact | boolean | no | false |
 | hide-swap | boolean | no | false |
 
 ###### `type`
@@ -2593,6 +2667,11 @@ Whether to display statistics for the local server or a remote server. Possible 
 
 ###### `name`
 The name of the server which will be displayed on the widget. If not provided it will default to the server's hostname.
+
+###### `compact`
+Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average.
+
+![](images/server-stats-compact-preview.webp)
 
 ###### `hide-swap`
 Whether to hide the swap usage.
@@ -2664,6 +2743,57 @@ The authentication token to use when fetching the statistics.
 
 ###### `timeout`
 The maximum time to wait for a response from the server. The value is a string and must be a number followed by one of s, m, h, d. Example: `10s` for 10 seconds, `1m` for 1 minute, etc
+
+### Speedtest
+Run a real internet speed test from the server and display the download, upload and ping. The test uses the [LibreSpeed](https://github.com/librespeed/speedtest-cli) protocol and, by default, automatically picks the nearest public LibreSpeed server. You can also point it at your own LibreSpeed instance.
+
+Preview:
+
+![](images/speedtest-widget-preview.png)
+
+Example:
+
+```yaml
+- type: speedtest
+```
+
+Using your own LibreSpeed server:
+
+```yaml
+- type: speedtest
+  server: https://librespeed.mydomain.com
+  update-interval: 6h
+```
+
+> [!CAUTION]
+>
+> This widget is still being tested, also note that:
+> When no `server` is configured the widget fetches the public LibreSpeed server list and runs the test against a community hosted server. Be considerate with how frequently you run tests against public servers.
+
+#### Properties
+
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| server | string | no |  |
+| duration | string | no | 15s |
+| concurrent | integer | no | 3 |
+| update-interval | string | no | 6h |
+| frameless | boolean | no | false |
+
+##### `server`
+The base URL of a LibreSpeed server to test against, for example `https://librespeed.mydomain.com`. When left empty, the widget automatically selects the lowest latency server from the public LibreSpeed server list.
+
+##### `duration`
+How long each direction (download and upload) is measured for. The value is a string and must be a number followed by one of s, m, h, d. Example: `15s` for 15 seconds.
+
+##### `concurrent`
+The number of concurrent connections used during the download and upload tests.
+
+##### `update-interval`
+How often a test is automatically run. The value is a string and must be a number followed by one of s, m or h. Default is `6h`.
+
+##### `frameless`
+When set to `true`, removes the border and padding around the widget.
 
 ### Split Column
 Splits a full sized column in half, allowing you to place widgets side by side horizontally. This is converted to a single column on mobile devices or if not enough width is available. Widgets are defined using a `widgets` property exactly as you would on a page column.
@@ -2926,6 +3056,7 @@ Preview:
 | channels | array | yes | |
 | collapse-after | integer | no | 5 |
 | sort-by | string | no | viewers |
+| link-category-to-stream | boolean | no | false |
 
 ##### `channels`
 A list of channels to display.
@@ -2935,6 +3066,9 @@ How many channels are visible before the "SHOW MORE" button appears. Set to `-1`
 
 ##### `sort-by`
 Can be used to specify the order in which the channels are displayed. Possible values are `viewers` and `live`.
+
+##### `link-category-to-stream`
+When set to `true`, clicking a live channel's game name opens the streamer instead of the Twitch game category.
 
 ### Twitch Top Games
 Display a list of games with the most viewers on Twitch.
