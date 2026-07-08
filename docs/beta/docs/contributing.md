@@ -66,6 +66,19 @@ If you want to share a custom widget with the community, follow these steps:
 
 5. Add a `required:` section at the bottom of `template.txt` to specify default configuration values. This is optional but recommended for any API that requires a URL or other configuration. The format is YAML, with supported fields:
    - `url`: The default API endpoint to fetch data from
+   - `subrequests`: Default subrequests keyed by name, each a request with its own `url` (and optional `headers`, `method`, etc). Required if your template calls `.Subrequest "key"`, so the key is defined even when the user does not set it. Example:
+
+     ```text
+     <div>{{ (.Subrequest "heartbeats").JSON.Int "count" }}</div>
+
+     required: |
+       url: https://api.example.com/stats
+       subrequests:
+         heartbeats:
+           url: https://api.example.com/heartbeats
+     ```
+
+     Users can override each subrequest's URL the same way they override the primary `url`.
 
    When users add your widget to their config, they can override these defaults:
 
