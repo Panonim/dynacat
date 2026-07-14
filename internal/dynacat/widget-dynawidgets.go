@@ -191,6 +191,13 @@ func dynawidgetsParseTemplate(raw string) (templateContent string, required *dyn
 		return templateContent, nil
 	}
 
+	expanded, err := parseConfigVariables([]byte(requiredRaw))
+	if err != nil {
+		slog.Error("Failed to expand variables in dynawidget required section", "error", err)
+		return templateContent, nil
+	}
+	requiredRaw = string(expanded)
+
 	required = &dynawidgetsRequired{}
 	if err := yaml.Unmarshal([]byte(requiredRaw), required); err != nil {
 		slog.Error("Failed to parse dynawidget required section", "error", err)

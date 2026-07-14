@@ -198,6 +198,10 @@ func (req *CustomAPIRequest) initialize() error {
 		req.Method = http.MethodGet
 	}
 
+	if !strings.Contains(req.URL, "://") {
+		req.URL = "https://" + req.URL
+	}
+
 	httpReq, err := http.NewRequest(strings.ToUpper(req.Method), req.URL, req.bodyReader)
 	if err != nil {
 		return err
