@@ -196,11 +196,11 @@ You can list multiple origins. Each entry must be a full origin including the sc
 
 **If you like this project, please consider [sponsoring](https://www.paypal.com/paypalme/imartur).**
 
-<a href="https://www.star-history.com/?repos=panonim%2Fdynacat&type=date&legend=bottom-right">
+<a href="https://star-history.dera.page/#panonim/dynacat&type=date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=panonim/dynacat&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=panonim/dynacat&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=panonim/dynacat&type=date&legend=bottom-right" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=panonim/dynacat&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=panonim/dynacat&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=panonim/dynacat&type=date&legend=bottom-right" />
  </picture>
 </a>
 </div>
