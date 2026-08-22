@@ -42,6 +42,30 @@ reloads most changes automatically without a restart.
 See the full configuration reference at
 <https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md>.
 
+### Displaying Home Assistant data on the dashboard
+
+Since the add-on has no dedicated Home Assistant widget yet, use the
+`custom-api` widget with the `SUPERVISOR_TOKEN` environment variable that
+Supervisor already injects into this container - no manually created token
+needed, and it's never exposed to the browser since `custom-api` fetches and
+renders server-side:
+
+```yaml
+- type: custom-api
+  title: Living Room Temperature
+  cache: 30s
+  url: http://supervisor/core/api/states/sensor.living_room_temperature
+  headers:
+    Authorization: "Bearer ${env:SUPERVISOR_TOKEN}"
+  template: |
+    <div class="size-h2">{{ .JSON.String "state" }}°{{ .JSON.String "attributes.unit_of_measurement" }}</div>
+```
+
+See
+[docs/docs/home-assistant.md](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md)
+for more examples (multiple entities, using a manually created long-lived
+token instead).
+
 ### Authentication
 
 If you add an `auth:` section to `dynglance.yml`, you need a secret key. Since

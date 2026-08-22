@@ -1122,7 +1122,7 @@ Whether to ignore invalid/self-signed certificates.
 When set to `true`, skips the JSON validation step. This is useful when the API returns JSON Lines/newline-delimited JSON, which is a format that consists of several JSON objects separated by newlines.
 
 ##### `template`
-The template that will be used to display the data. It relies on Go's `html/template` package so it's recommended to go through [its documentation](https://pkg.go.dev/text/template) to understand how to do basic things such as conditionals, loops, etc. In addition, it also uses [tidwall's gjson](https://github.com/tidwall/gjson) package to parse the JSON data so it's worth going through its documentation if you want to use more advanced JSON selectors. You can view additional examples with explanations and function definitions [here](custom-api.md).
+The template that will be used to display the data. It relies on Go's `html/template` package so it's recommended to go through [its documentation](https://pkg.go.dev/text/template) to understand how to do basic things such as conditionals, loops, etc. In addition, it also uses [tidwall's gjson](https://github.com/tidwall/gjson) package to parse the JSON data so it's worth going through its documentation if you want to use more advanced JSON selectors. You can view additional examples with explanations and function definitions [here](custom-api.md). For a worked example pulling data out of Home Assistant specifically, see [home-assistant.md](home-assistant.md).
 
 ##### `options`
 A map of options that will be passed to the template and can be used to modify the behavior of the widget.

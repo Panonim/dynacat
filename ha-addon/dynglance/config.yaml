@@ -18,6 +18,12 @@ arch:
 # if you don't use those widgets and want to reduce the add-on's privileges.
 docker_api: true
 
+# Lets custom-api widgets reach the Home Assistant Core API at
+# http://supervisor/core/api/... using the auto-injected SUPERVISOR_TOKEN,
+# so dashboard entities can be displayed without creating a separate
+# long-lived access token. See docs/docs/home-assistant.md.
+homeassistant_api: true
+
 ingress: true
 ingress_port: 8080
 panel_icon: mdi:view-dashboard
