@@ -1,0 +1,72 @@
+{{- template "document.html" . }}
+
+{{- define "document-title" }}Upload config{{ end }}
+
+{{- define "document-head-before" }}
+<link rel="preload" href='{{ .App.StaticAssetPath "js/templating.js" }}' as="script"/>
+{{- end }}
+
+{{- define "document-head-after" }}
+<link rel="stylesheet" href='{{ .App.StaticAssetPath "css/login.css" }}'>
+<link rel="stylesheet" href='{{ .App.StaticAssetPath "css/config-upload.css" }}'>
+<script type="module" src='{{ .App.StaticAssetPath "js/config-upload.js" }}'></script>
+{{- end }}
+
+{{- define "document-body" }}
+<div class="flex flex-column body-content">
+    <div class="flex grow items-center justify-center" style="padding: 3rem 1rem">
+        <main id="config-upload-container" class="grow config-upload-bounds">
+            <h1 class="size-h3 margin-bottom-15">Upload config</h1>
+            <p class="color-paragraph margin-bottom-20">
+                Replace <code>dynglance.yml</code> outright, or save a fragment you can wire up with
+                <code>$include</code>. Requires the config-upload passphrase, independent of any
+                dashboard login.
+            </p>
+
+            <div class="animate-entrance animate-delay-1">
+                <label class="form-label widget-header" for="config-upload-passphrase">Passphrase</label>
+                <div class="form-input widget-content-frame padding-inline-widget flex gap-10 items-center">
+                    <input type="password" id="config-upload-passphrase" class="input" placeholder="********" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="margin-top-20 animate-entrance animate-delay-2">
+                <label class="form-label widget-header">What should happen to the file</label>
+                <div class="flex gap-15 margin-top-10">
+                    <label class="flex items-center gap-5">
+                        <input type="radio" name="config-upload-mode" value="replace" checked>
+                        <span>Replace dynglance.yml</span>
+                    </label>
+                    <label class="flex items-center gap-5">
+                        <input type="radio" name="config-upload-mode" value="include">
+                        <span>Save as an include fragment</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="config-upload-filename-row" class="margin-top-15 animate-entrance animate-delay-2" style="display:none">
+                <label class="form-label widget-header" for="config-upload-filename">Fragment filename</label>
+                <div class="form-input widget-content-frame padding-inline-widget flex gap-10 items-center">
+                    <input type="text" id="config-upload-filename" class="input" placeholder="home-widgets.yml" autocomplete="off">
+                </div>
+            </div>
+
+            <div id="config-upload-dropzone" class="config-upload-dropzone margin-top-20 animate-entrance animate-delay-3">
+                <p>Drag and drop a <code>.yml</code>/<code>.yaml</code> file here, or</p>
+                <label class="config-upload-browse-button">
+                    Choose file
+                    <input type="file" id="config-upload-file-input" accept=".yml,.yaml" hidden>
+                </label>
+                <p id="config-upload-filename-preview" class="color-text-subdue margin-top-10"></p>
+            </div>
+
+            <div id="config-upload-message" class="margin-top-15"></div>
+
+            <button class="login-button animate-entrance animate-delay-4" id="config-upload-submit" disabled>
+                <div>UPLOAD</div>
+            </button>
+        </main>
+    </div>
+    {{ template "footer.html" . }}
+</div>
+{{- end }}

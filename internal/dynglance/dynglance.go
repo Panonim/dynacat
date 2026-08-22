@@ -74,19 +74,28 @@ type application struct {
 	imageProxyURLs map[string]imageProxyInfo
 
 	imageCache *imageCache
+
+	// ConfigPath is the file that was actually loaded at startup (after
+	// resolveConfigPath's legacy-name fallback). It's what the config-upload
+	// feature reads/overwrites and where it resolves relative $include
+	// fragments from.
+	ConfigPath               string
+	ConfigUploadEnabled      bool
+	configUploadPasswordHash []byte
 }
 
 func newApplication(c *config) (*application, error) {
 	app := &application{
-		Version:          buildVersion,
-		CreatedAt:        time.Now(),
-		Config:           *c,
-		slugToPage:       make(map[string]*page),
-		widgetByID:       make(map[uint64]widget),
-		widgetToPage:     make(map[uint64]*page),
-		sseClients:       make(map[*sseClient]struct{}),
-		imageProxyURLs:   make(map[string]imageProxyInfo),
-		todoListIDToPage: make(map[string]*page),
+		Version:            buildVersion,
+		CreatedAt:          time.Now(),
+		Config:             *c,
+		slugToPage:         make(map[string]*page),
+		widgetByID:         make(map[uint64]widget),
+		widgetToPage:       make(map[uint64]*page),
+		sseClients:         make(map[*sseClient]struct{}),
+		imageProxyURLs:     make(map[string]imageProxyInfo),
+		todoListIDToPage:   make(map[string]*page),
+		failedAuthAttempts: make(map[string]*failedAuthAttempt),
 	}
 	config := &app.Config
 
@@ -106,7 +115,6 @@ func newApplication(c *config) (*application, error) {
 		}
 
 		app.authSecretKey = secretBytes
-		app.failedAuthAttempts = make(map[string]*failedAuthAttempt)
 
 		requireAuth := true
 		if config.Auth.RequireAuth != nil {
@@ -140,6 +148,32 @@ func newApplication(c *config) (*application, error) {
 				user.PasswordHash = hashedPassword
 			}
 		}
+	}
+
+	if config.ConfigUpload.Enabled {
+		if config.ConfigUpload.PasswordHashString == "" && config.ConfigUpload.Password == "" {
+			return nil, fmt.Errorf("config-upload.enabled is true but neither config-upload.password nor config-upload.password-hash is set")
+		}
+
+		if config.ConfigUpload.PasswordHashString != "" {
+			config.ConfigUpload.PasswordHash = []byte(config.ConfigUpload.PasswordHashString)
+			config.ConfigUpload.PasswordHashString = ""
+		} else {
+			if len(config.ConfigUpload.Password) < 12 {
+				return nil, fmt.Errorf("config-upload.password must be at least 12 characters long")
+			}
+
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(config.ConfigUpload.Password), bcrypt.DefaultCost)
+			if err != nil {
+				return nil, fmt.Errorf("hashing config-upload password: %v", err)
+			}
+
+			config.ConfigUpload.Password = ""
+			config.ConfigUpload.PasswordHash = hashedPassword
+		}
+
+		app.ConfigUploadEnabled = true
+		app.configUploadPasswordHash = config.ConfigUpload.PasswordHash
 	}
 
 	if config.Auth.OIDC != nil {
@@ -939,6 +973,11 @@ func (a *application) server() (func() error, func() error) {
 	if a.todoStorage != nil {
 		mux.HandleFunc("GET /api/todo/{listID}", a.handleTodoLoad)
 		mux.HandleFunc("PUT /api/todo/{listID}", a.handleTodoSave)
+	}
+
+	if a.ConfigUploadEnabled {
+		mux.HandleFunc("GET /config-upload", a.handleConfigUploadPageRequest)
+		mux.HandleFunc("POST /api/config-upload", a.handleConfigUploadSubmit)
 	}
 
 	mux.Handle(

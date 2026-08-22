@@ -65,6 +65,51 @@ This tells DynGlance to read the real client IP from the `X-Forwarded-For` heade
 
 ---
 
+## Config Upload
+
+Lets you replace `dynglance.yml`, or save a new `$include` fragment, from the
+browser (`/config-upload`) - a file picker and a drag-and-drop zone, gated by
+its own passphrase, independent of `auth` above. This is useful when the
+config file isn't conveniently reachable for editing, e.g. running as a
+Home Assistant add-on without a File Editor add-on installed, or on a device
+without shell/SSH access.
+
+```yaml
+config-upload:
+  enabled: true
+  password: mysecretpassphrase # at least 12 characters
+```
+
+Like `auth.users[].password`, you can supply a bcrypt hash instead with
+`password-hash` (generate one with `./dynglance password:hash <passphrase>`),
+so the plaintext never needs to sit in `dynglance.yml`.
+
+Uploading works in two modes:
+- **Replace `dynglance.yml`**: the uploaded file is validated (same checks as
+  `config:validate`, including resolving any `$include`s it contains) before
+  it's applied. The previous version is kept as a timestamped
+  `dynglance.yml.bak-<unix-timestamp>` (the last 5 are kept, older ones are
+  pruned automatically) so a bad upload can always be rolled back by hand.
+  Once written, the existing config file watcher picks up the change and
+  hot-reloads automatically - no restart needed.
+- **Save as an include fragment**: the file is written to an `uploads/`
+  folder next to `dynglance.yml` and only checked for valid YAML syntax (it
+  doesn't have to be a complete, valid config on its own). You then add the
+  returned `$include: uploads/<filename>` line into `dynglance.yml` yourself
+  - uploading never silently rewrites your hand-authored config.
+
+This is a genuinely privileged endpoint (it can replace your entire
+dashboard configuration), so:
+- It's disabled by default and has no effect unless `config-upload.enabled`
+  is `true` and a `password`/`password-hash` is set.
+- Failed passphrase attempts are rate-limited the same way login attempts
+  are (5 attempts per 5 minutes per IP, with a randomized delay on every
+  failure).
+- The passphrase is completely separate from `auth` - enabling this does not
+  require or interact with viewer authentication, and vice versa.
+
+---
+
 ## OIDC Authentication
 
 Integrate with any OpenID Connect identity provider (Authentik, Authelia, PocketID, etc.) using the OAuth2 Authorization Code flow with PKCE.

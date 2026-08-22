@@ -12,6 +12,9 @@
         {{ else }}
             ({{ .App.Version }})
         {{ end }}
+        {{ if .App.ConfigUploadEnabled }}
+            • <a class="visited-indicator" href="{{ .App.Config.Server.BaseURL }}/config-upload">Upload config</a>
+        {{ end }}
     </div>
 {{ else }}
     {{ .App.Config.Branding.CustomFooter }}

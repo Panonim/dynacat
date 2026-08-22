@@ -1,0 +1,40 @@
+.config-upload-bounds {
+    max-width: 560px;
+    width: 100%;
+    padding: 0 2rem;
+}
+
+.config-upload-dropzone {
+    border: 1px dashed var(--color-text-subdue);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    text-align: center;
+    transition: border-color .2s, background-color .2s;
+}
+
+.config-upload-dropzone-active {
+    border-color: var(--color-primary);
+    background-color: var(--color-separator);
+}
+
+.config-upload-browse-button {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.6rem 1.4rem;
+    border: 1px solid var(--color-text-subdue);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+}
+
+.config-upload-browse-button:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+#config-upload-message:not(:empty) {
+    white-space: pre-line;
+    padding: 1.3rem calc(var(--widget-content-horizontal-padding) + 1px);
+    border-radius: var(--border-radius);
+    background: var(--color-separator);
+}

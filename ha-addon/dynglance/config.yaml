@@ -38,9 +38,15 @@ ports_description:
 #   Editable from the Studio Code Server / File editor add-ons.
 # share -> /share: optional, only useful if widgets need to read files that
 #   already live in Home Assistant's shared folder (e.g. bookmarked local docs).
+# homeassistant_config -> /homeassistant, read-only: lets dynglance.yml's
+#   `$include` reference YAML files that already live in your main Home
+#   Assistant config folder (e.g. a `dynglance-widgets.yml` you keep next to
+#   your other packages), instead of duplicating them under /config. See
+#   docs/docs/home-assistant.md.
 map:
   - addon_config:rw
   - share:rw
+  - homeassistant_config:ro
 
 options:
   log_level: info

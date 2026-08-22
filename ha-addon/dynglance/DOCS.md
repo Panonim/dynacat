@@ -42,6 +42,22 @@ reloads most changes automatically without a restart.
 See the full configuration reference at
 <https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md>.
 
+### Three ways to get a config onto the add-on
+
+1. **Reference files already in your Home Assistant config** - the add-on
+   mounts Home Assistant's `/config` read-only at `/homeassistant` inside the
+   container, so `dynglance.yml` can `$include` YAML files you keep there
+   (e.g. under a `dynglance/` folder), instead of duplicating them. See
+   [docs/docs/home-assistant.md](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md#5-referencing-config-files-that-live-in-your-home-assistant-config-folder).
+2. **Edit the file directly** via the File editor/Studio Code Server add-ons,
+   as described above.
+3. **Upload or drag-and-drop from the browser** - enable `config-upload` in
+   `dynglance.yml` and a passphrase-gated `/config-upload` page becomes
+   available with a file picker and a drop zone, letting you replace
+   `dynglance.yml` or add an `$include` fragment without shell/file-manager
+   access at all. See
+   [docs/docs/authentication.md#config-upload](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/authentication.md#config-upload).
+
 ### Displaying Home Assistant data on the dashboard
 
 Since the add-on has no dedicated Home Assistant widget yet, use the

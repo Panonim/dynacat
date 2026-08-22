@@ -51,6 +51,17 @@ type config struct {
 		OIDC            *oidcConfig      `yaml:"oidc"`
 	} `yaml:"auth"`
 
+	// ConfigUpload gates the /config-upload page and its API, which lets
+	// someone with the passphrase replace dynglance.yml or add a new
+	// $include fragment from the browser (file picker or drag-and-drop),
+	// independently of whatever auth (if any) is configured for viewers.
+	ConfigUpload struct {
+		Enabled            bool   `yaml:"enabled"`
+		Password           string `yaml:"password"`
+		PasswordHash       []byte `yaml:"-"`
+		PasswordHashString string `yaml:"password-hash"`
+	} `yaml:"config-upload"`
+
 	Document struct {
 		Head template.HTML `yaml:"head"`
 	} `yaml:"document"`

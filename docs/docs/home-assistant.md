@@ -92,7 +92,36 @@ headers:
   Authorization: "Bearer ${env:SUPERVISOR_TOKEN}"
 ```
 
-## 5. Pushing data from Home Assistant instead of polling
+## 5. Referencing config files that live in your Home Assistant config folder
+
+The add-on maps Home Assistant's own config directory into the container,
+read-only, at `/homeassistant`. Combined with `dynglance.yml`'s `$include`
+directive, this lets you keep widget definitions alongside the rest of your
+Home Assistant config (e.g. under a `dynglance/` folder you already sync or
+back up) instead of duplicating them into the add-on's own `/config`:
+
+```yaml
+# in /addon_configs/<slug>/dynglance.yml
+pages:
+  - name: Home
+    columns:
+      - size: full
+        widgets:
+          - $include: /homeassistant/dynglance/home-widgets.yml
+```
+
+`/homeassistant/dynglance/home-widgets.yml` is then just a plain YAML list of
+widgets (or any other includable fragment), edited directly from the Home
+Assistant `/config` folder via the File editor/Studio Code Server add-ons,
+Samba, or an automation that regenerates it. Included files are watched the
+same as `dynglance.yml` itself, so edits apply automatically without
+restarting the add-on.
+
+If you're running the standalone Docker container instead of the add-on,
+the equivalent is mounting the folder yourself, e.g.
+`-v /path/to/ha/config:/homeassistant:ro`.
+
+## 6. Pushing data from Home Assistant instead of polling
 
 The recipes above are pull-based: DynGlance polls Home Assistant on
 `cache`'s schedule (as low as a few seconds, though very short intervals add
