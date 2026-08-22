@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -244,8 +245,9 @@ func serveUpdateNoticeIfConfigLocationNotMigrated(configPath string) bool {
 	})
 
 	server := http.Server{
-		Addr:    ":8080",
-		Handler: mux,
+		Addr:              ":8080",
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 	server.ListenAndServe()
 

@@ -148,6 +148,9 @@ Configuration is done through YAML files, to learn more about how the layout wor
 ```
 </details>
 
+## Home Assistant add-on
+Dynacat can also be installed as a Home Assistant add-on, running the same container under Supervisor with Ingress support. See [`ha-addon/dynacat/DOCS.md`](ha-addon/dynacat/DOCS.md) for installation steps and add-on specific configuration.
+
 ## Common issues
 <details>
 <summary><strong>Requests timing out</strong></summary>

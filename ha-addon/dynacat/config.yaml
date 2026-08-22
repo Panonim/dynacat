@@ -1,0 +1,45 @@
+name: Dynacat
+version: "1.0.0"
+slug: dynacat
+description: Self-hosted dashboard (Glance fork) with dynamic widgets, run as a Home Assistant add-on
+url: https://github.com/trooperthorn/ha_app_dynglance
+webui: "http://[HOST]:[PORT:8080]/"
+startup: application
+boot: auto
+init: false
+arch:
+  - amd64
+  - aarch64
+  - armv7
+
+# Grants access to /var/run/docker.sock so the docker-containers and
+# docker-controller widgets work out of the box. This is equivalent to full
+# root access to the host - disable it (set to false and rebuild/reinstall)
+# if you don't use those widgets and want to reduce the add-on's privileges.
+docker_api: true
+
+ingress: true
+ingress_port: 8080
+panel_icon: mdi:view-dashboard
+panel_title: Dynacat
+
+ports:
+  8080/tcp: 8080
+ports_description:
+  8080/tcp: "Dynacat web UI (only needed for direct/non-Ingress access, e.g. from outside Home Assistant)"
+
+# addon_config -> /config: where dynacat.yml, custom CSS/assets and themes live.
+#   Editable from the Studio Code Server / File editor add-ons.
+# share -> /share: optional, only useful if widgets need to read files that
+#   already live in Home Assistant's shared folder (e.g. bookmarked local docs).
+map:
+  - addon_config:rw
+  - share:rw
+
+options:
+  log_level: info
+  timezone: ""
+
+schema:
+  log_level: list(debug|info|warning|error)
+  timezone: str?

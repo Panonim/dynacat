@@ -419,11 +419,20 @@ func (a *application) sseUnregisterClient(c *sseClient) {
 	a.sseMu.Unlock()
 }
 
+// widgetUpdateBatchTimeout caps how long a single batch of widget updates may
+// run. p.mu is held for the duration of the batch (see updateOutdatedWidgets
+// and sseCheckAndPushUpdates), so without this ceiling a single widget whose
+// update() call hangs (a stalled outbound connection that never trips its own
+// timeout) would block that mutex forever, wedging every subsequent request
+// and SSE tick for the page indefinitely.
+const widgetUpdateBatchTimeout = 25 * time.Second
+
 func (p *page) updateOutdatedWidgets() {
 	now := time.Now()
 
 	var wg sync.WaitGroup
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), widgetUpdateBatchTimeout)
+	defer cancel()
 
 	for w := range p.HeadWidgets {
 		widget := p.HeadWidgets[w]
@@ -997,8 +1006,10 @@ func (a *application) server() (func() error, func() error) {
 	}
 
 	server := http.Server{
-		Addr:    fmt.Sprintf("%s:%d", a.Config.Server.Host, a.Config.Server.Port),
-		Handler: a.securityHeadersMiddleware(mux),
+		Addr:              fmt.Sprintf("%s:%d", a.Config.Server.Host, a.Config.Server.Port),
+		Handler:           a.securityHeadersMiddleware(mux),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	start := func() error {

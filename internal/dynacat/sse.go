@@ -328,7 +328,12 @@ func (a *application) sseCheckAndPushUpdates(ctx context.Context) {
 				return
 			}
 
-			w.update(withSharedFetchMaxAge(ctx, w.getCacheDuration()))
+			// Bound the update so a stalled widget can never hold pg.mu (and thus
+			// every page request and SSE tick for it) indefinitely.
+			updateCtx, cancel := context.WithTimeout(ctx, widgetUpdateBatchTimeout)
+			defer cancel()
+
+			w.update(withSharedFetchMaxAge(updateCtx, w.getCacheDuration()))
 			html := string(w.Render())
 
 			type payload struct {
