@@ -1,6 +1,6 @@
 # Search
 
-This documentation file describes the search functionality available in the Dynacat Docs. 
+This documentation file describes the search functionality available in the DynGlance Docs. 
 It explains optional operators that can be used for more precise information retrieval.
 
 ## Operators

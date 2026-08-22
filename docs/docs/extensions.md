@@ -6,7 +6,7 @@
 
 ## Overview
 
-With the intention of requiring minimal knowledge in order to develop extensions, rather than being a convoluted protocol they are nothing more than an HTTP request to a server that returns a few special headers. The exchange between Dynacat and extensions can be seen in the following diagram:
+With the intention of requiring minimal knowledge in order to develop extensions, rather than being a convoluted protocol they are nothing more than an HTTP request to a server that returns a few special headers. The exchange between DynGlance and extensions can be seen in the following diagram:
 
 ![](images/extension-overview.png)
 
@@ -14,7 +14,7 @@ If you know how to setup an HTTP server and a bit of HTML and CSS you're ready t
 
 > [!TIP]
 >
-> By default, the extension widget has a cache time of 30 minutes. To avoid having to restart Dynacat after every extension change you can set the cache time of the widget to 1 second:
+> By default, the extension widget has a cache time of 30 minutes. To avoid having to restart DynGlance after every extension change you can set the cache time of the widget to 1 second:
 > ```yaml
 > - type: extension
 >   url: http://localhost:8081
@@ -39,14 +39,14 @@ When set to `true`, the widget's content will be displayed without the default b
 
 > [!NOTE]
 >
-> Currently, `html` is the only supported content type. The long-term goal is to have generic content types such as `videos`, `forum-posts`, `markets`, `streams`, etc. which will be returned in JSON format and displayed by Dynacat using existing styles and functionality, allowing extension developers to achieve a native look while only focusing on providing data from their preferred source.
+> Currently, `html` is the only supported content type. The long-term goal is to have generic content types such as `videos`, `forum-posts`, `markets`, `streams`, etc. which will be returned in JSON format and displayed by DynGlance using existing styles and functionality, allowing extension developers to achieve a native look while only focusing on providing data from their preferred source.
 
 ### `html`
 Displays the content as HTML. This requires the user to have the `allow-potentially-dangerous-html` property set to `true`, otherwise the content will be shown as plain text.
 
 
 #### Using existing classes and functionality
-Most of the features seen throughout Dynacat can easily be used in your custom HTML extensions. Below is an example of some of these features:
+Most of the features seen throughout DynGlance can easily be used in your custom HTML extensions. Below is an example of some of these features:
 
 ```html
 <p class="color-subdue">Text with subdued color</p>

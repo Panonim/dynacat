@@ -1,7 +1,7 @@
 FROM alpine:3.21
 
 WORKDIR /app
-COPY dynacat .
+COPY dynglance .
 
 EXPOSE 8080/tcp
-ENTRYPOINT ["/app/dynacat", "--config", "/app/config/dynacat.yml"]
+ENTRYPOINT ["/app/dynglance", "--config", "/app/config/dynglance.yml"]

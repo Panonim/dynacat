@@ -1,6 +1,6 @@
 # FAQ
 ## Does the information on the page update automatically?
-Yes! That's the whole point of Dynacat
+Yes! That's the whole point of DynGlance
 
 ## Can I create my own widgets?
 
@@ -27,19 +27,19 @@ The title of all widgets can be changed by specifying the `title` property in th
 # and so on for all widgets...
 ```
 
-## I get an error: dynacat.yml: no such file or directory
+## I get an error: dynglance.yml: no such file or directory
 
-Rename your file `glance.yml` into `dynacat.yml` if you are transitioning from Glance. 
+Rename your file `glance.yml` into `dynglance.yml` if you are transitioning from Glance. 
 
 If you're not make sure you copied the installation command correctly:
 
 ```bash
-mkdir dynacat && cd dynacat && \
+mkdir dynglance && cd dynglance && \
 curl -sL https://github.com/glanceapp/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2 && \
 sed -i \
-  -e 's/^  glance:/  dynacat:/' \
-  -e 's/^    container_name: glance/    container_name: dynacat/' \
-  -e 's/^    image: glanceapp\/glance/    image: panonim\/dynacat/' \
+  -e 's/^  glance:/  dynglance:/' \
+  -e 's/^    container_name: glance/    container_name: dynglance/' \
+  -e 's/^    image: glanceapp\/glance/    image: ghcr.io\/trooperthorn\/ha_app_dynglance/' \
   docker-compose.yml && \
-mv config/glance.yml config/dynacat.yml
+mv config/glance.yml config/dynglance.yml
 ```

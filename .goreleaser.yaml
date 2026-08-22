@@ -1,10 +1,10 @@
-project_name: dynacat
+project_name: dynglance
 
 checksum:
   disable: true
 
 builds:
-  - binary: dynacat
+  - binary: dynglance
     env:
       - CGO_ENABLED=0
     goos:
@@ -21,11 +21,11 @@ builds:
     goarm:
       - 7
     ldflags:
-      - -s -w -X github.com/Panonim/dynacat/internal/dynacat.buildVersion={{ .Tag }}
+      - -s -w -X github.com/Panonim/dynglance/internal/dynglance.buildVersion={{ .Tag }}
 
 archives:
   -
-    name_template: "dynacat-{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+    name_template: "dynglance-{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
     files:
       - nothing*
     format_overrides:

@@ -2,7 +2,9 @@
 /build
 /playground
 /.idea
+/dynglance*.yml
 /dynacat*.yml
+/glance*.yml
 docs/dynadev.yml
 docker-test/
 Makefile

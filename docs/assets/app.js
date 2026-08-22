@@ -613,7 +613,7 @@ async function navigateTo(pageId, hash, skipPushState) {
     const unknownPageId = pageId;
     setActiveNav('');
     bcPageEl.textContent = '404';
-    document.title = 'Page Not Found - Dynacat';
+    document.title = 'Page Not Found - DynGlance';
     const mainContainer = document.querySelector('.main');
     if (mainContainer) mainContainer.classList.remove('is-home');
     setHomeCursorTracking(false);
@@ -629,7 +629,7 @@ async function navigateTo(pageId, hash, skipPushState) {
   currentPage = pageId;
   setActiveNav(pageId);
   bcPageEl.textContent = PAGES[pageId].label;
-  document.title = `${PAGES[pageId].title} - Dynacat`;
+  document.title = `${PAGES[pageId].title} - DynGlance`;
 
   // Toggle home-specific layout (hide topbar, full-width)
   const mainContainer = document.querySelector('.main');
@@ -674,8 +674,8 @@ function parseMarkdown(md) {
     return `(#nav:${page}${hash || ''})`;
   });
 
-  // Preprocess: fix dynacat.yml link
-  md = md.replace(/\(dynacat\.yml\)/g, '(docs/dynacat.yml)');
+  // Preprocess: fix dynglance.yml link
+  md = md.replace(/\(dynglance\.yml\)/g, '(docs/dynglance.yml)');
 
   return marked.parse(md);
 }
@@ -1423,7 +1423,7 @@ async function getVersionTag() {
   }
 
   try {
-    const res = await fetch('https://api.github.com/repos/panonim/dynacat/releases/latest');
+    const res = await fetch('https://api.github.com/repos/trooperthorn/ha_app_dynglance/releases/latest');
     if (res.ok) {
       const data = await res.json();
       const versionTag = `v${data.tag_name}`;
@@ -1462,7 +1462,7 @@ async function getGitHubStargazers() {
   }
 
   try {
-    const res = await fetch('https://api.github.com/repos/panonim/dynacat');
+    const res = await fetch('https://api.github.com/repos/trooperthorn/ha_app_dynglance');
     if (res.ok) {
       const data = await res.json();
       const stargazersCount = data.stargazers_count;
@@ -1504,8 +1504,8 @@ async function getDockerPullCount() {
 
   // Try multiple CORS proxy services
   const proxies = [
-    'https://corsproxy.io/?https://hub.docker.com/v2/repositories/panonim/dynacat/',
-    'https://api.allorigins.win/raw?url=https://hub.docker.com/v2/repositories/panonim/dynacat/',
+    'https://corsproxy.io/?https://hub.docker.com/v2/repositories/trooperthorn/ha_app_dynglance/',
+    'https://api.allorigins.win/raw?url=https://hub.docker.com/v2/repositories/trooperthorn/ha_app_dynglance/',
   ];
 
   for (const proxyUrl of proxies) {
@@ -1618,7 +1618,7 @@ async function renderHome() {
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>`,
       title: 'External Integrations',
-      desc: 'Compared to original, Dynacat offers easy integration with services like Jellyfin, Plex, qBittorrent and more.'
+      desc: 'Compared to original, DynGlance offers easy integration with services like Jellyfin, Plex, qBittorrent and more.'
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>`,
@@ -1648,7 +1648,7 @@ async function renderHome() {
     { page: 'themes', title: 'Themes', desc: 'Browse dark and light theme options', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>` },
     { page: 'preconfigured-pages', title: 'Preconfigured Pages', desc: 'Ready-to-use page layouts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 10v10"/></svg>` },
     { page: 'custom-api', title: 'Custom API', desc: 'Build widgets from any HTTP JSON API', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6L3 12l5 6"/><path d="M16 6l5 6-5 6"/><path d="M13 4l-2 16"/></svg>` },
-    { page: 'extensions', title: 'Extensions', desc: 'Extend Dynacat with custom HTML and scripts', icon: `<svg fill="currentColor" width="800px" height="800px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M16 32.005c-0.634 0-1.231-0.246-1.68-0.693l-13.641-13.64c-0.923-0.927-0.923-2.436-0.002-3.361l4.997-4.996c0.308-0.309 0.782-0.382 1.17-0.179 0.386 0.202 0.598 0.632 0.522 1.062-0.051 0.286-0.074 0.515-0.074 0.723 0 2.188 1.78 4.005 3.969 4.005 2.191 0 3.79-1.817 3.79-4.005 0-2.191-1.599-3.971-3.79-3.971-0.205 0-0.433 0.024-0.719 0.074-0.434 0.080-0.86-0.135-1.062-0.521-0.202-0.388-0.129-0.862 0.179-1.17l4.659-4.66c0.902-0.898 2.463-0.896 3.361-0.002l3.411 3.413c0.712-2.213 2.79-3.82 5.235-3.82 3.032 0 5.499 2.468 5.499 5.501 0 2.446-1.605 4.523-3.82 5.234l3.314 3.312c0.925 0.928 0.925 2.436 0.001 3.363l-13.639 13.64c-0.451 0.45-1.047 0.696-1.681 0.696zM5.465 12.351l-3.372 3.371c-0.145 0.146-0.145 0.389 0.002 0.537l13.636 13.637c0.191 0.189 0.342 0.192 0.537-0.002l13.636-13.637c0.146-0.148 0.146-0.387-0.001-0.536l-4.809-4.806c-0.301-0.301-0.379-0.76-0.194-1.143s0.589-0.61 1.016-0.557l0.152 0.020c0.084 0.011 0.168 0.025 0.256 0.025 1.93 0 3.499-1.569 3.499-3.497 0-1.931-1.57-3.501-3.499-3.501s-3.498 1.571-3.498 3.501c0 0.080 0.012 0.158 0.023 0.236l0.021 0.178c0.045 0.422-0.18 0.826-0.563 1.009-0.38 0.181-0.838 0.104-1.137-0.196l-4.904-4.907c-0.192-0.19-0.342-0.192-0.537 0.002l-3.035 3.035c2.603 0.644 4.356 2.999 4.356 5.798 0 3.291-2.498 6.004-5.79 6.004-2.798-0-5.152-1.972-5.795-4.572z"></path></svg>` }
+    { page: 'extensions', title: 'Extensions', desc: 'Extend DynGlance with custom HTML and scripts', icon: `<svg fill="currentColor" width="800px" height="800px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M16 32.005c-0.634 0-1.231-0.246-1.68-0.693l-13.641-13.64c-0.923-0.927-0.923-2.436-0.002-3.361l4.997-4.996c0.308-0.309 0.782-0.382 1.17-0.179 0.386 0.202 0.598 0.632 0.522 1.062-0.051 0.286-0.074 0.515-0.074 0.723 0 2.188 1.78 4.005 3.969 4.005 2.191 0 3.79-1.817 3.79-4.005 0-2.191-1.599-3.971-3.79-3.971-0.205 0-0.433 0.024-0.719 0.074-0.434 0.080-0.86-0.135-1.062-0.521-0.202-0.388-0.129-0.862 0.179-1.17l4.659-4.66c0.902-0.898 2.463-0.896 3.361-0.002l3.411 3.413c0.712-2.213 2.79-3.82 5.235-3.82 3.032 0 5.499 2.468 5.499 5.501 0 2.446-1.605 4.523-3.82 5.234l3.314 3.312c0.925 0.928 0.925 2.436 0.001 3.363l-13.639 13.64c-0.451 0.45-1.047 0.696-1.681 0.696zM5.465 12.351l-3.372 3.371c-0.145 0.146-0.145 0.389 0.002 0.537l13.636 13.637c0.191 0.189 0.342 0.192 0.537-0.002l13.636-13.637c0.146-0.148 0.146-0.387-0.001-0.536l-4.809-4.806c-0.301-0.301-0.379-0.76-0.194-1.143s0.589-0.61 1.016-0.557l0.152 0.020c0.084 0.011 0.168 0.025 0.256 0.025 1.93 0 3.499-1.569 3.499-3.497 0-1.931-1.57-3.501-3.499-3.501s-3.498 1.571-3.498 3.501c0 0.080 0.012 0.158 0.023 0.236l0.021 0.178c0.045 0.422-0.18 0.826-0.563 1.009-0.38 0.181-0.838 0.104-1.137-0.196l-4.904-4.907c-0.192-0.19-0.342-0.192-0.537 0.002l-3.035 3.035c2.603 0.644 4.356 2.999 4.356 5.798 0 3.291-2.498 6.004-5.79 6.004-2.798-0-5.152-1.972-5.795-4.572z"></path></svg>` }
   ];
 
   const featureCards = features.map((f) => `
@@ -1694,7 +1694,7 @@ async function renderHome() {
               </div>
             </div>
             <div class="home-logo-wrapper" style="position: relative; width: 280px; height: 280px; flex-shrink: 0; margin-left: auto; margin-top: -40px;">
-              <img src="assets/model/model_noeyes.svg" alt="Dynacat" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+              <img src="assets/model/model_noeyes.svg" alt="DynGlance" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
               <img src="assets/model/eyeright.svg" alt="" id="eye-left" style="position: absolute; width: 3.152%; height: 7.0%; top: 52.94%; left: 19.51%; transition: transform 0.1s ease-out; transform-origin: center;">
               <img src="assets/model/eyeright.svg" alt="" id="eye-right" style="position: absolute; width: 4.456%; height: 7.444%; top: 53.83%; left: 56.14%; transition: transform 0.1s ease-out; transform-origin: center;">
             </div>
@@ -1703,21 +1703,21 @@ async function renderHome() {
         <div class="home-hero-glow"></div>
       </div>
 
-      <!-- What is Dynacat -->
+      <!-- What is DynGlance -->
       <section class="home-about">
         <div class="home-section-label">About</div>
-        <h2 class="home-section-heading">What is Dynacat?</h2>
+        <h2 class="home-section-heading">What is DynGlance?</h2>
         <div class="home-about-grid">
           <div class="home-about-text">
             <p>
-              Dynacat is a self-hosted dashboard built for people who want their
+              DynGlance is a self-hosted dashboard built for people who want their
               information in one place. Forked from <strong>Glance</strong>, it focuses on
               <em>dynamic content updates</em> and <em>seamless integration with
               external applications</em> - without requiring you to write custom widgets.
             </p>
             <p>
               Configure everything in a single YAML file, deploy with Docker, and
-              let Dynacat handle the rest. Widgets auto-refresh on configurable
+              let DynGlance handle the rest. Widgets auto-refresh on configurable
               schedules, so your dashboard stays current without manual intervention.
             </p>
           </div>
@@ -1748,7 +1748,7 @@ async function renderHome() {
       <!-- Community -->
       <section class="home-community-section">
         <div class="home-community-grid">
-          <a class="home-community-card" href="https://github.com/Panonim/dynacat" target="_blank" rel="noopener">
+          <a class="home-community-card" href="https://github.com/trooperthorn/ha_app_dynglance" target="_blank" rel="noopener">
             <div class="home-community-icon">
               <svg viewBox="0 0 16 16" fill="currentColor" width="20" height="20"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
             </div>

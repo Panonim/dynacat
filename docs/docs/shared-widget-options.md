@@ -83,7 +83,7 @@ Example:
 
 Allows you to specify custom CSS class names for individual widgets. This is useful when combined with a custom CSS file to apply specific styling to particular widgets.
 
-Because Dynacat uses utility classes, it can be difficult to target specific elements. Each widget already has a `widget-type-{name}` class automatically applied. With `css-class`, you can add additional classes for more targeted styling.
+Because DynGlance uses utility classes, it can be difficult to target specific elements. Each widget already has a `widget-type-{name}` class automatically applied. With `css-class`, you can add additional classes for more targeted styling.
 
 Example:
 

@@ -1,14 +1,14 @@
 <p align="center"><img width="250px" src="docs/docs/logo.png"></p>
-<h1 align="center">Dynacat</h1>
+<h1 align="center">DynGlance</h1>
 <p align="center">
-  <a href="https://dynacat.artur.zone/configuration">Configuration</a> •
-  <a href="https://discord.gg/mUqTzrfjFP">Discord</a> •
-  <a href="https://www.paypal.com/paypalme/imartur">Sponsor</a> 
+  <a href="https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md">Configuration</a> •
+  <a href="https://github.com/trooperthorn/ha_app_dynglance/issues">Issues</a> •
+  <a href="https://github.com/trooperthorn/ha_app_dynglance/wiki">Wiki</a> 
 </p>
 <p align="center">
   <a href="https://github.com/Panonim/dynawidgets">Dynawidgets repo</a> •
-  <a href="https://dynacat.artur.zone/preconfigured-pages">Preconfigured pages</a> •
-  <a href="https://dynacat.artur.zone/themes">Themes</a> 
+  <a href="https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/preconfigured-pages.md">Preconfigured pages</a> •
+  <a href="https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/themes.md">Themes</a> 
 </p>
 
 <p align="center">Self-hosted dashboard built for people who want their information in one place.<br>Forked from Glance - it focuses on dynamic content updates and seamless integration with external applications.</p>
@@ -27,7 +27,7 @@
 * Docker containers status
 * Server stats
 * Custom widgets
-* [and many more...](https://dynacat.artur.zone/configuration#configuring-dynacat)
+* [and many more...](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md#configuring-dynglance)
 
 ### Fast and lightweight
 * Low memory usage
@@ -49,14 +49,14 @@ Because you'll want to take it with you on the go.
 ![](docs/docs/images/mobile-preview.png)
 
 ### Themeable
-Easily create your own theme by tweaking a few numbers or choose from one of the [already available themes](https://dynacat.artur.zone/themes).
+Easily create your own theme by tweaking a few numbers or choose from one of the [already available themes](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/themes.md).
 
 ![](docs/docs/images/themes-example.png)
 
 <br>
 
 ## Configuration
-Configuration is done through YAML files, to learn more about how the layout works, how to add more pages and how to configure widgets, visit the [configuration documentation](https://dynacat.artur.zone/configuration#configuring-dynacat).
+Configuration is done through YAML files, to learn more about how the layout works, how to add more pages and how to configure widgets, visit the [configuration documentation](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md#configuring-dynglance).
 
 <details>
 <summary><strong>Preview example configuration file</strong></summary>
@@ -141,12 +141,15 @@ Configuration is done through YAML files, to learn more about how the layout wor
           - type: releases
             cache: 1d
             repositories:
-              - panonim/dynacat
+              - trooperthorn/ha_app_dynglance
               - go-gitea/gitea
               - immich-app/immich
               - syncthing/syncthing
 ```
 </details>
+
+## Home Assistant add-on
+DynGlance can also be installed as a Home Assistant add-on, running the same container under Supervisor with Ingress support. See [`ha-addon/dynglance/DOCS.md`](ha-addon/dynglance/DOCS.md) for installation steps and add-on specific configuration.
 
 ## Common issues
 <details>
@@ -165,20 +168,20 @@ networks:
 <details>
 <summary><strong>Broken layout for markets, bookmarks or other widgets</strong></summary>
 
-This is almost always caused by the browser extension Dark Reader. To fix this, disable dark mode for the domain where Dynacat is hosted.
+This is almost always caused by the browser extension Dark Reader. To fix this, disable dark mode for the domain where DynGlance is hosted.
 </details>
 
 <details>
-<summary><strong>cannot unmarshal !!map into []dynacat.page</strong></summary>
+<summary><strong>cannot unmarshal !!map into []dynglance.page</strong></summary>
 
-The most common cause of this is having a `pages` key in your `dynacat.yml` and then also having a `pages` key inside one of your included pages. To fix this, remove the `pages` key from the top of your included pages.
+The most common cause of this is having a `pages` key in your `dynglance.yml` and then also having a `pages` key inside one of your included pages. To fix this, remove the `pages` key from the top of your included pages.
 
 </details>
 
 <details>
-<summary><strong>Cannot embed Dynacat in an iframe</strong></summary>
+<summary><strong>Cannot embed DynGlance in an iframe</strong></summary>
 
-By default Dynacat only allows itself to be embedded on the same origin (`frame-ancestors 'self'`). To allow embedding from another host such as Homepage, add the `allowed-embed-hosts` option under `server` in your `dynacat.yml`:
+By default DynGlance only allows itself to be embedded on the same origin (`frame-ancestors 'self'`). To allow embedding from another host such as Homepage, add the `allowed-embed-hosts` option under `server` in your `dynglance.yml`:
 
 ```yaml
 server:
@@ -194,13 +197,13 @@ You can list multiple origins. Each entry must be a full origin including the sc
 
 <div style='text-align: center;'>
 
-**If you like this project, please consider [sponsoring](https://www.paypal.com/paypalme/imartur).**
+**If you like this project, please consider starring it, and also check out the original [Dynacat](https://github.com/Panonim/dynacat) and [Glance](https://github.com/glanceapp/glance) projects it builds on.**
 
-<a href="https://www.star-history.com/?repos=panonim%2Fdynacat&type=date&legend=bottom-right">
+<a href="https://www.star-history.com/?repos=trooperthorn%2Fha_app_dynglance&type=date&legend=bottom-right">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=panonim/dynacat&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=panonim/dynacat&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=panonim/dynacat&type=date&legend=bottom-right" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=trooperthorn/ha_app_dynglance&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=trooperthorn/ha_app_dynglance&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=trooperthorn/ha_app_dynglance&type=date&legend=bottom-right" />
  </picture>
 </a>
 </div>

@@ -1,6 +1,6 @@
 # Authentication
 
-Dynacat supports two authentication methods: username/password and OIDC (Single Sign-On). Both methods can be active at the same time.
+DynGlance supports two authentication methods: username/password and OIDC (Single Sign-On). Both methods can be active at the same time.
 
 ## Password Authentication
 
@@ -8,7 +8,7 @@ Protect your dashboard with username and password login. Configure via the top-l
 
 ```yaml
 auth:
-  secret-key: # generate with: ./dynacat secret:make
+  secret-key: # generate with: ./dynglance secret:make
   users:
     admin:
       password: mysecretpassword
@@ -19,13 +19,13 @@ auth:
 To generate a secret key:
 
 ```sh
-./dynacat secret:make
+./dynglance secret:make
 ```
 
 Or with Docker:
 
 ```sh
-docker run --rm panonim/dynacat secret:make
+docker run --rm ghcr.io/trooperthorn/ha_app_dynglance secret:make
 ```
 
 ### Hashed passwords
@@ -33,13 +33,13 @@ docker run --rm panonim/dynacat secret:make
 Avoid storing plain passwords in your config by hashing them first:
 
 ```sh
-./dynacat password:hash mysecretpassword
+./dynglance password:hash mysecretpassword
 ```
 
 Or with Docker:
 
 ```sh
-docker run --rm panonim/dynacat password:hash mysecretpassword
+docker run --rm ghcr.io/trooperthorn/ha_app_dynglance password:hash mysecretpassword
 ```
 
 Then use `password-hash` instead of `password`:
@@ -54,14 +54,59 @@ auth:
 
 ### Brute-force protection
 
-Dynacat automatically blocks IPs that fail to authenticate 5 times within 5 minutes. For this to work correctly behind a reverse proxy, set:
+DynGlance automatically blocks IPs that fail to authenticate 5 times within 5 minutes. For this to work correctly behind a reverse proxy, set:
 
 ```yaml
 server:
   proxied: true
 ```
 
-This tells Dynacat to read the real client IP from the `X-Forwarded-For` header.
+This tells DynGlance to read the real client IP from the `X-Forwarded-For` header.
+
+---
+
+## Config Upload
+
+Lets you replace `dynglance.yml`, or save a new `$include` fragment, from the
+browser (`/config-upload`) - a file picker and a drag-and-drop zone, gated by
+its own passphrase, independent of `auth` above. This is useful when the
+config file isn't conveniently reachable for editing, e.g. running as a
+Home Assistant add-on without a File Editor add-on installed, or on a device
+without shell/SSH access.
+
+```yaml
+config-upload:
+  enabled: true
+  password: mysecretpassphrase # at least 12 characters
+```
+
+Like `auth.users[].password`, you can supply a bcrypt hash instead with
+`password-hash` (generate one with `./dynglance password:hash <passphrase>`),
+so the plaintext never needs to sit in `dynglance.yml`.
+
+Uploading works in two modes:
+- **Replace `dynglance.yml`**: the uploaded file is validated (same checks as
+  `config:validate`, including resolving any `$include`s it contains) before
+  it's applied. The previous version is kept as a timestamped
+  `dynglance.yml.bak-<unix-timestamp>` (the last 5 are kept, older ones are
+  pruned automatically) so a bad upload can always be rolled back by hand.
+  Once written, the existing config file watcher picks up the change and
+  hot-reloads automatically - no restart needed.
+- **Save as an include fragment**: the file is written to an `uploads/`
+  folder next to `dynglance.yml` and only checked for valid YAML syntax (it
+  doesn't have to be a complete, valid config on its own). You then add the
+  returned `$include: uploads/<filename>` line into `dynglance.yml` yourself
+  - uploading never silently rewrites your hand-authored config.
+
+This is a genuinely privileged endpoint (it can replace your entire
+dashboard configuration), so:
+- It's disabled by default and has no effect unless `config-upload.enabled`
+  is `true` and a `password`/`password-hash` is set.
+- Failed passphrase attempts are rate-limited the same way login attempts
+  are (5 attempts per 5 minutes per IP, with a randomized delay on every
+  failure).
+- The passphrase is completely separate from `auth` - enabling this does not
+  require or interact with viewer authentication, and vice versa.
 
 ---
 
@@ -73,10 +118,10 @@ Integrate with any OpenID Connect identity provider (Authentik, Authelia, Pocket
 
 ```yaml
 auth:
-  secret-key: # generate with: ./dynacat secret:make
+  secret-key: # generate with: ./dynglance secret:make
   oidc:
     issuer-url: https://auth.example.com
-    client-id: dynacat
+    client-id: dynglance
     client-secret: ${secret:oidc_client_secret}
     redirect-url: https://dashboard.example.com/api/oidc/callback
 ```
@@ -88,7 +133,7 @@ auth:
   secret-key: ...
   oidc:
     issuer-url: https://auth.example.com       # required: OpenID Connect issuer URL
-    client-id: dynacat                          # required
+    client-id: dynglance                          # required
     client-secret: ${OIDC_CLIENT_SECRET}        # required
     redirect-url: https://dashboard.example.com/api/oidc/callback  # required
     scopes:                                     # optional, defaults shown
@@ -115,7 +160,7 @@ auth:
   disable-password: true
   oidc:
     issuer-url: https://auth.example.com
-    client-id: dynacat
+    client-id: dynglance
     client-secret: ${OIDC_CLIENT_SECRET}
     redirect-url: https://dashboard.example.com/api/oidc/callback
 ```
@@ -129,7 +174,7 @@ Register a new OAuth2/OIDC application in your identity provider:
 - **Grant type**: Authorization Code
 - **Scopes**: `openid profile email` (add `groups` if your provider supports it)
 
-Then configure Dynacat with the issuer URL, client ID, and client secret from your provider.
+Then configure DynGlance with the issuer URL, client ID, and client secret from your provider.
 
 #### Authentik
 
@@ -137,7 +182,7 @@ Then configure Dynacat with the issuer URL, client ID, and client secret from yo
 2. Set **Redirect URIs** to `https://dashboard.example.com/api/oidc/callback`
 3. Set **Scopes** to include `openid`, `profile`, `email`, and optionally `groups`
 4. Copy the **Client ID** and **Client Secret**
-5. Use the provider's OIDC issuer URL, not the bare Authentik instance URL. In Authentik this usually looks like `https://auth.example.com/application/o/<provider-slug>/` and is the URL Dynacat should use for discovery.
+5. Use the provider's OIDC issuer URL, not the bare Authentik instance URL. In Authentik this usually looks like `https://auth.example.com/application/o/<provider-slug>/` and is the URL DynGlance should use for discovery.
 
 ```yaml
 auth:
@@ -162,7 +207,7 @@ auth:
 identity_providers:
   oidc:
     clients:
-      - client_id: dynacat
+      - client_id: dynglance
         client_secret: '$pbkdf2-sha512$...'  # hashed secret
         redirect_uris:
           - https://dashboard.example.com/api/oidc/callback
@@ -175,13 +220,13 @@ identity_providers:
           - authorization_code
 ```
 
-2. In Dynacat:
+2. In DynGlance:
 
 ```yaml
 auth:
   oidc:
     issuer-url: https://auth.example.com
-    client-id: dynacat
+    client-id: dynglance
     client-secret: ${OIDC_CLIENT_SECRET}
     redirect-url: https://dashboard.example.com/api/oidc/callback
     scopes:
@@ -256,7 +301,7 @@ auth:
   require-auth: false
   oidc:
     issuer-url: https://auth.example.com
-    client-id: dynacat
+    client-id: dynglance
     client-secret: ${secret:oidc_secret}
     redirect-url: https://dashboard.example.com/api/oidc/callback
     groups-claim: groups
@@ -300,13 +345,13 @@ Docker Compose example:
 
 ```yaml
 services:
-  dynacat:
-    image: panonim/dynacat
+  dynglance:
+    image: ghcr.io/trooperthorn/ha_app_dynglance
     volumes:
       - ./config:/app/config
     environment:
       - OIDC_ISSUER_URL=https://auth.example.com
-      - OIDC_CLIENT_ID=dynacat
+      - OIDC_CLIENT_ID=dynglance
       - OIDC_REDIRECT_URL=https://dashboard.example.com/api/oidc/callback
     secrets:
       - auth_secret

@@ -72,7 +72,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ env.IMAGE_REPO }}
-            ${{ env.DOCKERHUB_USERNAME != '' && format('docker.io/{0}/dynacat', env.DOCKERHUB_USER_LOWER) || '' }}
+            ${{ env.DOCKERHUB_USERNAME != '' && format('docker.io/{0}/dynglance', env.DOCKERHUB_USER_LOWER) || '' }}
           tags: |
             type=ref,event=branch
             type=sha,prefix=beta-,enable=${{ github.ref == 'refs/heads/beta' }}
@@ -134,12 +134,12 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           APP_VERSION: ${{ github.ref_name }}
-        run: go build -ldflags="-X github.com/Panonim/dynacat/internal/dynacat.buildVersion=${APP_VERSION}" -o dynacat .
+        run: go build -ldflags="-X github.com/Panonim/dynglance/internal/dynglance.buildVersion=${APP_VERSION}" -o dynglance .
 
       - name: Create tarball
-        run: tar -czf dynacat-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz dynacat
+        run: tar -czf dynglance-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz dynglance
 
       - name: Upload release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" dynacat-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" dynglance-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz --clobber
