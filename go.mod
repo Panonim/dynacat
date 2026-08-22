@@ -1,4 +1,4 @@
-module github.com/Panonim/dynacat
+module github.com/Panonim/dynglance
 
 go 1.25.0
 

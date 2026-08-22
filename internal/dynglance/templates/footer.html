@@ -1,0 +1,20 @@
+{{ if not .App.Config.Branding.HideFooter }}
+<footer class="footer flex items-center flex-column">
+{{ if eq "" .App.Config.Branding.CustomFooter }}
+    <div>
+        <a class="size-h3" href="https://github.com/trooperthorn/ha_app_dynglance" target="_blank" rel="noreferrer">DynGlance</a> 
+        {{ if ne "dev" .App.Version }}
+            {{ if containsStr .App.Version "beta" }}
+                <a class="visited-indicator" title="Beta packages" href="https://github.com/trooperthorn/ha_app_dynglance/pkgs/container/dynglance/" target="_blank" rel="noreferrer">{{ .App.Version }}</a>
+            {{ else }}
+                <a class="visited-indicator" title="Release notes" href="https://github.com/trooperthorn/ha_app_dynglance/releases/tag/{{ .App.Version }}" target="_blank" rel="noreferrer">{{ .App.Version }}</a>
+            {{ end }}
+        {{ else }}
+            ({{ .App.Version }})
+        {{ end }}
+    </div>
+{{ else }}
+    {{ .App.Config.Branding.CustomFooter }}
+{{ end }}
+</footer>
+{{ end }}

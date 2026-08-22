@@ -16,7 +16,7 @@ COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build \
-    -ldflags="-X github.com/Panonim/dynacat/internal/dynacat.buildVersion=${APP_VERSION}" .
+    -ldflags="-X github.com/Panonim/dynglance/internal/dynglance.buildVersion=${APP_VERSION}" .
 
 FROM alpine:3.21
 
@@ -26,10 +26,10 @@ FROM alpine:3.21
 RUN apk add --no-cache zfs curl
 
 WORKDIR /app
-COPY --from=builder /app/dynacat .
+COPY --from=builder /app/dynglance .
 RUN mkdir -p /app/config
 
 EXPOSE 8080/tcp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8080/ -o /dev/null || exit 1
-ENTRYPOINT ["/app/dynacat", "--config", "/app/config/dynacat.yml"]
+ENTRYPOINT ["/app/dynglance", "--config", "/app/config/dynglance.yml"]

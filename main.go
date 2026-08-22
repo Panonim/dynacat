@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/Panonim/dynacat/internal/dynacat"
+	"github.com/Panonim/dynglance/internal/dynglance"
 )
 
 func main() {
-	os.Exit(dynacat.Main())
+	os.Exit(dynglance.Main())
 }

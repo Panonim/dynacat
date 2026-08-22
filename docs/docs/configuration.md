@@ -1,6 +1,6 @@
-# Configuring Dynacat
+# Configuring DynGlance
 ## Preconfigured page
-If you don't want to spend time reading through all the available configuration options and just want something to get you going quickly you can use [this `dynacat.yml` file](dynacat.yml) and make changes to it as you see fit. It will give you a page that looks like the following:
+If you don't want to spend time reading through all the available configuration options and just want something to get you going quickly you can use [this `dynglance.yml` file](dynglance.yml) and make changes to it as you see fit. It will give you a page that looks like the following:
 
 ![](images/preconfigured-page-preview.png)
 
@@ -13,14 +13,14 @@ Automatic config reload is supported, meaning that you can make changes to the c
 
 > [!NOTE]
 >
-> If you attempt to start Dynacat with an invalid config it will exit with an error outright. If you successfully started Dynacat with a valid config and then made changes to it which result in an error, you'll see that error in the console and Dynacat will continue to run with the old configuration. You can then continue to make changes and when there are no errors the new configuration will be loaded.
+> If you attempt to start DynGlance with an invalid config it will exit with an error outright. If you successfully started DynGlance with a valid config and then made changes to it which result in an error, you'll see that error in the console and DynGlance will continue to run with the old configuration. You can then continue to make changes and when there are no errors the new configuration will be loaded.
 
 > [!CAUTION]
 >
 > Reloading the configuration file clears your cached data, meaning that you have to request the data anew each time you do this. This can lead to rate limiting for some APIs if you do it too frequently. Having a cache that persists between reloads will be added in the future.
 
 ### Environment variables
-Inserting environment variables is supported anywhere in the config. This is done via the `${ENV_VAR}` syntax. Attempting to use an environment variable that doesn't exist will result in an error and Dynacat will either not start or load your new config on save. Example:
+Inserting environment variables is supported anywhere in the config. This is done via the `${ENV_VAR}` syntax. Attempting to use an environment variable that doesn't exist will result in an error and DynGlance will either not start or load your new config on save. Example:
 
 ```yaml
 server:
@@ -65,15 +65,15 @@ Alternatively, you can load the contents of a file who's path is provided by an 
 `docker-compose.yml`
 ```yaml
 services:
-  dynacat:
-    image: panonim/dynacat
+  dynglance:
+    image: ghcr.io/trooperthorn/ha_app_dynglance
     environment:
       - TOKEN_FILE=/home/user/token
     volumes:
       - /home/user/token:/home/user/token
 ```
 
-`dynacat.yml`
+`dynglance.yml`
 ```yaml
 token: ${readFileFromEnv:TOKEN_FILE}
 ```
@@ -94,7 +94,7 @@ pages:
 
 The file you are including should not have any additional indentation, its values should be at the top level and the appropriate amount of indentation will be added automatically depending on where the file is included. Example:
 
-`dynacat.yml`
+`dynglance.yml`
 
 ```yaml
 pages:
@@ -128,16 +128,16 @@ The `$include` directive can be used anywhere in the config file, not just in th
 If you encounter YAML parsing errors when using the `$include` directive, the reported line numbers will likely be incorrect. This is because the inclusion of files is done before the YAML is parsed, as YAML itself does not support file inclusion. To help with debugging in cases like this, you can use the `config:print` command and pipe it into `less -N` to see the full config file with includes resolved and line numbers added:
 
 ```sh
-dynacat --config /path/to/dynacat.yml config:print | less -N
+dynglance --config /path/to/dynglance.yml config:print | less -N
 ```
 
-This is a bit more convoluted when running Dynacat inside a Docker container:
+This is a bit more convoluted when running DynGlance inside a Docker container:
 
 ```sh
-docker run --rm -v ./dynacat.yml:/app/config/dynacat.yml Panonim/dynacat config:print | less -N
+docker run --rm -v ./dynglance.yml:/app/config/dynglance.yml ghcr.io/trooperthorn/ha_app_dynglance config:print | less -N
 ```
 
-This assumes that the config you want to print is in your current working directory and is named `dynacat.yml`.
+This assumes that the config you want to print is in your current working directory and is named `dynglance.yml`.
 
 ## Icons
 
@@ -173,18 +173,18 @@ Icons from the Simple icons library as well as Material Design icons will automa
 
 ```yaml
 icon: auto-invert https://example.com/path/to/icon.png # with a URL
-icon: auto-invert sh:dynacat-dark # with a selfh.st icon
+icon: auto-invert sh:dynglance-dark # with a selfh.st icon
 ```
 
 This expects the icon to be black and will automatically invert it to white when using a dark theme.
 
 The same icon syntax and prefixes also work for `title-icon` as well as the page `name-icon` (see [Pages](#pages)), which places an icon to the left of the page name in the navigation bar.
 
-If an icon URL cannot be loaded (for example, the file does not exist or the host is unreachable), Dynacat will hide the icon and render the widget as if no icon was configured.
+If an icon URL cannot be loaded (for example, the file does not exist or the host is unreachable), DynGlance will hide the icon and render the widget as if no icon was configured.
 
 ## Config schema
 
-For property descriptions, validation and autocompletion of the config within your IDE, @not-first has kindly created a [schema](https://github.com/not-first/dynacat-schema). Massive thanks to them for this, go check it out and give them a star!
+For property descriptions, validation and autocompletion of the config within your IDE, @not-first has kindly created a [schema](https://github.com/not-first/dynglance-schema). Massive thanks to them for this, go check it out and give them a star!
 
 ## Server
 Server configuration is done through a top level `server` property. Example:
@@ -192,7 +192,7 @@ Server configuration is done through a top level `server` property. Example:
 ```yaml
 server:
   port: 8080
-  assets-path: /home/user/dynacat-assets
+  assets-path: /home/user/dynglance-assets
 ```
 
 ### Properties
@@ -205,7 +205,7 @@ server:
 | base-url | string | no | |
 | assets-path | string | no | /app/assets |
 | cache-dir | string | no | .cache |
-| db-path | string | no | /app/assets/dynacat.db |
+| db-path | string | no | /app/assets/dynglance.db |
 | allowed-embed-hosts | array of strings | no | |
 
 #### `host`
@@ -215,13 +215,13 @@ The address which the server will listen on. Setting it to `localhost` means tha
 A number between 1 and 65,535, so long as that port isn't already used by anything else.
 
 #### `proxied`
-Set to `true` if you're using a reverse proxy in front of Dynacat. This will make Dynacat use the `X-Forwarded-*` headers to determine the original request details.
+Set to `true` if you're using a reverse proxy in front of DynGlance. This will make DynGlance use the `X-Forwarded-*` headers to determine the original request details.
 
 #### `base-url`
-The base URL that Dynacat is hosted under. No need to specify this unless you're using a reverse proxy and are hosting Dynacat under a directory. If that's the case then you can set this value to `/dynacat` or whatever the directory is called. Note that the forward slash (`/`) in the beginning is required unless you specify the full domain and path.
+The base URL that DynGlance is hosted under. No need to specify this unless you're using a reverse proxy and are hosting DynGlance under a directory. If that's the case then you can set this value to `/dynglance` or whatever the directory is called. Note that the forward slash (`/`) in the beginning is required unless you specify the full domain and path.
 
 > [!IMPORTANT]
-> You need to strip the `base-url` prefix before forwarding the request to the Dynacat server.
+> You need to strip the `base-url` prefix before forwarding the request to the DynGlance server.
 > In Caddy you can do this using [`handle_path`](https://caddyserver.com/docs/caddyfile/directives/handle_path) or [`uri strip_prefix`](https://caddyserver.com/docs/caddyfile/directives/uri).
 
 #### `assets-path`
@@ -234,12 +234,12 @@ The path to a directory that will be served by the server under the `/assets/` p
 >
 > If your assets are in:
 > ```
-> /home/user/dynacat-assets
+> /home/user/dynglance-assets
 > ```
 >
 > You should mount:
 > ```
-> /home/user/dynacat-assets:/app/assets
+> /home/user/dynglance-assets:/app/assets
 > ```
 >
 > And your config should contain:
@@ -249,10 +249,10 @@ The path to a directory that will be served by the server under the `/assets/` p
 
 ##### Examples
 
-Say you have a directory `dynacat-assets` with a file `gitea-icon.png` in it and you specify your assets path like:
+Say you have a directory `dynglance-assets` with a file `gitea-icon.png` in it and you specify your assets path like:
 
 ```yaml
-assets-path: /home/user/dynacat-assets
+assets-path: /home/user/dynglance-assets
 ```
 
 To be able to point to an asset from your assets path, use the `/assets/` path like such:
@@ -262,15 +262,15 @@ icon: /assets/gitea-icon.png
 ```
 
 #### `cache-dir`
-Directory where Dynacat stores cached remote images (for example, widget icons). Cached files are served from `/.cache/` with long cache headers so browsers reuse them without refetching from the original host.
+Directory where DynGlance stores cached remote images (for example, widget icons). Cached files are served from `/.cache/` with long cache headers so browsers reuse them without refetching from the original host.
 
-If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
+If the path is relative, it will be resolved relative to the DynGlance working directory. The directory will be created if it does not exist.
 
 #### `db-path`
-Path to the SQLite database file used for server-side todo storage. Only required when at least one `to-do` widget has `storage: server` set. If the path is relative, it will be resolved relative to the Dynacat working directory. The file will be created if it does not exist.
+Path to the SQLite database file used for server-side todo storage. Only required when at least one `to-do` widget has `storage: server` set. If the path is relative, it will be resolved relative to the DynGlance working directory. The file will be created if it does not exist.
 
 #### `allowed-embed-hosts`
-A list of origins that are allowed to embed Dynacat in an `<iframe>`. By default, only the same origin is allowed (`frame-ancestors 'self'`). This is useful when you want to display Dynacat inside another dashboard such as Homepage.
+A list of origins that are allowed to embed DynGlance in an `<iframe>`. By default, only the same origin is allowed (`frame-ancestors 'self'`). This is useful when you want to display DynGlance inside another dashboard such as Homepage.
 
 Example:
 
@@ -298,7 +298,7 @@ You can adjust the various parts of the branding through a top level `branding` 
 ```yaml
 branding:
   custom-footer: |
-    <p>Powered by <a href="https://github.com/Panonim/dynacat">Dynacat</a></p>
+    <p>Powered by <a href="https://github.com/trooperthorn/ha_app_dynglance">DynGlance</a></p>
   hide-logo: true
   logo-url: /assets/logo.png
   favicon-url: /assets/logo.png
@@ -319,9 +319,9 @@ branding:
 | logo-text | string | no | G |
 | logo-url | string | no | |
 | favicon-url | string | no | |
-| app-name | string | no | Dynacat |
-| app-icon-url | string | no | Dynacat's default icon |
-| app-background-color | string | no | Dynacat's default background color |
+| app-name | string | no | DynGlance |
+| app-icon-url | string | no | DynGlance's default icon |
+| app-background-color | string | no | DynGlance's default background color |
 | show-desktop-navigation-on-hover | boolean | no | false |
 | center-desktop-navigation | boolean | no | false |
 
@@ -435,7 +435,7 @@ theme:
 
 > [!TIP]
 >
-> Because Dynacat uses a lot of utility classes it might be difficult to target some elements. To make it easier to style specific widgets, each widget has a `widget-type-{name}` class, so for example if you wanted to make the links inside just the RSS widget bigger you could use the following selector:
+> Because DynGlance uses a lot of utility classes it might be difficult to target some elements. To make it easier to style specific widgets, each widget has a `widget-type-{name}` class, so for example if you wanted to make the links inside just the RSS widget bigger you could use the following selector:
 >
 > ```css
 > .widget-type-rss a {
@@ -859,7 +859,7 @@ You can configure multiple hosts, including several of the same type (for exampl
 
 `url`
 
-The base URL of the Sonarr/Radarr instance, prefixed with the service type, for example `radarr:https://radarr.domain.com` or `sonarr:https://sonarr.domain.com`. The instance must be reachable from the server that Dynacat is running on. Used both for the API requests and, unless `public-url` is set, for the links in the popover.
+The base URL of the Sonarr/Radarr instance, prefixed with the service type, for example `radarr:https://radarr.domain.com` or `sonarr:https://sonarr.domain.com`. The instance must be reachable from the server that DynGlance is running on. Used both for the API requests and, unless `public-url` is set, for the links in the popover.
 
 `token`
 
@@ -867,7 +867,7 @@ The API key, found in `Settings -> General -> Security` in Sonarr/Radarr. Option
 
 `public-url`
 
-Optionally override the URL used for the release links in the popover. Useful when Dynacat reaches the instance via an internal address but you browse it through a different (for example reverse-proxied) address.
+Optionally override the URL used for the release links in the popover. Useful when DynGlance reaches the instance via an internal address but you browse it through a different (for example reverse-proxied) address.
 
 `allow-insecure`
 
@@ -978,14 +978,14 @@ Display data from a JSON API using a custom template.
 
 > [!NOTE]
 >
-> The configuration of this widget requires some basic knowledge of programming, HTML, CSS, the Go template language and Dynacat-specific concepts.
+> The configuration of this widget requires some basic knowledge of programming, HTML, CSS, the Go template language and DynGlance-specific concepts.
 
 Examples:
 
 ![](images/custom-api-preview-1.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -1002,7 +1002,7 @@ Examples:
 ![](images/custom-api-preview-2.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -1035,7 +1035,7 @@ Examples:
 ![](images/custom-api-preview-3.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -1076,7 +1076,7 @@ Examples:
 | subrequests | map of requests | no | |
 
 ##### `url`
-The URL to fetch the data from. It must be accessible from the server that Dynacat is running on.
+The URL to fetch the data from. It must be accessible from the server that DynGlance is running on.
 
 ##### `headers`
 Optionally specify the headers that will be sent with the request. Example:
@@ -1273,7 +1273,7 @@ Display widgets from the [Dynawidgets community repository](https://github.com/P
 Examples:
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -1285,7 +1285,7 @@ Examples:
 <br>
 
 <details>
-<summary>View <code>dynacat.yml</code> with custom title and options</summary>
+<summary>View <code>dynglance.yml</code> with custom title and options</summary>
 <br>
 
 ```yaml
@@ -1418,12 +1418,12 @@ Display the status of your Docker containers along with an icon and an optional 
 
 > [!NOTE]
 >
-> The widget requires access to `docker.sock`. If you're running Dynacat inside a container, this can be done by mounting the socket as a volume:
+> The widget requires access to `docker.sock`. If you're running DynGlance inside a container, this can be done by mounting the socket as a volume:
 >
 > ```yaml
 > services:
->   dynacat:
->     image: panonim/dynacat
+>   dynglance:
+>     image: ghcr.io/trooperthorn/ha_app_dynglance
 >     volumes:
 >       - /var/run/docker.sock:/var/run/docker.sock
 > ```
@@ -1434,13 +1434,13 @@ Configuration of the containers is done via labels applied to each container:
   jellyfin:
     image: jellyfin/jellyfin:latest
     labels:
-      dynacat.name: Jellyfin
-      dynacat.icon: si:jellyfin
-      dynacat.url: https://jellyfin.domain.com
-      dynacat.description: Movies & shows
+      dynglance.name: Jellyfin
+      dynglance.icon: si:jellyfin
+      dynglance.url: https://jellyfin.domain.com
+      dynglance.description: Movies & shows
 ```
 
-Alternatively, you can also define the values within your `dynacat.yml` via the `containers` property, where the key is the container name and each value is the same as the labels but without the "dynacat." prefix:
+Alternatively, you can also define the values within your `dynglance.yml` via the `containers` property, where the key is the container name and each value is the same as the labels but without the "dynglance." prefix:
 
 ```yaml
 - type: docker-containers
@@ -1453,7 +1453,7 @@ Alternatively, you can also define the values within your `dynacat.yml` via the 
       hide: false
 ```
 
-For services with multiple containers you can specify a `dynacat.id` on the "main" container and `dynacat.parent` on each "child" container:
+For services with multiple containers you can specify a `dynglance.id` on the "main" container and `dynglance.parent` on each "child" container:
 
 <details>
 <summary>View <code>docker-compose.yml</code></summary>
@@ -1464,29 +1464,29 @@ services:
   immich-server:
     image: ghcr.io/immich-app/immich-server
     labels:
-      dynacat.name: Immich
-      dynacat.icon: si:immich
-      dynacat.url: https://immich.domain.com
-      dynacat.description: Image & video management
-      dynacat.id: immich
+      dynglance.name: Immich
+      dynglance.icon: si:immich
+      dynglance.url: https://immich.domain.com
+      dynglance.description: Image & video management
+      dynglance.id: immich
 
   redis:
     image: docker.io/redis:6.2-alpine
     labels:
-      dynacat.parent: immich
-      dynacat.name: Redis
+      dynglance.parent: immich
+      dynglance.name: Redis
 
   database:
     image: docker.io/tensorchord/pgvecto-rs:pg14-v0.2.0
     labels:
-      dynacat.parent: immich
-      dynacat.name: DB
+      dynglance.parent: immich
+      dynglance.name: DB
 
   proxy:
     image: nginx:stable
     labels:
-      dynacat.parent: immich
-      dynacat.name: Proxy
+      dynglance.parent: immich
+      dynglance.name: Proxy
 ```
 </details>
 <br>
@@ -1511,7 +1511,7 @@ If any of the child containers are down, their status will propagate up to the p
 | update-interval | string | no | 2m |
 
 ##### `hide-by-default`
-Whether to hide the containers by default. If set to `true` you'll have to manually add a `dynacat.hide: false` label to each container you want to display. By default all containers will be shown and if you want to hide a specific container you can add a `dynacat.hide: true` label.
+Whether to hide the containers by default. If set to `true` you'll have to manually add a `dynglance.hide: false` label to each container you want to display. By default all containers will be shown and if you want to hide a specific container you can add a `dynglance.hide: true` label.
 
 ##### `format-container-names`
 When set to `true`, automatically converts container names such as `container_name_1` into `Container Name 1`.
@@ -1520,7 +1520,7 @@ When set to `true`, automatically converts container names such as `container_na
 The path to the Docker socket. This can also be a [remote socket](https://docs.docker.com/engine/daemon/remote-access/) or proxied socket using something like [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy).
 
 ###### `category`
-Filter to only the containers which have this category specified via the `dynacat.category` label. Useful if you want to have multiple containers widgets, each showing a different set of containers.
+Filter to only the containers which have this category specified via the `dynglance.category` label. Useful if you want to have multiple containers widgets, each showing a different set of containers.
 
 <details>
 <summary>View example</summary>
@@ -1532,26 +1532,26 @@ services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     labels:
-      dynacat.name: Jellyfin
-      dynacat.icon: si:jellyfin
-      dynacat.url: https://jellyfin.domain.com
-      dynacat.category: media
+      dynglance.name: Jellyfin
+      dynglance.icon: si:jellyfin
+      dynglance.url: https://jellyfin.domain.com
+      dynglance.category: media
 
   gitea:
     image: gitea/gitea:latest
     labels:
-      dynacat.name: Gitea
-      dynacat.icon: si:gitea
-      dynacat.url: https://gitea.domain.com
-      dynacat.category: dev-tools
+      dynglance.name: Gitea
+      dynglance.icon: si:gitea
+      dynglance.url: https://gitea.domain.com
+      dynglance.category: dev-tools
 
   vaultwarden:
     image: vaultwarden/server:latest
     labels:
-      dynacat.name: Vaultwarden
-      dynacat.icon: si:vaultwarden
-      dynacat.url: https://vaultwarden.domain.com
-      dynacat.category: dev-tools
+      dynglance.name: Vaultwarden
+      dynglance.icon: si:vaultwarden
+      dynglance.url: https://vaultwarden.domain.com
+      dynglance.category: dev-tools
 ```
 
 Then you can use the `category` property to filter the containers:
@@ -1574,15 +1574,15 @@ Whether to only show running containers. If set to `true` only containers that a
 #### Labels
 | Name | Description |
 | ---- | ----------- |
-| dynacat.name | The name displayed in the UI. If not specified, the name of the container will be used. |
-| dynacat.icon | See [Icons](#icons) for more information on how to specify icons |
-| dynacat.url | The URL that the user will be redirected to when clicking on the container. |
-| dynacat.same-tab | Whether to open the link in the same or a new tab. Default is `false`. |
-| dynacat.description | A short description displayed in the UI. Default is empty. |
-| dynacat.hide | Whether to hide the container. If set to `true` the container will not be displayed. Defaults to `false`. |
-| dynacat.id | The custom ID of the container. Used to group containers under a single parent. |
-| dynacat.parent | The ID of the parent container. Used to group containers under a single parent. |
-| dynacat.category | The category of the container. Used to filter containers by category. |
+| dynglance.name | The name displayed in the UI. If not specified, the name of the container will be used. |
+| dynglance.icon | See [Icons](#icons) for more information on how to specify icons |
+| dynglance.url | The URL that the user will be redirected to when clicking on the container. |
+| dynglance.same-tab | Whether to open the link in the same or a new tab. Default is `false`. |
+| dynglance.description | A short description displayed in the UI. Default is empty. |
+| dynglance.hide | Whether to hide the container. If set to `true` the container will not be displayed. Defaults to `false`. |
+| dynglance.id | The custom ID of the container. Used to group containers under a single parent. |
+| dynglance.parent | The ID of the parent container. Used to group containers under a single parent. |
+| dynglance.category | The category of the container. Used to filter containers by category. |
 
 ### Docker Controller
 
@@ -1599,12 +1599,12 @@ Example:
 
 > [!NOTE]
 >
-> The widget requires access to `docker.sock`. If you're running Dynacat inside a container, this can be done by mounting the socket as a volume:
+> The widget requires access to `docker.sock`. If you're running DynGlance inside a container, this can be done by mounting the socket as a volume:
 >
 > ```yaml
 > services:
->   dynacat:
->     image: panonim/dynacat
+>   dynglance:
+>     image: ghcr.io/trooperthorn/ha_app_dynglance
 >     volumes:
 >       - /var/run/docker.sock:/var/run/docker.sock
 > ```
@@ -2030,7 +2030,7 @@ The title used to indicate the site.
 
 `url`
 
-The URL of the monitored service, which must be reachable by Dynacat, and will be used as the link to go to when clicking on the title. If `check-url` is not specified, this is used as the status check.
+The URL of the monitored service, which must be reachable by DynGlance, and will be used as the link to go to when clicking on the title. If `check-url` is not specified, this is used as the status check.
 
 `check-url`
 
@@ -2084,10 +2084,10 @@ Display a list of posts from a specific subreddit.
 
 > [!WARNING]
 >
-> Reddit does not allow unauthorized API access from VPS IPs, if you're hosting Dynacat on a VPS you will get a 403
+> Reddit does not allow unauthorized API access from VPS IPs, if you're hosting DynGlance on a VPS you will get a 403
 > response. As a workaround you can either [register an app on Reddit](https://ssl.reddit.com/prefs/apps/) and use the
 > generated ID and secret in the widget configuration to authenticate your requests (see `app-auth` property), use a proxy
-> (see `proxy` property) or route the traffic from Dynacat through a VPN.
+> (see `proxy` property) or route the traffic from DynGlance through a VPN.
 
 Example:
 
@@ -2170,7 +2170,7 @@ r/selfhosted/comments/bsp01i/welcome_to_rselfhosted_please_read_this_first/
 `{SUBREDDIT}` - the subreddit name
 
 ##### `request-url-template`
-A custom request URL that will be used to fetch the data. This is useful when you're hosting Dynacat on a VPS where Reddit is blocking the requests and you want to route them through a proxy that accepts the URL as either a part of the path or a query parameter.
+A custom request URL that will be used to fetch the data. This is useful when you're hosting DynGlance on a VPS where Reddit is blocking the requests and you want to route them through a proxy that accepts the URL as either a part of the path or a query parameter.
 
 Placeholders:
 
@@ -2182,7 +2182,7 @@ https://your.proxy/?url={REQUEST-URL}
 ```
 
 ##### `proxy`
-A custom HTTP/HTTPS proxy URL that will be used to fetch the data. This is useful when you're hosting Dynacat on a VPS where Reddit is blocking the requests and you want to bypass the restriction by routing the requests through a proxy. Example:
+A custom HTTP/HTTPS proxy URL that will be used to fetch the data. This is useful when you're hosting DynGlance on a VPS where Reddit is blocking the requests and you want to bypass the restriction by routing the requests through a proxy. Example:
 
 ```yaml
 proxy: http://user:pass@proxy.com:8080
@@ -2245,7 +2245,7 @@ Example:
   repositories:
     - go-gitea/gitea
     - jellyfin/jellyfin
-    - Panonim/dynacat
+    - trooperthorn/ha_app_dynglance
     - codeberg:redict/redict
     - gitlab:fdroid/fdroidclient
     - dockerhub:gotify/server
@@ -2273,7 +2273,7 @@ A list of repositores to fetch the latest release for. Only the name/repo is req
 ```yaml
 repositories:
   - gitlab:inkscape/inkscape
-  - dockerhub:Panonim/dynacat
+  - dockerhub:gotify/server
   - codeberg:redict/redict
 ```
 
@@ -2301,7 +2301,7 @@ To include prereleases you can specify the repository as an object and use the `
 ```yaml
 repositories:
   - gitlab:inkscape/inkscape
-  - repository: Panonim/dynacat
+  - repository: trooperthorn/ha_app_dynglance
     include-prereleases: true
   - codeberg:redict/redict
 ```
@@ -2315,17 +2315,17 @@ Shows only the repository or image name without the owner or organization when s
 ##### `token`
 Without authentication Github allows for up to 60 requests per hour. You can easily exceed this limit and start seeing errors if you're tracking lots of repositories or your cache time is low. To circumvent this you can [create a read only token from your Github account](https://github.com/settings/personal-access-tokens/new) and provide it here.
 
-You can also specify the value for this token through an ENV variable using the syntax `${GITHUB_TOKEN}` where `GITHUB_TOKEN` is the name of the variable that holds the token. If you've installed Dynacat through docker you can specify the token in your docker-compose:
+You can also specify the value for this token through an ENV variable using the syntax `${GITHUB_TOKEN}` where `GITHUB_TOKEN` is the name of the variable that holds the token. If you've installed DynGlance through docker you can specify the token in your docker-compose:
 
 ```yaml
 services:
-  dynacat:
-    image: panonim/dynacat
+  dynglance:
+    image: ghcr.io/trooperthorn/ha_app_dynglance
     environment:
       - GITHUB_TOKEN=<your token>
 ```
 
-and then use it in your `dynacat.yml` like this:
+and then use it in your `dynglance.yml` like this:
 
 ```yaml
 - type: releases
@@ -2333,7 +2333,7 @@ and then use it in your `dynacat.yml` like this:
   repositories: ...
 ```
 
-This way you can safely check your `dynacat.yml` in version control without exposing the token.
+This way you can safely check your `dynglance.yml` in version control without exposing the token.
 
 ##### `gitlab-token`
 Same as the above but used when fetching GitLab releases.
@@ -2351,7 +2351,7 @@ Example:
 
 ```yaml
 - type: repository
-  repository: Panonim/dynacat
+  repository: trooperthorn/ha_app_dynglance
   pull-requests-limit: 5
   issues-limit: 3
   commits-limit: 3
@@ -2478,7 +2478,7 @@ An array of RSS/atom feeds. The title can optionally be changed.
 The maximum number of articles to show from that specific feed. Useful if you have a feed which posts a lot of articles frequently and you want to prevent it from excessively pushing down articles from other feeds.
 
 ###### `item-link-prefix`
-If an RSS feed isn't returning item links with a base domain and Dynacat has failed to automatically detect the correct domain you can manually add a prefix to each link with this property.
+If an RSS feed isn't returning item links with a base domain and DynGlance has failed to automatically detect the correct domain you can manually add a prefix to each link with this property.
 
 ###### `headers`
 Optionally specify the headers that will be sent with the request. Example:
@@ -2621,7 +2621,7 @@ bangs:
 See the [Icons](#icons) section for full syntax reference including `si:`, `di:`, `sh:`, `mdi:` prefixes, URLs, and `auto-invert`.
 
 ### Server Stats
-Display statistics such as CPU usage, memory usage and disk usage of the server Dynacat is running on or other servers.
+Display statistics such as CPU usage, memory usage and disk usage of the server DynGlance is running on or other servers.
 
 Example:
 
@@ -2640,7 +2640,7 @@ Preview:
 >
 > This widget is currently under development, some features might not function as expected or may change.
 
-To display data from a remote server you need to have the Dynacat Agent running on that server. You can download the agent from [here](https://github.com/glanceapp/agent), though keep in mind that it is still in development and may not work as expected. Support for other providers such as Dynacats will be added in the future.
+To display data from a remote server you need to have the monitoring agent running on that server. You can download the agent from [here](https://github.com/glanceapp/agent), though keep in mind that it is still in development and may not work as expected. Support for other providers will be added in the future.
 
 In the event that the CPU temperature goes over 80°C, a flame icon will appear next to the CPU. The progress indicators will also turn red (or the equivalent of your negative color) to hopefully grab your attention if anything is unusually high:
 
@@ -2652,7 +2652,7 @@ In the event that the CPU temperature goes over 80°C, a flame icon will appear 
 | servers | array | no |  |
 
 ##### `servers`
-If not provided it will display the statistics of the server Dynacat is running on.
+If not provided it will display the statistics of the server DynGlance is running on.
 
 ##### Properties for both `local` and `remote` servers
 | Name | Type | Required | Default |
@@ -2701,7 +2701,7 @@ If set to `true` you'll have to manually make each mountpoint visible by adding 
           hide: false
 ```
 
-This is useful if you're running Dynacat inside of a container which usually mounts a lot of irrelevant filesystems.
+This is useful if you're running DynGlance inside of a container which usually mounts a lot of irrelevant filesystems.
 
 ###### `mountpoints`
 A map of mountpoints to display disk usage for. The key is the path to the mountpoint and the value is an object with optional properties. Example:
@@ -2803,7 +2803,7 @@ Two widgets side by side in a `full` column:
 ![](images/split-column-widget-preview.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -2830,7 +2830,7 @@ You can also achieve a number of different full page layouts using just this wid
 ![](images/split-column-widget-3-columns.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -2860,7 +2860,7 @@ pages:
 ![](images/split-column-widget-4-columns.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -2894,7 +2894,7 @@ Masonry layout with up to 5 columns where all columns have equal width (and the 
 ![](images/split-column-widget-masonry.png)
 
 <details>
-<summary>View <code>dynacat.yml</code></summary>
+<summary>View <code>dynglance.yml</code></summary>
 <br>
 
 ```yaml
@@ -3000,7 +3000,7 @@ The ID of the todo list. If you want to have multiple todo lists, you must speci
 Controls where tasks are persisted. Accepted values:
 
 - `local` (default) - tasks are stored in the browser's localStorage, same as before. No server-side setup required.
-- `server` - tasks are stored in a SQLite database on the server. Tasks persist across browsers and server restarts. Requires `server.db-path` to be set (or uses the default `/app/assets/dynacat.db`).
+- `server` - tasks are stored in a SQLite database on the server. Tasks persist across browsers and server restarts. Requires `server.db-path` to be set (or uses the default `/app/assets/dynglance.db`).
 
 ##### `collapse-after`
 
@@ -3010,7 +3010,7 @@ Example with server storage:
 
 ```yaml
 server:
-  db-path: /data/dynacat.db
+  db-path: /data/dynglance.db
 
 pages:
   - name: Home
@@ -3186,7 +3186,7 @@ Preview of `grid-cards`:
 ![](images/videos-widget-grid-cards-preview.png)
 
 ##### `include-shorts`
-When set to `false` (default), Dynacat attempts to use YouTube's unofficial `UULF` playlist to exclude Shorts from the feed. This playlist does not exist for all channels - if it returns a 404, Dynacat automatically falls back to the standard channel feed (which includes Shorts). Setting this to `true` always uses the channel feed directly.
+When set to `false` (default), DynGlance attempts to use YouTube's unofficial `UULF` playlist to exclude Shorts from the feed. This playlist does not exist for all channels - if it returns a 404, DynGlance automatically falls back to the standard channel feed (which includes Shorts). Setting this to `true` always uses the channel feed directly.
 
 ##### `video-url-template`
 Used to replace the default link for videos. Useful when you're running your own YouTube front-end. Example:
@@ -3237,7 +3237,7 @@ Each bar represents a 2 hour interval. The yellow background represents sunrise 
 | show-area-name | boolean | no | false |
 
 ##### `location`
-The name of the city and country to fetch weather information for. Attempting to launch the applcation with an invalid location will result in an error. You can use the [gecoding API page](https://open-meteo.com/en/docs/geocoding-api) to search for your specific location. Dynacat will use the first result from the list if there are multiple.
+The name of the city and country to fetch weather information for. Attempting to launch the applcation with an invalid location will result in an error. You can use the [gecoding API page](https://open-meteo.com/en/docs/geocoding-api) to search for your specific location. DynGlance will use the first result from the list if there are multiple.
 
 ##### `units`
 Whether to show the temperature in celsius or fahrenheit, possible values are `metric` or `imperial`.
@@ -3464,7 +3464,7 @@ When set to `true`, halves the number of columns. Useful when placing the widget
 When `true` (default), each card displays a dark gradient overlay at the bottom containing the title, year, duration (movies only), and relative time since it was added. Set to `false` to show only the poster thumbnail without any overlay text.
 
 #####  `public-url`
-Public-facing base URL used for clickable item links and public image thumbnails for this host. When set, Dynacat will use this value when building URLs; when not set Dynacat defaults to the `url`.
+Public-facing base URL used for clickable item links and public image thumbnails for this host. When set, DynGlance will use this value when building URLs; when not set DynGlance defaults to the `url`.
 
 #### API Access & Tokens
 

@@ -1,7 +1,7 @@
 # Docker Configuration & Options
 ## Environment Variables
 
-Environment variables can be set in the `docker-compose.yml` file or through a `.env` file. These control runtime behavior of Dynacat without requiring changes to the configuration file.
+Environment variables can be set in the `docker-compose.yml` file or through a `.env` file. These control runtime behavior of DynGlance without requiring changes to the configuration file.
 
 ### LOG_LEVEL
 
@@ -104,9 +104,9 @@ The global page update interval can be disabled by:
 
 ## ZFS Mountpoint Support
 
-By default, the `server-stats` widget uses `statfs()` to read disk usage. On ZFS pool roots (e.g. TrueNAS SCALE), `statfs()` returns `Used = 0` because data lives in child datasets, not at the pool root. Dynacat works around this by calling `zfs list` when a ZFS filesystem is detected.
+By default, the `server-stats` widget uses `statfs()` to read disk usage. On ZFS pool roots (e.g. TrueNAS SCALE), `statfs()` returns `Used = 0` because data lives in child datasets, not at the pool root. DynGlance works around this by calling `zfs list` when a ZFS filesystem is detected.
 
-The `zfs` binary is included in the Dynacat image but **requires `/dev/zfs` to be passed to the container** to function. Without it, the binary is inert and poses no security risk.
+The `zfs` binary is included in the DynGlance image but **requires `/dev/zfs` to be passed to the container** to function. Without it, the binary is inert and poses no security risk.
 
 ### Enabling ZFS stats
 
@@ -114,8 +114,8 @@ Add the following to your `docker-compose.yml`:
 
 ```yaml
 services:
-  dynacat:
-    image: panonim/dynacat:latest
+  dynglance:
+    image: ghcr.io/trooperthorn/ha_app_dynglance:latest
     devices:
       - /dev/zfs:/dev/zfs
     cap_drop:
@@ -126,7 +126,7 @@ services:
       - /mnt/POOLNAME:/mnt/POOLNAME:ro  # repeat for each pool
 ```
 
-Then configure the mountpoints in `dynacat.yml`:
+Then configure the mountpoints in `dynglance.yml`:
 
 ```yaml
 - type: server-stats
@@ -146,4 +146,4 @@ Then configure the mountpoints in `dynacat.yml`:
 
 > [!TIP]
 >
-> If you do not add `/dev/zfs` to your compose file, Dynacat silently falls back to `statfs()` values. ZFS pool roots will show `0 MB used` in that case, but no error is raised.
+> If you do not add `/dev/zfs` to your compose file, DynGlance silently falls back to `statfs()` values. ZFS pool roots will show `0 MB used` in that case, but no error is raised.

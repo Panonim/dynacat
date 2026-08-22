@@ -1,6 +1,6 @@
 # Dynamic Updates
 
-Dynacat uses dynamic updates to keep your dashboard relevant without requiring manual page refreshes. This is powered by a combination of Server-Sent Events (SSE) and client-side polling.
+DynGlance uses dynamic updates to keep your dashboard relevant without requiring manual page refreshes. This is powered by a combination of Server-Sent Events (SSE) and client-side polling.
 
 Updates occur at three levels: **Global**, **Page**, and **Widget**.
 
@@ -10,7 +10,7 @@ You can disable all dynamic updates across the entire application using the `ENA
 - **`ENABLE_DYNAMIC_UPDATE`**: Set to `false`, `0`, or `f` in your `docker-compose.yml` to stop all automatic refreshes.
 
 ### Page Control
-Dynamic updates can be toggled for specific pages in your `dynacat.yml` using the `dynamic-updates` property.
+Dynamic updates can be toggled for specific pages in your `dynglance.yml` using the `dynamic-updates` property.
 
 - **`dynamic-updates`**: (boolean, default: `true`) When set to `false`, the page will not perform SSE updates or poll for widget changes.
 
@@ -67,7 +67,7 @@ The following table lists the default update intervals for widgets when `update-
 
 ## Efficiency and Optimization
 
-To save resources, Dynacat intelligently manages updates using two primary mechanisms:
+To save resources, DynGlance intelligently manages updates using two primary mechanisms:
 
 ### Server-Side Updates (SSE)
 Most widgets use **Server-Sent Events (SSE)**. The server keeps a persistent connection with your browser and "pushes" updates only when the server-side update loop detects a change. This is highly efficient as it avoids constant HTTP requests from your browser.
@@ -80,9 +80,9 @@ Instead of waiting for the server to push data, your browser independently sends
 - **Direct feedback**: Ensuring that specific API-driven widgets can refresh their state even if the global page updates are throttled.
 
 ### Visibility Tracking
-If you switch to another tab or minimize your browser, Dynacat detects the `visibilitychange`. To save your device's battery and reduce server load:
+If you switch to another tab or minimize your browser, DynGlance detects the `visibilitychange`. To save your device's battery and reduce server load:
 - Independent polling is **paused**.
 - SSE processing is throttled.
 - Relative time updates (e.g., "just now") are paused.
 
-When you return to the tab, Dynacat immediately triggers a refresh for any widgets that have expired during the background period.
+When you return to the tab, DynGlance immediately triggers a refresh for any widgets that have expired during the background period.

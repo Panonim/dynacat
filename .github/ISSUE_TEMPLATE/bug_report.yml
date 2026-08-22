@@ -10,13 +10,13 @@ body:
 
         Please include only the information you think is relevant to the bug:
 
-        * How did you install Dynacat? (Docker container, manual binary install, etc)
-        * Which version of Dynacat are you using?
-        * Include the relevant parts of your `dynacat.yml` if applicable (widget, data source, properties used, etc)
+        * How did you install DynGlance? (Docker container, manual binary install, etc)
+        * Which version of DynGlance are you using?
+        * Include the relevant parts of your `dynglance.yml` if applicable (widget, data source, properties used, etc)
         * Include any relevant logs or screenshots if applicable
         * Is the issue specific to a certain browser or OS?
         * Steps to reliably reproduce the issue
-        * Are you hosting Dynacat on a VPS?
+        * Are you hosting DynGlance on a VPS?
         * Anything else you think might be relevant
 
         **No need to copy the above list into your description, it's just a guide to help you provide the most useful information.**

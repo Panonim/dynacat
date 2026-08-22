@@ -321,7 +321,7 @@ Output:
 <div data-dynamic-relative-time="1701621922"></div>
 ```
 
-You don't have to worry about the internal implementation, this will then be dynamically populated by Dynacat on the client side to show the correct relative time.
+You don't have to worry about the internal implementation, this will then be dynamically populated by DynGlance on the client side to show the correct relative time.
 
 The important thing to notice here is that the return value of `toRelativeTime` must be used as an attribute in an HTML tag, be it a `div`, `li`, `span`, etc.
 
@@ -483,7 +483,7 @@ The following functions are available on the `Options` object:
 - `BoolOr(key string, default bool) bool`: Returns the value of the key as a boolean, or the default value if the key does not exist.
 - `JSON(key string) JSON`: Returns the value of the key as a stringified `JSON` object, or throws an error if the key does not exist.
 
-The following helper functions provided by Dynacat are available:
+The following helper functions provided by DynGlance are available:
 
 - `hide() template.HTML`: Hides the current `custom-api` widget for this render. Useful when an API response should not be displayed (for example, a `204 No Content` response).
 - `toFloat(i int) float`: Converts an integer to a float.
