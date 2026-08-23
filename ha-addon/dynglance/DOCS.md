@@ -130,11 +130,16 @@ if you do enable it: Home Assistant's per-install **Protection mode** toggle
 socket is actually mounted at runtime, independent of the rating number.
 
 With `docker_api` off, this add-on reaches the **maximum score of 8**
-(baseline 5 + Ingress's +2 + the AppArmor profile's +1).
+(baseline 5 + Ingress's +2 + the shipped AppArmor profile's (`apparmor.txt`)
++1).
 
-This add-on also ships a custom AppArmor profile (`apparmor.txt`), which
-Supervisor loads automatically and which is worth +1 on top of whatever the
-Docker-access override allows.
+`server-stats`' uptime/CPU/memory readings already reflect real host-wide
+numbers with `docker_api` off - only disk usage is genuinely limited to
+what's mounted into the container (a mount-namespace fact, not something
+any privilege flag changes). See
+[docs/docs/home-assistant.md#security-rating](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md#security-rating)
+for the full breakdown and the recommended fix (a remote agent) if you want
+host-wide disk stats too.
 
 ### Networking / Ingress
 

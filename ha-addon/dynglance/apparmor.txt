@@ -51,22 +51,21 @@ profile dynglance flags=(attach_disconnected,mediate_deleted) {
     /etc/resolv.conf r,
     /etc/hosts r,
     /etc/nsswitch.conf r,
-    /etc/passwd r,
 
     # dynglance reads its own cgroup to identify its own container - unused
     # unless the docker-controller widget is configured (see below), but
     # harmless to always allow.
     /proc/self/cgroup r,
 
-    # Add-on options, dynglance.yml + uploads/custom assets, the read-only
-    # Home Assistant config mount, and the mapped share folder - matching
-    # this add-on's `map:` list in config.yaml.
+    # Add-on options, dynglance.yml + uploads/custom assets, and the
+    # read-only Home Assistant config / share mounts - matching this
+    # add-on's `map:` list in config.yaml. dynglance never writes to /tmp,
+    # /etc/passwd, /homeassistant, or /share, so none of those are granted
+    # write access (or, for the first two, any access at all).
     /data/** rw,
     /config/** rw,
     /homeassistant/** r,
-    /share/** rw,
-
-    /tmp/** rw,
+    /share/** r,
 
     # docker_api is off by default (see config.yaml) - the docker-containers
     # and docker-controller widgets won't work without it. If you rebuild a

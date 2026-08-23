@@ -3,6 +3,19 @@
 Versions are dated `YYYY.MM.DD.V`: the calendar date a release was cut, and
 a 1-based counter for however many releases happened that day.
 
+## 2026.08.23.4
+
+- Confirmed `server-stats`' uptime/CPU/memory readings already reflect
+  real host-wide numbers with no elevated privileges (they come from
+  `/proc/uptime`, `/proc/stat`, `/proc/meminfo`, none of which are
+  container-namespace-scoped); disk usage is the one genuinely
+  container-scoped metric, a mount-namespace limitation no privilege flag
+  fixes - a remote agent is the recommended path if host-wide disk stats
+  are wanted. See docs/docs/home-assistant.md.
+- Tightened `map:` (`share:rw` → `share:ro`) and `apparmor.txt`
+  (`/etc/passwd`, `/tmp` removed from the app's own profile) to match -
+  verified via source that nothing in DynGlance needs either.
+
 ## 2026.08.23.3
 
 - `docker_api` is now off by default - the `server-stats` widget never

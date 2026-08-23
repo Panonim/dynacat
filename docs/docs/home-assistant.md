@@ -212,10 +212,56 @@ things worth knowing if you go this route:
   anything already running - it takes effect on the next container
   recreate, not the next start/stop.
 
-**Getting real host-level stats for `server-stats` without Docker access**
-is an open question worth its own research pass: since the add-on doesn't
-run on the host PID/network namespace, `type: local` sees the *container's*
-view of `/proc`, not necessarily the Raspberry Pi/host's - whether that
-matters (and what the least-privileged fix would be: a host-side agent
-process reporting over HTTP, a narrower host mount, etc.) hasn't been
-investigated yet.
+**Does `server-stats`' `type: local` mode need `host_pid`/`host_network` to
+see real host-level numbers?** Checked `pkg/sysinfo/sysinfo.go` and how
+Linux/Docker expose `/proc` and mount namespaces - the four things it
+reports break down like this:
+
+- **Uptime, CPU, memory** - all three are read from `/proc/uptime`,
+  `/proc/stat`, and `/proc/meminfo`. None of these are namespace-virtualized
+  by a standard container runtime (that requires something like `lxcfs`,
+  which isn't in play here) - a container without `host_pid` still sees the
+  *host's* real boot time, CPU accounting, and total/used physical memory
+  through these files. This add-on already reports accurate host-wide
+  numbers for all three with zero elevated privileges.
+- **Disk** is different in kind, not degree: mountpoint usage is read via
+  each filesystem's actual mount, and mounts are inherently scoped to the
+  container's own mount namespace - there's no `/proc`-style loophole here.
+  With this add-on's current `map:` list, `server-stats` sees `/data`,
+  `/config`, `/homeassistant`, `/share`, and the container's own root
+  overlay - not the Raspberry Pi's real root filesystem/SD card as a whole.
+
+So three of the four already work exactly as intended with no extra
+privilege, and disk is a real, structural limitation - but not one that
+`host_pid`, `host_network`, `full_access`, or any other elevated grant
+would actually fix (mount namespaces aren't affected by any of those). The
+two real options, in order of preference:
+1. **Point `server-stats` at a remote agent running directly on the host**
+   instead of `type: local` - the widget already supports this over plain
+   HTTP (see [Server Stats](configuration.md#server-stats)), and it needs
+   *zero* elevated Supervisor privileges, since it's just an outbound HTTP
+   call this add-on already makes for other widgets.
+2. **Bind-mount the host's root filesystem in in** (e.g. via `/` mapped
+   read-only) - technically possible but a much larger grant than anything
+   discussed above, on par with `full_access`; not recommended.
+
+## Further tightening (2026.08.23.4)
+
+With the above confirmed, the AppArmor profile and `map:` list were
+tightened further to match reality rather than being defensively broad:
+- `share:rw` → `share:ro` in `config.yaml` (nothing in DynGlance writes to
+  `/share`), and the matching AppArmor rule for it and `/homeassistant`
+  narrowed to read-only.
+- Removed `/etc/passwd r,` and the `dynglance_bin` profile's `/tmp/** rw,`
+  from `apparmor.txt` - verified via source (no `os/user` import, no
+  `/etc/passwd` or `os.TempDir`/`/tmp` reference anywhere in the Go code)
+  that the running binary never touches either.
+
+The outer bootstrap profile's broader `/bin/** ix,`/`/usr/bin/** ix,`
+execute rules were deliberately left alone: they cover bashio's own
+internal dependency chain (jq and various coreutils), which isn't something
+that can be safely enumerated by reading this repo's source - narrowing it
+without the `complain`-mode-plus-audit-log process the official Home
+Assistant add-on template itself recommends risks breaking add-on startup
+outright, which is worse than a somewhat generous bootstrap profile in
+front of a tightly-scoped one for the actual long-running process.
