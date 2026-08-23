@@ -112,19 +112,25 @@ and put the result in `auth.secret-key`.
 
 ### Docker widgets and the security rating
 
-The add-on requests Docker socket access (`docker_api: true`), so the
-`docker-containers` and `docker-controller` widgets work with their default
-socket path (`/var/run/docker.sock`) without extra configuration. This grants
-the add-on root-equivalent access to the host, and per Supervisor's own
-rating logic it unconditionally forces the add-on's Home Assistant security
-rating to 1 (the minimum) - no combination of other settings can offset it;
-see [docs/docs/home-assistant.md#security-rating](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md#security-rating)
-for exactly how that's calculated, including a real (if partial) mitigation:
-Home Assistant's per-install **Protection mode** toggle (Settings → Add-ons
-→ DynGlance → Info tab) determines whether the Docker socket is actually
-mounted at runtime, independent of the rating number. If you don't use the
-Docker widgets, removing `docker_api: true` from `config.yaml` and rebuilding
-a local copy of the add-on is the only way to change the number itself.
+`docker_api` is **off by default**. The `server-stats` widget (host
+CPU/RAM/disk/temperature) doesn't need it - it reads `/proc`/`/sys` and
+`gopsutil` directly, not the Docker API - so this add-on doesn't request
+Docker socket access at all out of the box. Only the separate
+`docker-containers` and `docker-controller` widgets (listing/controlling
+containers) need it; those won't work unless you set `docker_api: true`
+back in `config.yaml` and rebuild a local copy of the add-on (also
+uncomment the matching rules in `apparmor.txt`). That grants root-equivalent
+access to the host, and per Supervisor's own rating logic it unconditionally
+forces the add-on's Home Assistant security rating to 1 (the minimum) - no
+combination of other settings can offset it; see
+[docs/docs/home-assistant.md#security-rating](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md#security-rating)
+for exactly how that's calculated, including a real (if partial) mitigation
+if you do enable it: Home Assistant's per-install **Protection mode** toggle
+(Settings → Add-ons → DynGlance → Info tab) determines whether the Docker
+socket is actually mounted at runtime, independent of the rating number.
+
+With `docker_api` off, this add-on reaches the **maximum score of 8**
+(baseline 5 + Ingress's +2 + the AppArmor profile's +1).
 
 This add-on also ships a custom AppArmor profile (`apparmor.txt`), which
 Supervisor loads automatically and which is worth +1 on top of whatever the

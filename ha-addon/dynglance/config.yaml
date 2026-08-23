@@ -1,5 +1,5 @@
 name: DynGlance
-version: "2026.08.23.2"
+version: "2026.08.23.3"
 slug: dynglance
 description: Self-hosted dashboard (Glance fork) with dynamic widgets, run as a Home Assistant add-on
 url: https://github.com/trooperthorn/ha_app_dynglance
@@ -12,15 +12,16 @@ arch:
   - aarch64
   - armv7
 
-# Grants access to /var/run/docker.sock so the docker-containers and
-# docker-controller widgets work out of the box. This is equivalent to full
-# root access to the host - disable it (set to false and rebuild/reinstall)
-# if you don't use those widgets and want to reduce the add-on's privileges.
-# This is the one privilege that forces the add-on's Home Assistant security
-# rating down to 1 regardless of anything else in this file - see
-# docs/docs/home-assistant.md for why it can't be made a runtime toggle and
-# what the alternatives are.
-docker_api: true
+# Off by default: the server-stats widget (host CPU/RAM/disk/temp stats)
+# reads /proc, /sys, and gopsutil directly - it doesn't touch Docker at all.
+# Only the separate docker-containers and docker-controller widgets need
+# the Docker socket, and enabling this is equivalent to full root access to
+# the host. It's also the one privilege that unconditionally forces the
+# add-on's Home Assistant security rating to 1 regardless of anything else
+# in this file. If you want those two widgets, set this back to true and
+# rebuild a local copy of the add-on - see docs/docs/home-assistant.md for
+# the exact rating math and docs/docs/configuration.md for the widgets.
+docker_api: false
 
 ingress: true
 ingress_port: 8080

@@ -167,9 +167,24 @@ project's issue tracker if you'd like to propose one.
 
 ## Security rating
 
-The add-on requests `docker_api: true` so the `docker-containers` and
-`docker-controller` widgets work. Per Home Assistant Supervisor's own rating
-logic (`supervisor/apps/utils.py`, current as of Supervisor's `main` branch):
+`docker_api` is **off by default** (`config.yaml`). The `server-stats`
+widget (host CPU/RAM/disk/temperature) doesn't touch Docker at all - it
+reads `/proc`, `/sys`, and similar directly via `gopsutil`, both for its
+built-in `type: local` mode and for a remote agent's HTTP endpoint - so it
+never needed this privilege. Only the separate `docker-containers` and
+`docker-controller` widgets (listing/controlling containers) actually
+require the Docker socket.
+
+With `docker_api` off, an AppArmor profile shipped (`apparmor.txt`), and
+Ingress enabled, the add-on reaches the maximum score under Home Assistant
+Supervisor's own rating logic (`supervisor/apps/utils.py`): baseline 5 +
+Ingress's +2 + AppArmor's +1 = **8 of 8**.
+
+If you want the Docker widgets instead, set `docker_api: true` back in
+`config.yaml` and rebuild a local copy of the add-on (also uncomment the
+Docker socket rules in `apparmor.txt` - they're left in place, commented
+out, for exactly this). Per Supervisor's rating logic that's an
+unconditional override:
 
 ```python
 # Docker Access & full Access
@@ -177,18 +192,12 @@ if app.access_docker_api or app.with_full_access:
     rating = 1
 ```
 
-This is an unconditional override - it forces the rating to 1 regardless of
-anything else the add-on does right (Ingress, a shipped AppArmor profile,
-no other elevated privileges, etc. all still apply, they just can't move the
-number while this override is in effect). There is no config.yaml option,
+It forces the rating to 1 regardless of anything else the add-on does right
+- Ingress and the AppArmor profile still apply, they just can't move the
+number while this override is in effect. There is no config.yaml option,
 schema field, or Supervisor REST API that makes `docker_api` conditional -
-it's read once from the add-on's manifest at install/update time.
-
-Two things worth knowing if you don't need the Docker widgets:
-- **Removing `docker_api: true` and rebuilding a local copy** of the add-on
-  is the only way to change the *number*. With it removed (and the AppArmor
-  profile and Ingress this add-on already has), the rating reaches the
-  maximum of 8 (baseline 5 + Ingress's +2 + AppArmor's +1).
+it's read once from the add-on's manifest at install/update time. Two
+things worth knowing if you go this route:
 - **Protection mode** (Settings → Add-ons → DynGlance → Info tab, or
   `POST /apps/{slug}/security` / `POST /addons/{slug}/security` with
   `{"protected": false}`) is a real, existing, per-installation toggle -
@@ -198,7 +207,15 @@ Two things worth knowing if you don't need the Docker widgets:
   (`supervisor/docker/app.py`: `if not app.protected and app.access_docker_api:
   mounts.append(MOUNT_DOCKER)`) - with protection mode left on (the
   default), the socket isn't mounted even though `docker_api: true` is
-  declared, so the Docker widgets won't work until you turn it off. Note
-  this also means simply toggling protection mode back on later doesn't
-  retroactively re-secure anything already running - it takes effect on the
-  next container recreate, not the next start/stop.
+  declared, so the widgets still won't work until you turn it off.
+- Toggling protection mode back on later doesn't retroactively re-secure
+  anything already running - it takes effect on the next container
+  recreate, not the next start/stop.
+
+**Getting real host-level stats for `server-stats` without Docker access**
+is an open question worth its own research pass: since the add-on doesn't
+run on the host PID/network namespace, `type: local` sees the *container's*
+view of `/proc`, not necessarily the Raspberry Pi/host's - whether that
+matters (and what the least-privileged fix would be: a host-side agent
+process reporting over HTTP, a narrower host mount, etc.) hasn't been
+investigated yet.

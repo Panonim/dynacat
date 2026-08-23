@@ -37,14 +37,12 @@ profile dynglance flags=(attach_disconnected,mediate_deleted) {
     signal (receive),
 
     # Outbound HTTP(S) to arbitrary widget sources (RSS, weather, GitHub,
-    # Docker Hub, Home Assistant's API, etc.), the app's own listener on
-    # :8080, and the Docker socket (a unix stream connection, granted below
-    # as a file rule too) since this add-on has docker_api: true.
+    # Docker Hub, Home Assistant's API, etc.) and the app's own listener on
+    # :8080.
     network inet stream,
     network inet dgram,
     network inet6 stream,
     network inet6 dgram,
-    network unix stream,
 
     /usr/bin/dynglance rm,
 
@@ -55,8 +53,9 @@ profile dynglance flags=(attach_disconnected,mediate_deleted) {
     /etc/nsswitch.conf r,
     /etc/passwd r,
 
-    # dynglance reads its own cgroup to identify its own container so the
-    # docker-controller widget can filter it out of the container list.
+    # dynglance reads its own cgroup to identify its own container - unused
+    # unless the docker-controller widget is configured (see below), but
+    # harmless to always allow.
     /proc/self/cgroup r,
 
     # Add-on options, dynglance.yml + uploads/custom assets, the read-only
@@ -67,11 +66,14 @@ profile dynglance flags=(attach_disconnected,mediate_deleted) {
     /homeassistant/** r,
     /share/** rw,
 
-    # Docker socket (docker_api: true) - both paths since /var/run is
-    # typically a symlink to /run on Alpine, but the exact target can vary.
-    /var/run/docker.sock rw,
-    /run/docker.sock rw,
-
     /tmp/** rw,
+
+    # docker_api is off by default (see config.yaml) - the docker-containers
+    # and docker-controller widgets won't work without it. If you rebuild a
+    # local copy of the add-on with docker_api: true, also uncomment these
+    # (both paths since /var/run is typically a symlink to /run on Alpine,
+    # but the exact target can vary) and add `network unix stream,` above:
+    # /var/run/docker.sock rw,
+    # /run/docker.sock rw,
   }
 }
