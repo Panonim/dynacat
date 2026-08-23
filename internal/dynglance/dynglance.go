@@ -285,7 +285,13 @@ func newApplication(c *config) (*application, error) {
 	app.imageCache = newImageCache(config.Server.BaseURL, config.Server.CacheDir)
 
 	providers := &widgetProviders{
-		assetResolver:        app.StaticAssetPath,
+		// Resolved once per widget refresh (not per-request, there's no
+		// HTTP request in scope here), so unlike page/asset links this can't
+		// be made Ingress-path aware; it falls back to the static
+		// server.base-url config value like before.
+		assetResolver: func(asset string) string {
+			return app.StaticAssetPath(config.Server.BaseURL, asset)
+		},
 		imageCache:           app.imageCache,
 		baseURL:              config.Server.BaseURL,
 		DynamicUpdateEnabled: dynamicUpdateEnabled,
@@ -374,7 +380,7 @@ func newApplication(c *config) (*application, error) {
 
 	config.Branding.FaviconURL = ternary(
 		config.Branding.FaviconURL == "",
-		app.StaticAssetPath("favicon.svg"),
+		app.StaticAssetPath(config.Server.BaseURL, "favicon.svg"),
 		app.resolveUserDefinedAssetPath(config.Branding.FaviconURL),
 	)
 
@@ -389,7 +395,7 @@ func newApplication(c *config) (*application, error) {
 	}
 
 	if config.Branding.AppIconURL == "" {
-		config.Branding.AppIconURL = app.StaticAssetPath("app-icon.svg")
+		config.Branding.AppIconURL = app.StaticAssetPath(config.Server.BaseURL, "app-icon.svg")
 	}
 
 	if config.Branding.AppBackgroundColor == "" {
@@ -566,7 +572,30 @@ func (a *application) resolveUserDefinedAssetPath(path string) string {
 }
 
 type templateRequestData struct {
-	Theme *themeProperties
+	Theme   *themeProperties
+	BaseURL string
+}
+
+// ingressPathHeader is set by the Home Assistant Supervisor on every request
+// proxied through Ingress, carrying the dynamic, per-installation path
+// prefix (e.g. /api/hassio_ingress/<token>) that the browser's address bar
+// actually shows. Root-absolute links generated without this prefix (plain
+// "/static/...", "/api/...") resolve against the real origin instead of the
+// ingress path when the browser follows them, bypassing the ingress proxy
+// entirely and 404ing - which is why the dashboard loses all styling and
+// functionality when opened from the Home Assistant sidebar but works fine
+// in a plain browser tab. See docs/docs/home-assistant.md.
+const ingressPathHeader = "X-Ingress-Path"
+
+// effectiveBaseURL returns the base path that should prefix every link,
+// redirect, and cookie path generated for this request: the Home Assistant
+// Ingress path when present, otherwise the statically configured
+// server.base-url (used for manually reverse-proxied setups).
+func (a *application) effectiveBaseURL(r *http.Request) string {
+	if ingressPath := strings.TrimRight(r.Header.Get(ingressPathHeader), "/"); ingressPath != "" {
+		return ingressPath
+	}
+	return a.Config.Server.BaseURL
 }
 
 type templateData struct {
@@ -592,6 +621,7 @@ func (a *application) populateTemplateRequestData(data *templateRequestData, r *
 	}
 
 	data.Theme = theme
+	data.BaseURL = a.effectiveBaseURL(r)
 }
 
 func (a *application) getAccessiblePages(user *authenticatedUser) []*page {
@@ -821,12 +851,19 @@ func (a *application) handleWidgetActionRequest(w http.ResponseWriter, r *http.R
 	widget.handleRequest(w, r)
 }
 
-func (a *application) StaticAssetPath(asset string) string {
-	return a.Config.Server.BaseURL + "/static/" + getStaticFSHash() + "/" + asset
+// StaticAssetPath builds the URL for an embedded static asset. baseURL should
+// be the requesting page's effective base URL (.Request.BaseURL in
+// templates) rather than the static server.base-url config value, so links
+// still resolve correctly when accessed through Home Assistant Ingress.
+func (a *application) StaticAssetPath(baseURL, asset string) string {
+	return baseURL + "/static/" + getStaticFSHash() + "/" + asset
 }
 
-func (a *application) VersionedAssetPath(asset string) string {
-	return a.Config.Server.BaseURL + asset +
+// VersionedAssetPath is like StaticAssetPath but for non-embedded, top-level
+// routes (e.g. manifest.json) that are cache-busted with a query string
+// instead of a content hash in the path.
+func (a *application) VersionedAssetPath(baseURL, asset string) string {
+	return baseURL + asset +
 		"?v=" + strconv.FormatInt(a.CreatedAt.Unix(), 10)
 }
 

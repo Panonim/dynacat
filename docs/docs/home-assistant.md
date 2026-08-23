@@ -1,5 +1,20 @@
 # Home Assistant integration
 
+## Viewing the dashboard via the sidebar (Ingress)
+
+If DynGlance opens with all the page structure and content but none of the
+styling (no colors, unstyled default browser buttons/checkboxes, everything
+stacked full-width) when opened from the Home Assistant sidebar - but looks
+fine when opened directly in its own browser tab - this was a real bug in
+versions before the fix below and has been resolved: DynGlance now reads the
+`X-Ingress-Path` header Supervisor sends on every Ingress request and uses it
+to prefix every generated link, script, and stylesheet URL, instead of only
+supporting a fixed `server.base-url` set at config time (which can't work for
+Ingress anyway, since each install's `/api/hassio_ingress/<token>/` prefix is
+random and only known at runtime, not when you write `dynglance.yml`). Update
+to a build that includes this fix if you still see the issue - no
+config change is needed for it to take effect.
+
 DynGlance has no Home Assistant-specific widget, but you can pull data out of
 Home Assistant's REST API into the `custom-api` widget with no code changes.
 Because `custom-api` fetches and renders server-side, your Home Assistant

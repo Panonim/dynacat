@@ -3,13 +3,13 @@
 {{- define "document-title" }}Upload config{{ end }}
 
 {{- define "document-head-before" }}
-<link rel="preload" href='{{ .App.StaticAssetPath "js/templating.js" }}' as="script"/>
+<link rel="preload" href='{{ .App.StaticAssetPath .Request.BaseURL "js/templating.js" }}' as="script"/>
 {{- end }}
 
 {{- define "document-head-after" }}
-<link rel="stylesheet" href='{{ .App.StaticAssetPath "css/login.css" }}'>
-<link rel="stylesheet" href='{{ .App.StaticAssetPath "css/config-upload.css" }}'>
-<script type="module" src='{{ .App.StaticAssetPath "js/config-upload.js" }}'></script>
+<link rel="stylesheet" href='{{ .App.StaticAssetPath .Request.BaseURL "css/login.css" }}'>
+<link rel="stylesheet" href='{{ .App.StaticAssetPath .Request.BaseURL "css/config-upload.css" }}'>
+<script type="module" src='{{ .App.StaticAssetPath .Request.BaseURL "js/config-upload.js" }}'></script>
 {{- end }}
 
 {{- define "document-body" }}
