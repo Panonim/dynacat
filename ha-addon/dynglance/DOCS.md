@@ -18,12 +18,15 @@ access for the Docker widgets.
 
 ## Configuration
 
-The add-on itself only exposes two options:
+The add-on exposes these options on its **Configuration** tab:
 
-| Option      | Description                                                      |
-|-------------|--------------------------------------------------------------------|
-| `log_level` | `debug`, `info`, `warning`, or `error`.                            |
-| `timezone`  | Optional IANA timezone (e.g. `Europe/Warsaw`) for the clock widget/logs. |
+| Option | Description |
+|---|---|
+| `log_level` | `debug`, `info`, `warning`, or `error`. |
+| `timezone` | Optional IANA timezone (e.g. `Europe/Warsaw`) for the clock widget/logs. |
+| `home_assistant_token` | Optional Home Assistant long-lived access token, passed through as the `HA_TOKEN` env var so `custom-api` widgets can use `${env:HA_TOKEN}` - see [Displaying Home Assistant data](#displaying-home-assistant-data-on-the-dashboard). |
+| `config_upload_enabled` | Turns the passphrase-gated `/config-upload` page on or off - see [Config Upload](#config-upload). |
+| `config_upload_password` | Passphrase for that page (12+ characters, required if the toggle above is on). |
 
 Everything else - pages, columns, widgets, theming, authentication - is
 configured the same way as upstream DynGlance/Glance: through
@@ -51,36 +54,46 @@ See the full configuration reference at
    [docs/docs/home-assistant.md](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md#5-referencing-config-files-that-live-in-your-home-assistant-config-folder).
 2. **Edit the file directly** via the File editor/Studio Code Server add-ons,
    as described above.
-3. **Upload or drag-and-drop from the browser** - enable `config-upload` in
-   `dynglance.yml` and a passphrase-gated `/config-upload` page becomes
-   available with a file picker and a drop zone, letting you replace
-   `dynglance.yml` or add an `$include` fragment without shell/file-manager
-   access at all. See
-   [docs/docs/authentication.md#config-upload](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/authentication.md#config-upload).
+3. **Upload or drag-and-drop from the browser** - see [Config Upload](#config-upload)
+   below; turned on and off entirely from the Configuration tab, no YAML
+   editing required.
 
 ### Displaying Home Assistant data on the dashboard
 
-Since the add-on has no dedicated Home Assistant widget yet, use the
-`custom-api` widget with the `SUPERVISOR_TOKEN` environment variable that
-Supervisor already injects into this container - no manually created token
-needed, and it's never exposed to the browser since `custom-api` fetches and
-renders server-side:
+Set the **Home Assistant long-lived token** option (Configuration tab) to a
+token from your profile (**Security** → **Long-lived access tokens** →
+**Create Token**). It's passed through as the `HA_TOKEN` env var - never
+typed into `dynglance.yml`, and never sent to the browser either, since
+`custom-api` fetches and renders server-side:
 
 ```yaml
 - type: custom-api
   title: Living Room Temperature
   cache: 30s
-  url: http://supervisor/core/api/states/sensor.living_room_temperature
+  url: http://homeassistant.local:8123/api/states/sensor.living_room_temperature
   headers:
-    Authorization: "Bearer ${env:SUPERVISOR_TOKEN}"
+    Authorization: "Bearer ${env:HA_TOKEN}"
   template: |
     <div class="size-h2">{{ .JSON.String "state" }}°{{ .JSON.String "attributes.unit_of_measurement" }}</div>
 ```
 
-See
+Replace `homeassistant.local:8123` with your instance's address. See
 [docs/docs/home-assistant.md](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md)
-for more examples (multiple entities, using a manually created long-lived
-token instead).
+for more examples (multiple entities via `subrequests`, etc).
+
+### Config Upload
+
+Set **Config Upload** to on and give it a **Config Upload passphrase**
+(12+ characters) on the Configuration tab, and a passphrase-gated
+`/config-upload` page becomes available with a file picker and a drop zone
+for replacing `dynglance.yml` or adding an `$include` fragment - no YAML
+editing needed to turn it on. This passphrase is entirely separate from
+DynGlance's own dashboard auth (if any). Leaving the passphrase blank or
+under 12 characters keeps the page disabled even with the toggle on, so a
+half-filled-in option can't start the app with a broken config. See
+[docs/docs/authentication.md#config-upload](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/authentication.md#config-upload)
+for the full details, including how it interacts with a hand-written
+`config-upload:` section if you already have one.
 
 ### Authentication
 
@@ -97,14 +110,25 @@ docker exec -it addon_dynglance dynglance secret:make
 
 and put the result in `auth.secret-key`.
 
-### Docker widgets
+### Docker widgets and the security rating
 
 The add-on requests Docker socket access (`docker_api: true`), so the
 `docker-containers` and `docker-controller` widgets work with their default
 socket path (`/var/run/docker.sock`) without extra configuration. This grants
-the add-on root-equivalent access to the host - if you don't use those
-widgets, you can remove `docker_api: true` from `config.yaml` and rebuild a
-local copy of the add-on for a smaller privilege footprint.
+the add-on root-equivalent access to the host, and per Supervisor's own
+rating logic it unconditionally forces the add-on's Home Assistant security
+rating to 1 (the minimum) - no combination of other settings can offset it;
+see [docs/docs/home-assistant.md#security-rating](https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/home-assistant.md#security-rating)
+for exactly how that's calculated, including a real (if partial) mitigation:
+Home Assistant's per-install **Protection mode** toggle (Settings → Add-ons
+→ DynGlance → Info tab) determines whether the Docker socket is actually
+mounted at runtime, independent of the rating number. If you don't use the
+Docker widgets, removing `docker_api: true` from `config.yaml` and rebuilding
+a local copy of the add-on is the only way to change the number itself.
+
+This add-on also ships a custom AppArmor profile (`apparmor.txt`), which
+Supervisor loads automatically and which is worth +1 on top of whatever the
+Docker-access override allows.
 
 ### Networking / Ingress
 

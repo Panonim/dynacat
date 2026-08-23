@@ -80,6 +80,15 @@ config-upload:
   password: mysecretpassphrase # at least 12 characters
 ```
 
+**Running as the Home Assistant add-on:** you don't need to write this
+section by hand at all - turn on **Config Upload** and set a **Config
+Upload passphrase** on the add-on's Configuration tab instead, and the
+add-on manages this section of `dynglance.yml` for you on every restart. If
+`dynglance.yml` already has its own hand-written `config-upload:` section
+(e.g. from before you used the option, or a manual override), that's left
+alone and the option is ignored instead of overwriting it - remove your
+manual section to let the add-on manage it.
+
 Like `auth.users[].password`, you can supply a bcrypt hash instead with
 `password-hash` (generate one with `./dynglance password:hash <passphrase>`),
 so the plaintext never needs to sit in `dynglance.yml`.

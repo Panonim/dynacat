@@ -1,5 +1,5 @@
 name: DynGlance
-version: "2026.08.23.1"
+version: "2026.08.23.2"
 slug: dynglance
 description: Self-hosted dashboard (Glance fork) with dynamic widgets, run as a Home Assistant add-on
 url: https://github.com/trooperthorn/ha_app_dynglance
@@ -16,13 +16,11 @@ arch:
 # docker-controller widgets work out of the box. This is equivalent to full
 # root access to the host - disable it (set to false and rebuild/reinstall)
 # if you don't use those widgets and want to reduce the add-on's privileges.
+# This is the one privilege that forces the add-on's Home Assistant security
+# rating down to 1 regardless of anything else in this file - see
+# docs/docs/home-assistant.md for why it can't be made a runtime toggle and
+# what the alternatives are.
 docker_api: true
-
-# Lets custom-api widgets reach the Home Assistant Core API at
-# http://supervisor/core/api/... using the auto-injected SUPERVISOR_TOKEN,
-# so dashboard entities can be displayed without creating a separate
-# long-lived access token. See docs/docs/home-assistant.md.
-homeassistant_api: true
 
 ingress: true
 ingress_port: 8080
@@ -51,7 +49,20 @@ map:
 options:
   log_level: info
   timezone: ""
+  home_assistant_token: ""
+  config_upload_enabled: false
+  config_upload_password: ""
 
 schema:
   log_level: list(debug|info|warning|error)
   timezone: str?
+  # Optional Home Assistant long-lived access token (Profile -> Security ->
+  # Long-lived access tokens), passed through as the HA_TOKEN env var so
+  # custom-api widgets can use ${env:HA_TOKEN} instead of anyone pasting the
+  # token into dynglance.yml. See docs/docs/home-assistant.md.
+  home_assistant_token: password?
+  # Turns the passphrase-gated /config-upload page on or off. Requires
+  # config_upload_password to be at least 12 characters - if it's missing
+  # or too short, Config Upload stays disabled regardless of this toggle.
+  config_upload_enabled: bool
+  config_upload_password: password?
