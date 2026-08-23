@@ -3,7 +3,7 @@
 {{ if eq "" .App.Config.Branding.CustomFooter }}
     <div>
         <a class="size-h3" href="https://github.com/trooperthorn/ha_app_dynglance" target="_blank" rel="noreferrer">DynGlance</a> 
-        {{ if ne "dev" .App.Version }}
+        {{ if not (hasSuffix .App.Version ".0") }}
             {{ if containsStr .App.Version "beta" }}
                 <a class="visited-indicator" title="Beta packages" href="https://github.com/trooperthorn/ha_app_dynglance/pkgs/container/dynglance/" target="_blank" rel="noreferrer">{{ .App.Version }}</a>
             {{ else }}

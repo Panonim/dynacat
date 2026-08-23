@@ -67,7 +67,7 @@ type requestDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-var dynglanceUserAgentString = "DynGlance/" + buildVersion + " +https://github.com/trooperthorn/ha_app_dynglance"
+var dynglanceUserAgentString = "DynGlance/" + resolveVersion() + " +https://github.com/trooperthorn/ha_app_dynglance"
 var userAgentPersistentVersion atomic.Int32
 
 func getBrowserUserAgentHeader() string {

@@ -86,7 +86,7 @@ type application struct {
 
 func newApplication(c *config) (*application, error) {
 	app := &application{
-		Version:            buildVersion,
+		Version:            resolveVersion(),
 		CreatedAt:          time.Now(),
 		Config:             *c,
 		slugToPage:         make(map[string]*page),

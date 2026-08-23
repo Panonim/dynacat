@@ -1,5 +1,5 @@
 name: DynGlance
-version: "1.0.0"
+version: "2026.08.23.1"
 slug: dynglance
 description: Self-hosted dashboard (Glance fork) with dynamic widgets, run as a Home Assistant add-on
 url: https://github.com/trooperthorn/ha_app_dynglance
