@@ -1,0 +1,78 @@
+#include <tunables/global>
+
+# Profile name must match the add-on slug ("dynglance" in config.yaml) -
+# Supervisor loads this file and attaches it automatically because it's
+# present, no `apparmor:` field needed in config.yaml. Adds +1 to the
+# add-on's Home Assistant security rating.
+#
+# This container has no s6-overlay/init system (config.yaml sets
+# `init: false`); run.sh is a plain bashio bootstrap script that `exec`s
+# straight into the dynglance binary, replacing itself as PID 1. This outer
+# profile only needs to cover that brief bootstrap (mkdir/cat/sed/grep from
+# run.sh, plus curl for the container HEALTHCHECK) before transitioning into
+# the tighter "dynglance_bin" profile below for the long-running process.
+profile dynglance flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  file,
+  signal (send) set=(kill,term,int,hup,cont),
+
+  # Bootstrap script and the coreutils/busybox/curl it calls
+  /run.sh r,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Add-on options (options.json etc.)
+  /data/** rw,
+
+  # Hand off to the long-running process under its own, tighter profile
+  /usr/bin/dynglance cx -> dynglance_bin,
+
+  profile dynglance_bin flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    #include <abstractions/nameservice>
+
+    signal (receive),
+
+    # Outbound HTTP(S) to arbitrary widget sources (RSS, weather, GitHub,
+    # Docker Hub, Home Assistant's API, etc.) and the app's own listener on
+    # :8080.
+    network inet stream,
+    network inet dgram,
+    network inet6 stream,
+    network inet6 dgram,
+
+    /usr/bin/dynglance rm,
+
+    # TLS root certificates and DNS resolution config for outbound HTTPS
+    /etc/ssl/certs/** r,
+    /etc/resolv.conf r,
+    /etc/hosts r,
+    /etc/nsswitch.conf r,
+
+    # dynglance reads its own cgroup to identify its own container - unused
+    # unless the docker-controller widget is configured (see below), but
+    # harmless to always allow.
+    /proc/self/cgroup r,
+
+    # Add-on options, dynglance.yml + uploads/custom assets, and the
+    # read-only Home Assistant config / share mounts - matching this
+    # add-on's `map:` list in config.yaml. dynglance never writes to /tmp,
+    # /etc/passwd, /homeassistant, or /share, so none of those are granted
+    # write access (or, for the first two, any access at all).
+    /data/** rw,
+    /config/** rw,
+    /homeassistant/** r,
+    /share/** r,
+
+    # docker_api is off by default (see config.yaml) - the docker-containers
+    # and docker-controller widgets won't work without it. If you rebuild a
+    # local copy of the add-on with docker_api: true, also uncomment these
+    # (both paths since /var/run is typically a symlink to /run on Alpine,
+    # but the exact target can vary) and add `network unix stream,` above:
+    # /var/run/docker.sock rw,
+    # /run/docker.sock rw,
+  }
+}

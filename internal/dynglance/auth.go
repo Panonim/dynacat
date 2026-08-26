@@ -396,7 +396,7 @@ func (a *application) handleUnauthorizedResponse(w http.ResponseWriter, r *http.
 
 	switch fallback {
 	case redirectToLogin:
-		http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
+		http.Redirect(w, r, a.effectiveBaseURL(r)+"/login", http.StatusSeeOther)
 	case showUnauthorizedJSON:
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{"error": "Unauthorized"}`))
@@ -426,18 +426,18 @@ func (a *application) redirectToLoginPage(w http.ResponseWriter, r *http.Request
 			Value:    target,
 			Expires:  time.Now().Add(OIDC_STATE_VALID_PERIOD),
 			Secure:   a.isRequestHTTPS(r),
-			Path:     a.Config.Server.BaseURL + "/",
+			Path:     a.effectiveBaseURL(r) + "/",
 			SameSite: http.SameSiteLaxMode,
 			HttpOnly: true,
 		})
 	}
-	http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
+	http.Redirect(w, r, a.effectiveBaseURL(r)+"/login", http.StatusSeeOther)
 }
 
 // takeLoginRedirect consumes and clears the post-login redirect cookie,
 // returning a safe destination to send the user to after a successful login.
 func (a *application) takeLoginRedirect(w http.ResponseWriter, r *http.Request) string {
-	target := a.Config.Server.BaseURL + "/"
+	target := a.effectiveBaseURL(r) + "/"
 	if c, err := r.Cookie(AUTH_REDIRECT_COOKIE_NAME); err == nil && isSafeLocalPath(c.Value) {
 		target = c.Value
 	}
@@ -445,7 +445,7 @@ func (a *application) takeLoginRedirect(w http.ResponseWriter, r *http.Request) 
 		Name:     AUTH_REDIRECT_COOKIE_NAME,
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     a.Config.Server.BaseURL + "/",
+		Path:     a.effectiveBaseURL(r) + "/",
 		HttpOnly: true,
 	})
 	return target
@@ -470,11 +470,11 @@ func (a *application) handleLogoutRequest(w http.ResponseWriter, r *http.Request
 		Name:     OIDC_SESSION_COOKIE_NAME,
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     a.Config.Server.BaseURL + "/",
+		Path:     a.effectiveBaseURL(r) + "/",
 		HttpOnly: true,
 	})
 
-	http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
+	http.Redirect(w, r, a.effectiveBaseURL(r)+"/login", http.StatusSeeOther)
 }
 
 func (a *application) setAuthSessionCookie(w http.ResponseWriter, r *http.Request, token string, expires time.Time) {
@@ -483,7 +483,7 @@ func (a *application) setAuthSessionCookie(w http.ResponseWriter, r *http.Reques
 		Value:    token,
 		Expires:  expires,
 		Secure:   a.isRequestHTTPS(r),
-		Path:     a.Config.Server.BaseURL + "/",
+		Path:     a.effectiveBaseURL(r) + "/",
 		SameSite: http.SameSiteStrictMode,
 		HttpOnly: true,
 	})
@@ -491,7 +491,7 @@ func (a *application) setAuthSessionCookie(w http.ResponseWriter, r *http.Reques
 
 func (a *application) handleLoginPageRequest(w http.ResponseWriter, r *http.Request) {
 	if a.getAuthenticatedUser(w, r) != nil {
-		http.Redirect(w, r, a.Config.Server.BaseURL+"/", http.StatusSeeOther)
+		http.Redirect(w, r, a.effectiveBaseURL(r)+"/", http.StatusSeeOther)
 		return
 	}
 

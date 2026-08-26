@@ -62,7 +62,7 @@ func (a *application) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Expires:  time.Now().Add(OIDC_STATE_VALID_PERIOD),
 		Secure:   secure,
-		Path:     a.Config.Server.BaseURL + "/",
+		Path:     a.effectiveBaseURL(r) + "/",
 		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 	})
@@ -72,7 +72,7 @@ func (a *application) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    pkceVerifier,
 		Expires:  time.Now().Add(OIDC_STATE_VALID_PERIOD),
 		Secure:   secure,
-		Path:     a.Config.Server.BaseURL + "/",
+		Path:     a.effectiveBaseURL(r) + "/",
 		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 	})
@@ -82,7 +82,7 @@ func (a *application) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
-	baseURL := a.Config.Server.BaseURL
+	baseURL := a.effectiveBaseURL(r)
 
 	// Validate state
 	stateCookie, err := r.Cookie(OIDC_STATE_COOKIE_NAME)

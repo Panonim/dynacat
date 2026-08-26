@@ -3,14 +3,14 @@
 {{ define "document-title" }}{{ .Page.Title }}{{ end }}
 
 {{ define "document-head-after" }}
-<script type="module" src='{{ .App.StaticAssetPath "js/page.js" }}'></script>
-<script src='{{ .App.StaticAssetPath "js/docker-controller.js" }}'></script>
+<script type="module" src='{{ .App.StaticAssetPath .Request.BaseURL "js/page.js" }}'></script>
+<script src='{{ .App.StaticAssetPath .Request.BaseURL "js/docker-controller.js" }}'></script>
 {{ end }}
 
 {{ define "navigation-links" }}
 {{ range .AccessiblePages }}
 {{ if not .HideFromNavigation }}
-<a href="{{ $.App.Config.Server.BaseURL }}/{{ .Slug }}" class="nav-item{{ if eq .Slug $.Page.Slug }} nav-item-current{{ end }}"{{ if eq .Slug $.Page.Slug }} aria-current="page"{{ end }}{{ if .KeyBind }} data-key-bind="{{ .KeyBind }}"{{ end }}>{{ if ne "" .NameIcon.URL }}{{ if .NameIcon.AutoInvert }}<span class="nav-item-icon nav-item-icon-mask" style="--nav-item-icon-url: url('{{ .NameIcon.URL }}')"></span>{{ else }}<img class="nav-item-icon" src="{{ .NameIcon.URL }}" alt="">{{ end }}{{ end }}{{ .Title }}{{ if .KeyBind }}<span class="nav-keybind-hint">{{ .KeyBind }}</span>{{ end }}</a>
+<a href="{{ $.Request.BaseURL }}/{{ .Slug }}" class="nav-item{{ if eq .Slug $.Page.Slug }} nav-item-current{{ end }}"{{ if eq .Slug $.Page.Slug }} aria-current="page"{{ end }}{{ if .KeyBind }} data-key-bind="{{ .KeyBind }}"{{ end }}>{{ if ne "" .NameIcon.URL }}{{ if .NameIcon.AutoInvert }}<span class="nav-item-icon nav-item-icon-mask" style="--nav-item-icon-url: url('{{ .NameIcon.URL }}')"></span>{{ else }}<img class="nav-item-icon" src="{{ .NameIcon.URL }}" alt="">{{ end }}{{ end }}{{ .Title }}{{ if .KeyBind }}<span class="nav-keybind-hint">{{ .KeyBind }}</span>{{ end }}</a>
 {{ end }}
 {{ end }}
 {{ end }}
@@ -65,7 +65,7 @@
             {{- if .AuthUser }}
             <div class="flex items-center gap-10 self-center">
                 <span class="nav-username color-subdue">{{ .AuthUser.Username }}</span>
-                <form method="POST" action="{{ .App.Config.Server.BaseURL }}/logout" style="display:contents">
+                <form method="POST" action="{{ .Request.BaseURL }}/logout" style="display:contents">
                     <button type="submit" class="block" title="Logout" style="background:none;border:none;padding:0;cursor:pointer">
                         <svg class="logout-button" stroke="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
@@ -74,7 +74,7 @@
                 </form>
             </div>
             {{- else if .App.AnyAuthEnabled }}
-            <a class="block self-center" href="{{ .App.Config.Server.BaseURL }}/login" title="Login">
+            <a class="block self-center" href="{{ .Request.BaseURL }}/login" title="Login">
                 <svg class="logout-button" stroke="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H3" />
                 </svg>
@@ -123,7 +123,7 @@
             {{ end }}
 
             {{ if .AuthUser }}
-            <form method="POST" action="{{ .App.Config.Server.BaseURL }}/logout">
+            <form method="POST" action="{{ .Request.BaseURL }}/logout">
                 <button type="submit" class="flex justify-between items-center" style="background:none;border:none;padding:0;cursor:pointer;width:100%">
                     <div class="size-h3">Logout ({{ .AuthUser.Username }})</div>
                     <svg class="ui-icon" stroke="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
@@ -132,7 +132,7 @@
                 </button>
             </form>
             {{ else if .App.AnyAuthEnabled }}
-            <a href="{{ .App.Config.Server.BaseURL }}/login" class="flex justify-between items-center">
+            <a href="{{ .Request.BaseURL }}/login" class="flex justify-between items-center">
                 <div class="size-h3">Login</div>
                 <svg class="ui-icon" stroke="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H3" />

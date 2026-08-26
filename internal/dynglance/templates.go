@@ -20,6 +20,9 @@ var globalTemplateFunctions = template.FuncMap{
 	"containsStr": func(str, substr string) bool {
 		return strings.Contains(str, substr)
 	},
+	"hasSuffix": func(str, suffix string) bool {
+		return strings.HasSuffix(str, suffix)
+	},
 	"hasURLPathSuffixFold": func(str, suffix string) bool {
 		if u, err := url.Parse(str); err == nil {
 			str = u.Path

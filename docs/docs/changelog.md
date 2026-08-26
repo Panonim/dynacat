@@ -1,3 +1,9 @@
+> Starting with this fork, versions follow the `YYYY.MM.DD.V` scheme (the
+> calendar date a release was cut, and a 1-based counter for however many
+> releases happened that day - e.g. `2026.08.23.1`, then `2026.08.23.2` for
+> a second release the same day) instead of semver below. Historical entries
+> below predate the switch and are left as originally numbered.
+
 # Changes for 2.4.0
 - Added Brave Search as an autocompletion engine and normal one
 - Added support for icons in the page title 

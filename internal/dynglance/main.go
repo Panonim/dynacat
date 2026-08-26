@@ -12,7 +12,26 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var buildVersion = "dev"
+// buildVersion is injected at build/release time via -X (see .goreleaser.yaml,
+// Dockerfile, ha-addon/dynglance/Dockerfile, .github/workflows/deploy.yml),
+// formatted as YYYY.MM.DD.V - the calendar date of the release, and V is a
+// 1-based counter for however many releases were cut that day (e.g.
+// 2026.08.23.1 for the first release on August 23rd, 2026; a second release
+// that same day would be 2026.08.23.2).
+//
+// Left empty for ad-hoc local builds (plain `go build`/`go run`, no ldflags);
+// resolveVersion falls back to today's date with a ".0" build number in that
+// case, so the displayed version is always a real date, never a placeholder.
+var buildVersion = ""
+
+// resolveVersion returns the effective version string to display: the
+// build-time injected value, or a same-day ".0" fallback when unset.
+func resolveVersion() string {
+	if buildVersion != "" {
+		return buildVersion
+	}
+	return time.Now().UTC().Format("2006.01.02") + ".0"
+}
 
 func Main() int {
 	configureLogging()
@@ -35,7 +54,7 @@ func Main() int {
 
 	switch options.intent {
 	case cliIntentVersionPrint:
-		fmt.Println(buildVersion)
+		fmt.Println(resolveVersion())
 	case cliIntentServe:
 		// remove in v0.10.0
 		if serveUpdateNoticeIfConfigLocationNotMigrated(options.configPath) {

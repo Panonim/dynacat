@@ -1,5 +1,5 @@
 name: DynGlance
-version: "1.0.0"
+version: "2026.08.23.4"
 slug: dynglance
 description: Self-hosted dashboard (Glance fork) with dynamic widgets, run as a Home Assistant add-on
 url: https://github.com/trooperthorn/ha_app_dynglance
@@ -12,17 +12,16 @@ arch:
   - aarch64
   - armv7
 
-# Grants access to /var/run/docker.sock so the docker-containers and
-# docker-controller widgets work out of the box. This is equivalent to full
-# root access to the host - disable it (set to false and rebuild/reinstall)
-# if you don't use those widgets and want to reduce the add-on's privileges.
-docker_api: true
-
-# Lets custom-api widgets reach the Home Assistant Core API at
-# http://supervisor/core/api/... using the auto-injected SUPERVISOR_TOKEN,
-# so dashboard entities can be displayed without creating a separate
-# long-lived access token. See docs/docs/home-assistant.md.
-homeassistant_api: true
+# Off by default: the server-stats widget (host CPU/RAM/disk/temp stats)
+# reads /proc, /sys, and gopsutil directly - it doesn't touch Docker at all.
+# Only the separate docker-containers and docker-controller widgets need
+# the Docker socket, and enabling this is equivalent to full root access to
+# the host. It's also the one privilege that unconditionally forces the
+# add-on's Home Assistant security rating to 1 regardless of anything else
+# in this file. If you want those two widgets, set this back to true and
+# rebuild a local copy of the add-on - see docs/docs/home-assistant.md for
+# the exact rating math and docs/docs/configuration.md for the widgets.
+docker_api: false
 
 ingress: true
 ingress_port: 8080
@@ -36,8 +35,10 @@ ports_description:
 
 # addon_config -> /config: where dynglance.yml, custom CSS/assets and themes live.
 #   Editable from the Studio Code Server / File editor add-ons.
-# share -> /share: optional, only useful if widgets need to read files that
-#   already live in Home Assistant's shared folder (e.g. bookmarked local docs).
+# share -> /share, read-only: optional, only useful if widgets need to read
+#   files that already live in Home Assistant's shared folder (e.g.
+#   bookmarked local docs). Nothing in DynGlance writes to /share, so this
+#   is read-only rather than read-write.
 # homeassistant_config -> /homeassistant, read-only: lets dynglance.yml's
 #   `$include` reference YAML files that already live in your main Home
 #   Assistant config folder (e.g. a `dynglance-widgets.yml` you keep next to
@@ -45,13 +46,26 @@ ports_description:
 #   docs/docs/home-assistant.md.
 map:
   - addon_config:rw
-  - share:rw
+  - share:ro
   - homeassistant_config:ro
 
 options:
   log_level: info
   timezone: ""
+  home_assistant_token: ""
+  config_upload_enabled: false
+  config_upload_password: ""
 
 schema:
   log_level: list(debug|info|warning|error)
   timezone: str?
+  # Optional Home Assistant long-lived access token (Profile -> Security ->
+  # Long-lived access tokens), passed through as the HA_TOKEN env var so
+  # custom-api widgets can use ${env:HA_TOKEN} instead of anyone pasting the
+  # token into dynglance.yml. See docs/docs/home-assistant.md.
+  home_assistant_token: password?
+  # Turns the passphrase-gated /config-upload page on or off. Requires
+  # config_upload_password to be at least 12 characters - if it's missing
+  # or too short, Config Upload stays disabled regardless of this toggle.
+  config_upload_enabled: bool
+  config_upload_password: password?

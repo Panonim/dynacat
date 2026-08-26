@@ -6,6 +6,9 @@ CONFIG_DIR=/config
 CONFIG_FILE="${CONFIG_DIR}/dynglance.yml"
 DATA_DIR=/data
 
+CONFIG_UPLOAD_BEGIN_MARKER="# BEGIN-DYNGLANCE-CONFIG-UPLOAD"
+CONFIG_UPLOAD_END_MARKER="# END-DYNGLANCE-CONFIG-UPLOAD"
+
 mkdir -p "${CONFIG_DIR}" "${DATA_DIR}/cache"
 
 if bashio::config.has_value 'timezone'; then
@@ -19,6 +22,35 @@ case "$(bashio::config 'log_level')" in
     error)   export LOG_LEVEL=ERROR ;;
     *)       export LOG_LEVEL=INFO ;;
 esac
+
+# Home Assistant long-lived access token, passed through as an env var so
+# custom-api widgets can reference it with ${env:HA_TOKEN} instead of anyone
+# having to paste it into dynglance.yml. See docs/docs/home-assistant.md.
+HA_TOKEN=""
+if bashio::config.has_value 'home_assistant_token'; then
+    HA_TOKEN="$(bashio::config 'home_assistant_token')"
+fi
+export HA_TOKEN
+
+# Config Upload (the /config-upload page): driven entirely by these two
+# add-on options rather than requiring anyone to hand-edit dynglance.yml.
+# The passphrase must be at least 12 characters (dynglance's own minimum);
+# if it's missing or too short, Config Upload is left disabled rather than
+# letting the app fail to start on an incomplete configuration.
+CONFIG_UPLOAD_PASSWORD=""
+if bashio::config.has_value 'config_upload_password'; then
+    CONFIG_UPLOAD_PASSWORD="$(bashio::config 'config_upload_password')"
+fi
+
+CONFIG_UPLOAD_ENABLED="false"
+if [ "$(bashio::config 'config_upload_enabled')" = "true" ]; then
+    if [ "${#CONFIG_UPLOAD_PASSWORD}" -ge 12 ]; then
+        CONFIG_UPLOAD_ENABLED="true"
+    else
+        bashio::log.warning "Config Upload is enabled but its passphrase is missing or shorter than 12 characters; leaving it disabled until a valid passphrase is set."
+    fi
+fi
+export CONFIG_UPLOAD_ENABLED CONFIG_UPLOAD_PASSWORD
 
 if [ ! -f "${CONFIG_FILE}" ]; then
     bashio::log.info "No dynglance.yml found in /config, creating a starter configuration..."
@@ -40,6 +72,35 @@ pages:
         widgets:
           - type: clock
           - type: server-stats
+EOF
+fi
+
+# Sync the Config Upload section with the add-on's options on every start.
+# A managed block (marked below) is stripped and re-appended fresh each time
+# so toggling the option in Home Assistant's Configuration page takes effect
+# on restart with no manual YAML editing. If dynglance.yml already has its
+# own hand-written "config-upload:" section (from before this option
+# existed, or a manual override), that's left alone instead - the add-on
+# option is ignored in that case rather than fighting the user's own config.
+if grep -qF "${CONFIG_UPLOAD_BEGIN_MARKER}" "${CONFIG_FILE}"; then
+    sed -i "/^${CONFIG_UPLOAD_BEGIN_MARKER}\$/,/^${CONFIG_UPLOAD_END_MARKER}\$/d" "${CONFIG_FILE}"
+    # Trim the trailing blank line(s) left behind so repeated restarts don't
+    # accumulate blank lines at the end of the file forever.
+    printf '%s\n' "$(cat "${CONFIG_FILE}")" > "${CONFIG_FILE}"
+fi
+
+if grep -qE '^config-upload:' "${CONFIG_FILE}"; then
+    bashio::log.warning "dynglance.yml already has its own 'config-upload:' section; the add-on's Config Upload option is ignored until you remove it."
+else
+    cat >> "${CONFIG_FILE}" <<EOF
+
+${CONFIG_UPLOAD_BEGIN_MARKER}
+# Managed by the add-on's "Config Upload" options - edits here are
+# overwritten on every restart, use the Configuration page instead.
+config-upload:
+  enabled: \${env:CONFIG_UPLOAD_ENABLED}
+  password: \${env:CONFIG_UPLOAD_PASSWORD}
+${CONFIG_UPLOAD_END_MARKER}
 EOF
 fi
 
