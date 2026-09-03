@@ -151,6 +151,9 @@ Configuration is done through YAML files, to learn more about how the layout wor
 ## Home Assistant add-on
 DynGlance can also be installed as a Home Assistant add-on, running the same container under Supervisor with Ingress support. See [`ha-addon/dynglance/DOCS.md`](ha-addon/dynglance/DOCS.md) for installation steps and add-on specific configuration.
 
+## Maintainer notes
+Release process, architecture rationale, dated design decisions, and the TODO backlog for this fork live in [`docs/operations.md`](docs/operations.md), [`docs/design.md`](docs/design.md), [`docs/decisions.md`](docs/decisions.md), and [`docs/backlog.md`](docs/backlog.md).
+
 ## Common issues
 <details>
 <summary><strong>Requests timing out</strong></summary>

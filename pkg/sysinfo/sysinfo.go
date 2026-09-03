@@ -163,10 +163,7 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 		if err == nil {
 			info.CPU.LoadIsAvailable = true
 			if runtime.GOOS == "windows" {
-				// The numbers returned here seem unreliable on Windows. Even with the CPU pegged
-				// at close to 50% for multiple minutes, load1 is sometimes way under or way over
-				// with no clear pattern. Dividing by core count gives numbers that are way too
-				// low so that's likely not necessary as it is with unix.
+				// Windows load values are unreliable and not divided by core count; unverified, see docs/design.md.
 				info.CPU.Load1Percent = uint8(math.Min(loadAvg.Load1*100, 100))
 				info.CPU.Load15Percent = uint8(math.Min(loadAvg.Load15*100, 100))
 			} else {
@@ -200,11 +197,7 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 		addErr(fmt.Errorf("getting swap memory info: %v", err))
 	}
 
-	// currently disabled on Windows because it requires elevated privilidges, otherwise
-	// keeps returning a single sensor with key "ACPI\\ThermalZone\\TZ00_0" which
-	// doesn't seem to be the CPU sensor or correspond to anything useful when
-	// compared against the temperatures Libre Hardware Monitor reports.
-	// Also disabled on the bsd's because it's not implemented by go-psutil for them
+	// Disabled on Windows (unreliable sensor, unverified, see docs/design.md) and the BSDs (unimplemented in go-psutil).
 	if runtime.GOOS != "windows" && runtime.GOOS != "openbsd" && runtime.GOOS != "netbsd" && runtime.GOOS != "freebsd" {
 		sensorReadings, err := sensors.SensorsTemperatures()
 		_, errIsWarning := err.(*sensors.Warnings)
@@ -287,10 +280,7 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 			addErr(fmt.Errorf("getting filesystems: %v", err))
 		}
 
-		// Inside containers (e.g. Docker), disk.Partitions(false) only returns
-		// devices starting with /dev/ — the overlay root filesystem is skipped.
-		// Fall back to "/" so disk usage is still reported without requiring a
-		// host bind-mount.
+		// Falls back to "/" when no /dev/-prefixed mountpoints are found (container overlay root); see docs/decisions.md.
 		if len(addedMountpoints) == 0 {
 			addMountpointInfo("/", req.Mountpoints["/"])
 		}
@@ -307,11 +297,7 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 	return info, errs
 }
 
-// getZFSUsage returns accurate (totalBytes, usedBytes) for a ZFS mountpoint by
-// invoking `zfs list`. This is necessary because statfs(2) on a ZFS pool root
-// returns Used=0 when all data lives in child datasets (e.g. TrueNAS SCALE).
-// Returns an error if the `zfs` binary is unavailable or the mountpoint is not
-// found, so callers can fall back to the statfs values.
+// getZFSUsage shells out to `zfs list` because statfs(2) reports Used=0 on a ZFS pool root; see docs/decisions.md.
 func getZFSUsage(mountpoint string) (totalBytes, usedBytes uint64, err error) {
 	cmd := exec.Command("zfs", "list", "-H", "-p", "-o", "used,available,mountpoint")
 	out, err := cmd.Output()

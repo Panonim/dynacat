@@ -19,3 +19,14 @@ images on tag push and on pushes to the `beta` branch.
 The `version:` field in `ha-addon/dynglance/config.yaml` and the
 `APP_VERSION` default in `ha-addon/dynglance/Dockerfile` are bumped by hand
 and must stay in sync with each other; nothing automates that today.
+
+## Build-time version injection
+
+`internal/dynglance/main.go`'s `buildVersion` variable is set at build time
+via an `-X` ldflag (see `.goreleaser.yaml`, `Dockerfile`,
+`ha-addon/dynglance/Dockerfile`, and `.github/workflows/deploy.yml`), using
+the same `YYYY.MM.DD.V` scheme as the release tags above. A plain `go
+build`/`go run` with no ldflags leaves `buildVersion` empty; `resolveVersion`
+falls back to today's date with a `.0` build number in that case, so the
+displayed version is always a real date, never a placeholder like "dev" or
+"unknown".

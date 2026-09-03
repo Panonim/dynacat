@@ -83,7 +83,6 @@ function Releases(widgetId, intervalMs) {
     };
 }
 
-// TODO: when viewing the previous/next month, display the current date if it's within the spill-over days
 function Calendar(firstDay, releases) {
     let header, dates;
     let advanceTimeTicker;
@@ -109,7 +108,6 @@ function Calendar(firstDay, releases) {
 
     const autoAdvanceNow = () => {
         advanceTimeTicker = setTimeout(() => {
-            // TODO: don't auto advance if looking at a different month
             update(now = new Date());
             autoAdvanceNow();
         }, msTillNextDay());

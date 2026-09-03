@@ -75,10 +75,8 @@ type application struct {
 
 	imageCache *imageCache
 
-	// ConfigPath is the file that was actually loaded at startup (after
-	// resolveConfigPath's legacy-name fallback). It's what the config-upload
-	// feature reads/overwrites and where it resolves relative $include
-	// fragments from.
+	// ConfigPath is the file actually loaded at startup (after resolveConfigPath's
+	// legacy-name fallback); config-upload reads/overwrites it and resolves relative $include from it.
 	ConfigPath               string
 	ConfigUploadEnabled      bool
 	configUploadPasswordHash []byte
@@ -285,10 +283,7 @@ func newApplication(c *config) (*application, error) {
 	app.imageCache = newImageCache(config.Server.BaseURL, config.Server.CacheDir)
 
 	providers := &widgetProviders{
-		// Resolved once per widget refresh (not per-request, there's no
-		// HTTP request in scope here), so unlike page/asset links this can't
-		// be made Ingress-path aware; it falls back to the static
-		// server.base-url config value like before.
+		// Not Ingress-path aware (resolved once per refresh, no request in scope); see docs/design.md.
 		assetResolver: func(asset string) string {
 			return app.StaticAssetPath(config.Server.BaseURL, asset)
 		},
@@ -459,12 +454,7 @@ func (a *application) sseUnregisterClient(c *sseClient) {
 	a.sseMu.Unlock()
 }
 
-// widgetUpdateBatchTimeout caps how long a single batch of widget updates may
-// run. p.mu is held for the duration of the batch (see updateOutdatedWidgets
-// and sseCheckAndPushUpdates), so without this ceiling a single widget whose
-// update() call hangs (a stalled outbound connection that never trips its own
-// timeout) would block that mutex forever, wedging every subsequent request
-// and SSE tick for the page indefinitely.
+// widgetUpdateBatchTimeout bounds a stalled widget's update() from blocking page.mu forever; see docs/design.md.
 const widgetUpdateBatchTimeout = 25 * time.Second
 
 func (p *page) updateOutdatedWidgets() {
@@ -576,21 +566,10 @@ type templateRequestData struct {
 	BaseURL string
 }
 
-// ingressPathHeader is set by the Home Assistant Supervisor on every request
-// proxied through Ingress, carrying the dynamic, per-installation path
-// prefix (e.g. /api/hassio_ingress/<token>) that the browser's address bar
-// actually shows. Root-absolute links generated without this prefix (plain
-// "/static/...", "/api/...") resolve against the real origin instead of the
-// ingress path when the browser follows them, bypassing the ingress proxy
-// entirely and 404ing - which is why the dashboard loses all styling and
-// functionality when opened from the Home Assistant sidebar but works fine
-// in a plain browser tab. See docs/docs/home-assistant.md.
+// ingressPathHeader is the Supervisor-set Ingress path prefix header; see docs/docs/home-assistant.md.
 const ingressPathHeader = "X-Ingress-Path"
 
-// effectiveBaseURL returns the base path that should prefix every link,
-// redirect, and cookie path generated for this request: the Home Assistant
-// Ingress path when present, otherwise the statically configured
-// server.base-url (used for manually reverse-proxied setups).
+// effectiveBaseURL prefers the Ingress path when present, else the static server.base-url.
 func (a *application) effectiveBaseURL(r *http.Request) string {
 	if ingressPath := strings.TrimRight(r.Header.Get(ingressPathHeader), "/"); ingressPath != "" {
 		return ingressPath
@@ -778,7 +757,6 @@ func (a *application) addressOfRequest(r *http.Request) string {
 }
 
 func (a *application) handleNotFound(w http.ResponseWriter, _ *http.Request) {
-	// TODO: add proper not found page
 	w.WriteHeader(http.StatusNotFound)
 	w.Write([]byte("Page not found"))
 }
@@ -851,10 +829,7 @@ func (a *application) handleWidgetActionRequest(w http.ResponseWriter, r *http.R
 	widget.handleRequest(w, r)
 }
 
-// StaticAssetPath builds the URL for an embedded static asset. baseURL should
-// be the requesting page's effective base URL (.Request.BaseURL in
-// templates) rather than the static server.base-url config value, so links
-// still resolve correctly when accessed through Home Assistant Ingress.
+// StaticAssetPath: baseURL must be the page's effective base URL (.Request.BaseURL), not server.base-url; see docs/design.md.
 func (a *application) StaticAssetPath(baseURL, asset string) string {
 	return baseURL + "/static/" + getStaticFSHash() + "/" + asset
 }

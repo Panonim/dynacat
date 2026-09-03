@@ -148,7 +148,6 @@ type marketResponseJson struct {
 	} `json:"chart"`
 }
 
-// TODO: allow changing chart time frame
 const marketChartDays = 21
 
 func fetchMarketsDataFromYahoo(marketRequests []marketRequest, client *http.Client) (marketList, error) {

@@ -4,8 +4,6 @@ import { throttledDebounce, isElementVisible, openURLInNewTab } from './utils.js
 import { elem, find, findAll } from './templating.js';
 
 async function fetchPageContent(pageData) {
-    // TODO: handle non 200 status codes/time outs
-    // TODO: add retries
     const response = await fetch(`${pageData.baseURL}/api/pages/${pageData.slug}/content/`);
     const content = await response.text();
 
@@ -1031,7 +1029,6 @@ function timeInZone(now, zone) {
     try {
         timeInZone = new Date(now.toLocaleString('en-US', { timeZone: zone }));
     } catch (e) {
-        // TODO: indicate to the user that this is an invalid timezone
         console.error(e);
         timeInZone = now
     }
@@ -1133,7 +1130,6 @@ async function setupCalendars() {
     const elems = Array.from(document.getElementsByClassName("calendar"));
     if (elems.length == 0) return;
 
-    // TODO: implement prefetching, currently loads as a nasty waterfall of requests
     const calendar = await import ('./calendar.js');
 
     for (let i = 0; i < elems.length; i++)
@@ -1544,10 +1540,7 @@ function updateContentPreservingImages(oldContent, newContent) {
     oldContent.replaceWith(newContent);
 }
 
-// syncWidgetUpdateInterval keeps the polling cadence in step with a widget that
-// reports a dynamic data-update-interval (e.g. speedtest polls fast while testing,
-// then slows down once the result is in). updateWidget only swaps inner content, so
-// the root attribute and the polling state need to be reconciled explicitly.
+// syncWidgetUpdateInterval reconciles polling state after updateWidget swaps inner content, for widgets with a dynamic data-update-interval (e.g. speedtest).
 function syncWidgetUpdateInterval(widgetElement, newWidget) {
     const newInterval = newWidget.dataset.updateInterval;
 

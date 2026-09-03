@@ -12,16 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// buildVersion is injected at build/release time via -X (see .goreleaser.yaml,
-// Dockerfile, ha-addon/dynglance/Dockerfile, .github/workflows/deploy.yml),
-// formatted as YYYY.MM.DD.V - the calendar date of the release, and V is a
-// 1-based counter for however many releases were cut that day (e.g.
-// 2026.08.23.1 for the first release on August 23rd, 2026; a second release
-// that same day would be 2026.08.23.2).
-//
-// Left empty for ad-hoc local builds (plain `go build`/`go run`, no ldflags);
-// resolveVersion falls back to today's date with a ".0" build number in that
-// case, so the displayed version is always a real date, never a placeholder.
+// buildVersion is injected at build/release time via -X; see docs/operations.md.
 var buildVersion = ""
 
 // resolveVersion returns the effective version string to display: the
@@ -151,9 +142,6 @@ func resolveConfigPath(primaryPath string) string {
 }
 
 func serveApp(configPath string) error {
-	// TODO: refactor if this gets any more complex, the current implementation is
-	// difficult to reason about due to all of the callbacks and simultaneous operations,
-	// use a single goroutine and a channel to initiate synchronous changes to the server
 	exitChannel := make(chan struct{})
 	hadValidConfigOnStartup := false
 	var stopServer func() error

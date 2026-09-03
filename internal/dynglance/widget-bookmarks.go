@@ -21,11 +21,7 @@ type bookmarksWidget struct {
 			URL         string          `yaml:"url"`
 			Description string          `yaml:"description"`
 			Icon        customIconField `yaml:"icon"`
-			// we need a pointer to bool to know whether a value was provided,
-			// however there's no way to dereference a pointer in a template so
-			// {{ if not .SameTab }} would return true for any non-nil pointer
-			// which leaves us with no way of checking if the value is true or
-			// false, hence the duplicated fields below
+			// Duplicated raw/processed fields because templates can't dereference *bool; see docs/decisions.md.
 			SameTabRaw   *bool  `yaml:"same-tab"`
 			SameTab      bool   `yaml:"-"`
 			HideArrowRaw *bool  `yaml:"hide-arrow"`

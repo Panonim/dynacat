@@ -51,10 +51,7 @@ type config struct {
 		OIDC            *oidcConfig      `yaml:"oidc"`
 	} `yaml:"auth"`
 
-	// ConfigUpload gates the /config-upload page and its API, which lets
-	// someone with the passphrase replace dynglance.yml or add a new
-	// $include fragment from the browser (file picker or drag-and-drop),
-	// independently of whatever auth (if any) is configured for viewers.
+	// ConfigUpload gates /config-upload (replace dynglance.yml or add an $include), independent of viewer auth.
 	ConfigUpload struct {
 		Enabled            bool   `yaml:"enabled"`
 		Password           string `yaml:"password"`
@@ -188,14 +185,8 @@ func newConfigFromYAML(contents []byte) (*config, error) {
 var envVariableNamePattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
 var configVariablePattern = regexp.MustCompile(`(^|.)\$\{(?:([a-zA-Z]+):)?([a-zA-Z0-9_-]+)\}`)
 
-// Parses variables defined in the config such as:
-// ${API_KEY} 				            - gets replaced with the value of the API_KEY environment variable
-// \${API_KEY} 					        - escaped, gets used as is without the \ in the config
-// ${secret:api_key} 			        - value gets loaded from /run/secrets/api_key
-// ${readFileFromEnv:PATH_TO_SECRET}    - value gets loaded from the file path specified in the environment variable PATH_TO_SECRET
-//
-// TODO: don't match against commented out sections, not sure exactly how since
-// variables can be placed anywhere and used to modify the YAML structure itself
+// parseConfigVariables supports ${API_KEY}, \${escaped}, ${secret:name}, and
+// ${readFileFromEnv:VAR}; see docs/design.md ("Config variable substitution").
 func parseConfigVariables(contents []byte) ([]byte, error) {
 	var err error
 
@@ -405,7 +396,6 @@ func configFilesWatcher(
 		return nil, fmt.Errorf("getting absolute path of main file: %w", err)
 	}
 
-	// TODO: refactor, flaky
 	lastIncludes[mainFileAbsPath] = struct{}{}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -441,7 +431,6 @@ func configFilesWatcher(
 			return
 		}
 
-		// TODO: refactor, flaky
 		currentIncludes[mainFileAbsPath] = struct{}{}
 
 		mu.Lock()
@@ -486,16 +475,7 @@ func configFilesWatcher(
 				if event.Has(fsnotify.Write) {
 					debouncedParseAndCompareBeforeCallback()
 				} else if event.Has(fsnotify.Rename) {
-					// on linux the file will no longer be watched after a rename, on windows
-					// it will continue to be watched with the new name but we have no access to
-					// the new name in this event in order to stop watching it manually and match the
-					// behavior in linux, may lead to weird unintended behaviors on windows as we're
-					// only handling renames from linux's perspective
-					// see https://github.com/fsnotify/fsnotify/issues/255
-
-					// remove the old file from our manually tracked includes, calling
-					// debouncedParseAndCompareBeforeCallback will re-add it if it's still
-					// required after it triggers
+					// Cross-platform rename handling differs; see docs/design.md ("Config file watching").
 					deleteLastInclude(event.Name)
 
 					// wait for file to maybe get created again
@@ -532,10 +512,6 @@ func configFilesWatcher(
 	}, nil
 }
 
-// TODO: Refactor, we currently validate in two different places, this being
-// one of them, which doesn't modify the data and only checks for logical errors
-// and then again when creating the application which does modify the data and do
-// further validation. Would be better if validation was done in a single place.
 func isConfigStateValid(config *config) error {
 	if len(config.Pages) == 0 {
 		return fmt.Errorf("no pages configured")

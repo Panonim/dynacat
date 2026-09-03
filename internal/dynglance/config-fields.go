@@ -381,7 +381,6 @@ func (q *queryParametersField) UnmarshalYAML(node *yaml.Node) error {
 
 	*q = make(queryParametersField)
 
-	// TODO: refactor the duplication in the switch cases if any more types get added
 	for key, value := range decoded {
 		switch v := value.(type) {
 		case string:

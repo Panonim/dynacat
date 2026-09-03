@@ -135,10 +135,7 @@ func (widget *calendarWidget) ReleasesIntervalMs() int64 {
 	return widget.releasesInterval.Milliseconds()
 }
 
-// UpdateIntervalMs is overridden to always return 0 so the page never sets up
-// HTMX content polling for the calendar (which would swap the widget and reset
-// the viewed month). The configured update-interval instead drives the
-// client-side release polling via ReleasesIntervalMs.
+// UpdateIntervalMs is always 0: HTMX polling would swap the widget and reset the viewed month; ReleasesIntervalMs drives polling instead.
 func (widget *calendarWidget) UpdateIntervalMs() int64 {
 	return 0
 }

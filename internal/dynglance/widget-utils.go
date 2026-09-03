@@ -187,14 +187,6 @@ func (job *workerPoolJob[I, O]) withWorkers(workers int) *workerPoolJob[I, O] {
 	return job
 }
 
-// func (job *workerPoolJob[I, O]) withContext(ctx context.Context) *workerPoolJob[I, O] {
-// 	if ctx != nil {
-// 		job.ctx = ctx
-// 	}
-
-// 	return job
-// }
-
 func newJob[I any, O any](task func(I) (O, error), data []I) *workerPoolJob[I, O] {
 	return &workerPoolJob[I, O]{
 		workers: defaultNumWorkers,

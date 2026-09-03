@@ -245,11 +245,7 @@ func (data *customAPITemplateData) JSONLines() []decoratedGJSONResult {
 func (data *customAPITemplateData) Subrequest(key string) *customAPIResponseData {
 	req, exists := data.subrequests[key]
 	if !exists {
-		// We have to panic here since there's nothing sensible we can return and the
-		// lack of an error would cause requested data to return zero values which
-		// would be confusing from the user's perspective. Go's template module
-		// handles recovering from panics and will return the panic message as an
-		// error during template execution.
+		// Panics deliberately; text/template recovers and surfaces it as an execution error. See docs/design.md.
 		panic(fmt.Sprintf("subrequest with key %q has not been defined", key))
 	}
 
@@ -591,11 +587,7 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 		"endOfDay": func(t time.Time) time.Time {
 			return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location())
 		},
-		// The reason we flip the parameter order is so that you can chain multiple calls together like this:
-		// {{ .JSON.String "foo" | trimPrefix "bar" | doSomethingElse }}
-		// instead of doing this:
-		// {{ trimPrefix (.JSON.String "foo") "bar" | doSomethingElse }}
-		// since the piped value gets passed as the last argument to the function.
+		// Argument order is (prefix, s), reversed, so pipe chaining works; see docs/decisions.md.
 		"trimPrefix": func(prefix, s string) string {
 			return strings.TrimPrefix(s, prefix)
 		},

@@ -220,8 +220,6 @@ func (widget *latestMediaWidget) fetchLatestItems(ctx context.Context, host *lat
 	}
 }
 
-// --- Plex ---
-
 type plexIdentityResponse struct {
 	MediaContainer struct {
 		MachineIdentifier string `json:"machineIdentifier"`
@@ -368,8 +366,6 @@ func (widget *latestMediaWidget) fetchPlexLatest(ctx context.Context, host *late
 
 	return items, nil
 }
-
-// --- Jellyfin / Emby ---
 
 type jellyfinLatestItem struct {
 	Id             string `json:"Id"`
@@ -524,8 +520,6 @@ func (widget *latestMediaWidget) fetchJellyfinEmbyLatestFromParent(
 
 	return items, nil
 }
-
-// --- Helpers ---
 
 // stripAPIKeysFromError removes sensitive API keys from error messages
 func stripAPIKeysFromError(err error) string {

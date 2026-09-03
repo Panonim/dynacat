@@ -10,21 +10,9 @@ import (
 	"time"
 )
 
-// Shared HTTP request layer.
-//
-// Multiple widgets often request the same external endpoint (for example two
-// repository widgets watching the same repo). Routing their GET requests
-// through globalSharedFetcher collapses identical concurrent requests into a
-// single fetch (singleflight) and keeps a short response cache so near
-// sequential requests reuse the result instead of hitting the endpoint again.
-//
-// The cache is requester tolerant: each caller passes its own maxAge (its
-// widget cacheDuration) and only reuses an entry younger than that. A short
-// cache widget refetches on its own schedule while a long cache widget reuses
-// freely, so every widget's configured cache is respected.
-//
-// Only GET requests are shared. POST and other methods (auth, GraphQL) always
-// go out directly.
+// Shared HTTP request layer: collapses concurrent identical GET requests
+// across widgets into a single fetch with a per-caller cache. See
+// docs/design.md ("Shared HTTP request layer") for the full rationale.
 
 const (
 	// defaultSharedFetchMaxAge is used when a caller does not supply a maxAge

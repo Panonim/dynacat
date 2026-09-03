@@ -288,10 +288,7 @@ type pihole5StatsResponse struct {
 	DomainsBlocked    int                      `json:"domains_being_blocked"`
 }
 
-// If the user has query logging disabled it's possible for domains_over_time to be returned as an
-// empty array rather than a map which will prevent unmashalling the rest of the data so we use
-// custom unmarshal behavior to fallback to an empty map.
-// See https://github.com/Panonim/dynacat/issues/289
+// pihole5QueriesSeries falls back to an empty map for an empty domains_over_time array; see docs/design.md.
 type pihole5QueriesSeries map[int64]int
 
 func (p *pihole5QueriesSeries) UnmarshalJSON(data []byte) error {
@@ -573,11 +570,7 @@ func fetchPiholeStats(
 			)
 			partialContent = true
 		} else {
-			// The API from v5 used to return 144 data points, but v6 returns 145.
-			// We only show data from the last 24 hours hours, Pihole returns data
-			// points in a 10 minute interval, 24*(60/10) = 144. Why is there an extra
-			// data point? I don't know, but we'll just ignore the first one since it's
-			// the oldest data point.
+			// Drops the extra leading point v6 returns beyond the expected 144; reason unverified, see docs/design.md.
 			history := seriesResponse.History[1:]
 
 			const interval = 10

@@ -337,8 +337,6 @@ func (w *widgetBase) renderTemplate(data any, t *template.Template) template.HTM
 		if err2 != nil {
 			slog.Error("Failed to render error within widget", "error", err2, "initial_error", err)
 			w.templateBuffer.Reset()
-			// TODO: add some kind of a generic widget error template when the widget
-			// failed to render, and we also failed to re-render the widget with the error
 		}
 	}
 
@@ -396,19 +394,6 @@ func (w *widgetBase) withError(err error) *widgetBase {
 }
 
 func (w *widgetBase) canContinueUpdateAfterHandlingErr(err error) bool {
-	// TODO: needs covering more edge cases.
-	// if there's partial content and we update early there's a chance
-	// the early update returns even less content than the initial update.
-	// need some kind of mechanism that tells us whether we should update early
-	// or not depending on the number of things that failed during the initial
-	// and subsequent update and how they failed - ie whether it was server
-	// error (like gateway timeout, do retry early) or client error (like
-	// hitting a rate limit, don't retry early). will require reworking a
-	// good amount of code in the feed package and probably having a custom
-	// error type that holds more information because screw wrapping errors.
-	// alternatively have a resource cache and only refetch the failed resources,
-	// then rebuild the widget.
-
 	if err != nil {
 		w.scheduleEarlyUpdate()
 

@@ -55,10 +55,9 @@ server:
   cache-dir: ${DATA_DIR}/cache
   db-path: ${DATA_DIR}/dynglance.db
 
-# See https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md for everything that can go here
-# (widgets, pages, auth, themes, custom CSS...). This file lives on the
-# "addon_config" share, so it survives add-on updates and reinstalls, and can
-# be edited from the Studio Code Server / File editor add-ons.
+# Configuration reference: https://github.com/trooperthorn/ha_app_dynglance/blob/main/docs/docs/configuration.md
+# This file is on the "addon_config" share (survives updates/reinstalls); edit it with the
+# Studio Code Server / File editor add-ons.
 pages:
   - name: Home
     columns:

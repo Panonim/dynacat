@@ -211,7 +211,6 @@ func fetchRepositoryDetailsFromGithub(ctx context.Context, repo string, token st
 
 	if maxIssues > 0 {
 		if issuesErr != nil {
-			// TODO: fix, overwriting the previous error
 			err = fmt.Errorf("%w: could not get issues: %s", errPartialContent, issuesErr)
 		} else {
 			details.OpenIssues = issuesResponse.Count

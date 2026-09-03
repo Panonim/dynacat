@@ -21,10 +21,7 @@ import (
 
 var configUploadPageTemplate = mustParseTemplate("config-upload.html", "document.html", "footer.html")
 
-// configUploadMaxBodyBytes caps the request body (passphrase + JSON envelope +
-// file contents). Generous enough for a large dynglance.yml, small enough to
-// not let an unauthenticated caller exhaust memory before the passphrase is
-// even checked.
+// configUploadMaxBodyBytes bounds the upload body so an unauthenticated caller can't exhaust memory before the passphrase check.
 const configUploadMaxBodyBytes = 5 << 20 // 5 MiB
 
 // configUploadBackupsToKeep bounds how many timestamped backups of the main
@@ -220,10 +217,7 @@ func (a *application) handleConfigUploadReplace(w http.ResponseWriter, req confi
 	})
 }
 
-// backupConfigFile copies the current config file to a timestamped .bak-*
-// path (a no-op if the file doesn't exist yet) and prunes older backups
-// beyond configUploadBackupsToKeep so repeated uploads don't accumulate
-// files forever.
+// backupConfigFile copies the config to a timestamped .bak-* file (no-op if missing) and prunes beyond configUploadBackupsToKeep.
 func backupConfigFile(configPath string) error {
 	contents, err := os.ReadFile(configPath)
 	if err != nil {
