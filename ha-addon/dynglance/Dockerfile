@@ -1,4 +1,4 @@
-ARG BUILD_FROM
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.19
 ARG DYNGLANCE_REPO=https://github.com/trooperthorn/ha_app_dynglance.git
 ARG DYNGLANCE_REF=main
 
@@ -7,8 +7,9 @@ FROM --platform=$BUILDPLATFORM golang:1.25.0-alpine3.21 AS builder
 ARG DYNGLANCE_REPO
 ARG DYNGLANCE_REF
 ARG TARGETARCH
+# Keep in sync with the `version:` field in config.yaml.
 ARG TARGETVARIANT
-ARG APP_VERSION=
+ARG APP_VERSION="2026.08.23.4"
 
 RUN apk add --no-cache git
 

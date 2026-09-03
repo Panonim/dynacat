@@ -23,20 +23,14 @@ case "$(bashio::config 'log_level')" in
     *)       export LOG_LEVEL=INFO ;;
 esac
 
-# Home Assistant long-lived access token, passed through as an env var so
-# custom-api widgets can reference it with ${env:HA_TOKEN} instead of anyone
-# having to paste it into dynglance.yml. See docs/docs/home-assistant.md.
+# See docs/docs/home-assistant.md.
 HA_TOKEN=""
 if bashio::config.has_value 'home_assistant_token'; then
     HA_TOKEN="$(bashio::config 'home_assistant_token')"
 fi
 export HA_TOKEN
 
-# Config Upload (the /config-upload page): driven entirely by these two
-# add-on options rather than requiring anyone to hand-edit dynglance.yml.
-# The passphrase must be at least 12 characters (dynglance's own minimum);
-# if it's missing or too short, Config Upload is left disabled rather than
-# letting the app fail to start on an incomplete configuration.
+# See "Config Upload" in docs/docs/authentication.md.
 CONFIG_UPLOAD_PASSWORD=""
 if bashio::config.has_value 'config_upload_password'; then
     CONFIG_UPLOAD_PASSWORD="$(bashio::config 'config_upload_password')"
@@ -75,13 +69,8 @@ pages:
 EOF
 fi
 
-# Sync the Config Upload section with the add-on's options on every start.
-# A managed block (marked below) is stripped and re-appended fresh each time
-# so toggling the option in Home Assistant's Configuration page takes effect
-# on restart with no manual YAML editing. If dynglance.yml already has its
-# own hand-written "config-upload:" section (from before this option
-# existed, or a manual override), that's left alone instead - the add-on
-# option is ignored in that case rather than fighting the user's own config.
+# See "Config Upload" in docs/docs/authentication.md for why a hand-written
+# config-upload: section takes precedence over this managed block.
 if grep -qF "${CONFIG_UPLOAD_BEGIN_MARKER}" "${CONFIG_FILE}"; then
     sed -i "/^${CONFIG_UPLOAD_BEGIN_MARKER}\$/,/^${CONFIG_UPLOAD_END_MARKER}\$/d" "${CONFIG_FILE}"
     # Trim the trailing blank line(s) left behind so repeated restarts don't

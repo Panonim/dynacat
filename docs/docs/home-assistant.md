@@ -155,6 +155,16 @@ If you're running the standalone Docker container instead of the add-on,
 the equivalent is mounting the folder yourself, e.g.
 `-v /path/to/ha/config:/homeassistant:ro`.
 
+### The add-on's three mapped directories
+
+- `addon_config` → `/config`, read-write: where `dynglance.yml`, custom
+  CSS/assets and themes live. Editable from the Studio Code Server or File
+  editor add-ons.
+- `share` → `/share`, read-only: only useful if a widget needs to read files
+  that already live in Home Assistant's shared folder (e.g. bookmarked local
+  docs). Nothing in DynGlance writes to `/share`, hence read-only.
+- `homeassistant_config` → `/homeassistant`, read-only: see section 6 above.
+
 ## 7. Pushing data from Home Assistant instead of polling
 
 The recipes above are pull-based: DynGlance polls Home Assistant on

@@ -10,17 +10,9 @@ init: false
 arch:
   - amd64
   - aarch64
-  - armv7
 
-# Off by default: the server-stats widget (host CPU/RAM/disk/temp stats)
-# reads /proc, /sys, and gopsutil directly - it doesn't touch Docker at all.
-# Only the separate docker-containers and docker-controller widgets need
-# the Docker socket, and enabling this is equivalent to full root access to
-# the host. It's also the one privilege that unconditionally forces the
-# add-on's Home Assistant security rating to 1 regardless of anything else
-# in this file. If you want those two widgets, set this back to true and
-# rebuild a local copy of the add-on - see docs/docs/home-assistant.md for
-# the exact rating math and docs/docs/configuration.md for the widgets.
+# Forces the security rating to 1 when true; only docker-containers and
+# docker-controller widgets need it. See docs/docs/home-assistant.md.
 docker_api: false
 
 ingress: true
@@ -33,17 +25,7 @@ ports:
 ports_description:
   8080/tcp: "DynGlance web UI (only needed for direct/non-Ingress access, e.g. from outside Home Assistant)"
 
-# addon_config -> /config: where dynglance.yml, custom CSS/assets and themes live.
-#   Editable from the Studio Code Server / File editor add-ons.
-# share -> /share, read-only: optional, only useful if widgets need to read
-#   files that already live in Home Assistant's shared folder (e.g.
-#   bookmarked local docs). Nothing in DynGlance writes to /share, so this
-#   is read-only rather than read-write.
-# homeassistant_config -> /homeassistant, read-only: lets dynglance.yml's
-#   `$include` reference YAML files that already live in your main Home
-#   Assistant config folder (e.g. a `dynglance-widgets.yml` you keep next to
-#   your other packages), instead of duplicating them under /config. See
-#   docs/docs/home-assistant.md.
+# See "The add-on's three mapped directories" in docs/docs/home-assistant.md.
 map:
   - addon_config:rw
   - share:ro
@@ -59,13 +41,8 @@ options:
 schema:
   log_level: list(debug|info|warning|error)
   timezone: str?
-  # Optional Home Assistant long-lived access token (Profile -> Security ->
-  # Long-lived access tokens), passed through as the HA_TOKEN env var so
-  # custom-api widgets can use ${env:HA_TOKEN} instead of anyone pasting the
-  # token into dynglance.yml. See docs/docs/home-assistant.md.
+  # Passed through as the HA_TOKEN env var. See docs/docs/home-assistant.md.
   home_assistant_token: password?
-  # Turns the passphrase-gated /config-upload page on or off. Requires
-  # config_upload_password to be at least 12 characters - if it's missing
-  # or too short, Config Upload stays disabled regardless of this toggle.
+  # See "Config Upload" in docs/docs/authentication.md.
   config_upload_enabled: bool
   config_upload_password: password?
