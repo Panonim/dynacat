@@ -405,7 +405,7 @@ var redditHTTPClient = &http.Client{Transport: &http2.Transport{
 
 var (
 	redditChallengePattern = regexp.MustCompile(`await\(async \w+\s*=>\s*\w+\s*\+\s*\w+\)\("([^"]+)"\)`)
-	redditTokenPattern     = regexp.MustCompile(`name="token"\s+value="([^"]+)"`)
+	redditTokenPattern     = regexp.MustCompile(`name="jsc_token"\s+value="([^"]+)"`)
 )
 
 // Share one loid cookie across all reddit widgets - the JS-challenge flow
@@ -474,7 +474,7 @@ func fetchRedditLoidCookie() (string, error) {
 	params := url.Values{
 		"solution":     {solution},
 		"js_challenge": {"1"},
-		"token":        {token},
+		"jsc_token":    {token},
 	}
 	request, err = http.NewRequest("GET", "https://www.reddit.com/?"+params.Encode(), nil)
 	if err != nil {
