@@ -150,7 +150,7 @@ func newApplication(c *config) (*application, error) {
 		app.oidcProvider = provider
 		app.oidcVerifier = verifier
 		app.oauth2Config = oauth2Cfg
-		app.oidcSessions = newSessionStore()
+		app.oidcSessions = newSessionStore(filepath.Join(config.Server.AssetsPath, "oidc_sessions.json"))
 		app.OIDCEnabled = true
 	}
 

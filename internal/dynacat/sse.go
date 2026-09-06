@@ -239,7 +239,7 @@ func (a *application) handleSSEUpdates(w http.ResponseWriter, r *http.Request) {
 	a.sseRegisterClient(client)
 	defer a.sseUnregisterClient(client)
 
-	authRecheck := time.NewTicker(60 * time.Second)
+	authRecheck := time.NewTicker(25 * time.Second)
 	defer authRecheck.Stop()
 
 	for {
@@ -251,6 +251,8 @@ func (a *application) handleSSEUpdates(w http.ResponseWriter, r *http.Request) {
 			if a.RequiresAuth && a.getAuthenticatedUser(w, r) == nil {
 				return
 			}
+			fmt.Fprintf(w, ": ping\n\n")
+			flusher.Flush()
 		case <-r.Context().Done():
 			return
 		}
