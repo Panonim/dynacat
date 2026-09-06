@@ -120,6 +120,12 @@ auth:
     redirect-url: https://dashboard.example.com/api/oidc/callback
 ```
 
+When password auth is disabled, an unauthenticated visit to a protected route
+is redirected **straight to the OIDC flow** (`/api/oidc/login`) instead of the
+`/login` interstitial — since the login page has no password form to offer,
+the only path forward is the identity provider. The user is returned to the
+page they originally requested after the OIDC callback completes.
+
 ### Provider guides
 
 #### Generic OIDC

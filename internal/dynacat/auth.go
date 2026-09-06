@@ -396,7 +396,7 @@ func (a *application) handleUnauthorizedResponse(w http.ResponseWriter, r *http.
 
 	switch fallback {
 	case redirectToLogin:
-		http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
+		http.Redirect(w, r, a.loginDestination(), http.StatusSeeOther)
 	case showUnauthorizedJSON:
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{"error": "Unauthorized"}`))
@@ -416,9 +416,29 @@ func isSafeLocalPath(target string) bool {
 		!strings.HasPrefix(target, "/\\")
 }
 
+// oidcOnlyAuth reports whether the deployment authenticates exclusively via
+// OIDC. Config validation guarantees disable-password:true implies OIDC is
+// configured (config.go), so this is the "password login is unavailable" state.
+func (a *application) oidcOnlyAuth() bool {
+	return a.OIDCEnabled && !a.PasswordEnabled
+}
+
+// loginDestination returns where an unauthenticated visitor should be sent to
+// authenticate. When password auth is unavailable (disable-password + OIDC),
+// there is no point landing on the /login interstitial — the only way forward
+// is the OIDC flow, so send them straight to it. Otherwise keep the existing
+// /login page (which offers both password and OIDC entry points).
+func (a *application) loginDestination() string {
+	if a.oidcOnlyAuth() {
+		return a.Config.Server.BaseURL + "/api/oidc/login"
+	}
+	return a.Config.Server.BaseURL + "/login"
+}
+
 // redirectToLoginPage remembers where an unauthenticated visitor was headed
 // (path and query) so they can be returned there after logging in, then sends
-// them to the login page.
+// them to authenticate (the OIDC flow directly when it is the only auth
+// option, otherwise the login page).
 func (a *application) redirectToLoginPage(w http.ResponseWriter, r *http.Request) {
 	if target := r.URL.RequestURI(); isSafeLocalPath(target) {
 		http.SetCookie(w, &http.Cookie{
@@ -431,7 +451,7 @@ func (a *application) redirectToLoginPage(w http.ResponseWriter, r *http.Request
 			HttpOnly: true,
 		})
 	}
-	http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
+	http.Redirect(w, r, a.loginDestination(), http.StatusSeeOther)
 }
 
 // takeLoginRedirect consumes and clears the post-login redirect cookie,
