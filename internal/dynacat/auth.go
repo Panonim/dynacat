@@ -31,9 +31,8 @@ const AUTH_TIMESTAMP_LENGTH = 4 // uint32
 const AUTH_TOKEN_DATA_LENGTH = AUTH_USERNAME_HASH_LENGTH + AUTH_TIMESTAMP_LENGTH
 
 // How long the token will be valid for
-const AUTH_TOKEN_VALID_PERIOD = 14 * 24 * time.Hour // 14 days
-// How long the token has left before it should be regenerated
-const AUTH_TOKEN_REGEN_BEFORE = 7 * 24 * time.Hour // 7 days
+const AUTH_TOKEN_VALID_PERIOD = 30 * 24 * time.Hour // 30 days
+const AUTH_TOKEN_REGEN_BEFORE = 15 * 24 * time.Hour // 15 days
 
 var loginPageTemplate = mustParseTemplate("login.html", "document.html", "footer.html")
 
@@ -478,13 +477,18 @@ func (a *application) handleLogoutRequest(w http.ResponseWriter, r *http.Request
 }
 
 func (a *application) setAuthSessionCookie(w http.ResponseWriter, r *http.Request, token string, expires time.Time) {
+	maxAge := int(time.Until(expires).Seconds())
+	if maxAge < 0 {
+		maxAge = -1
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     AUTH_SESSION_COOKIE_NAME,
 		Value:    token,
 		Expires:  expires,
+		MaxAge:   maxAge,
 		Secure:   a.isRequestHTTPS(r),
 		Path:     a.Config.Server.BaseURL + "/",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 	})
 }

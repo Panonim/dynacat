@@ -227,9 +227,10 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		Name:     OIDC_SESSION_COOKIE_NAME,
 		Value:    sessionID,
 		Expires:  time.Now().Add(OIDC_SESSION_VALID_PERIOD),
+		MaxAge:   int(OIDC_SESSION_VALID_PERIOD.Seconds()),
 		Secure:   a.isRequestHTTPS(r),
 		Path:     baseURL + "/",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 	})
 

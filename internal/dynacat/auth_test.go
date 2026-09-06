@@ -83,3 +83,33 @@ func TestAuthTokenGenerationAndVerification(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionStorePersistence(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := tmpDir + "/oidc_sessions.json"
+
+	store1 := newSessionStore(sessionPath)
+	sess := &oidcSession{
+		Username:  "alice",
+		Groups:    []string{"admin"},
+		CreatedAt: time.Now(),
+	}
+	store1.set("sess-1", sess)
+
+	// Read through another instance pointing at the same file
+	store2 := newSessionStore(sessionPath)
+	loaded, ok := store2.get("sess-1")
+	if !ok {
+		t.Fatal("Expected session to be restored from disk")
+	}
+	if loaded.Username != "alice" {
+		t.Fatalf("Expected username alice, got %s", loaded.Username)
+	}
+
+	// Delete and verify persistence
+	store2.delete("sess-1")
+	store3 := newSessionStore(sessionPath)
+	if _, ok := store3.get("sess-1"); ok {
+		t.Fatal("Expected deleted session to not exist after reload")
+	}
+}
