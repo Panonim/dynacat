@@ -3,6 +3,7 @@
     { "id": "home", "title": "Welcome" },
     { "id": "search", "title": "Search", "file": "docs/search.md" },
     { "section": "reference" },
+    { "id": "api", "title": "Api", "file": "docs/api.md" },
     { "id": "authentication", "title": "Authentication", "file": "docs/authentication.md" },
     { "id": "configuration", "title": "Configuration", "file": "docs/configuration.md" },
     { "id": "changelog", "title": "Changelog", "file": "docs/changelog.md" },
@@ -15,6 +16,8 @@
     { "id": "preconfigured-pages", "title": "Preconfigured Pages", "file": "docs/preconfigured-pages.md" },
     { "id": "shared-widget-options", "title": "Shared Widget Options", "file": "docs/shared-widget-options.md" },
     { "id": "themes", "title": "Themes", "file": "docs/themes.md" },
+    { "id": "ui-editor", "title": "UI Editor", "file": "docs/ui-editor.md" },
+    { "id": "widget-editor", "title": "Widget Editor", "file": "docs/widget-editor.md" },
     { "section": "dynawidgets" },
     { "id": "contributing", "title": "Contributing", "file": "docs/contributing.md" }
   ]
