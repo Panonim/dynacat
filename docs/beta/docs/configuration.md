@@ -202,11 +202,15 @@ server:
 | host | string | no |  |
 | port | number | no | 8080 |
 | proxied | boolean | no | false |
+| trusted-proxies | array of strings | no | |
 | base-url | string | no | |
 | assets-path | string | no | /app/assets |
 | cache-dir | string | no | .cache |
 | db-path | string | no | /app/assets/dynacat.db |
 | allowed-embed-hosts | array of strings | no | |
+| allow-editing | boolean | no | true |
+| editing-users | array of strings | no | |
+| editing-groups | array of strings | no | |
 
 #### `host`
 The address which the server will listen on. Setting it to `localhost` means that only the machine that the server is running on will be able to access the dashboard. By default it will listen on all interfaces.
@@ -216,6 +220,21 @@ A number between 1 and 65,535, so long as that port isn't already used by anythi
 
 #### `proxied`
 Set to `true` if you're using a reverse proxy in front of Dynacat. This will make Dynacat use the `X-Forwarded-*` headers to determine the original request details.
+
+#### `trusted-proxies`
+A list of IPs and/or CIDR ranges (e.g. `10.0.0.1` or `10.0.0.0/24`) allowed to set the `X-Forwarded-*` headers when `proxied` is `true`. A bare IP is treated as a `/32` (or `/128` for IPv6).
+
+If left empty, `X-Forwarded-*` headers are ignored entirely and the direct connection's address is used instead, even with `proxied: true`. This is the safe default: it avoids trusting forwarded headers from an unknown source, but it also means client IPs/protocol will show as your proxy's, not the real visitor's, until you list the proxy here.
+
+Example:
+
+```yaml
+server:
+  proxied: true
+  trusted-proxies:
+    - 10.0.0.0/24
+    - 192.168.1.1
+```
 
 #### `base-url`
 The base URL that Dynacat is hosted under. No need to specify this unless you're using a reverse proxy and are hosting Dynacat under a directory. If that's the case then you can set this value to `/dynacat` or whatever the directory is called. Note that the forward slash (`/`) in the beginning is required unless you specify the full domain and path.
@@ -282,6 +301,23 @@ server:
 ```
 
 This sets the `Content-Security-Policy: frame-ancestors` directive to include the listed origins in addition to `'self'`.
+
+#### `allow-editing`
+Whether the web UI editor (the pencil icon that lets you drag, drop and configure widgets and pages directly from the dashboard) is allowed to make changes. Defaults to `true`.
+
+Set it to `false` to disable the web UI editor entirely:
+
+```yaml
+server:
+  allow-editing: false
+```
+
+> [!NOTE]
+>
+> This only controls the web UI editor. Editing the config file directly, or through `$include`d files, always works regardless of this setting.
+
+#### `editing-users`, `editing-groups`
+Restrict who is allowed to use the web UI editor, regardless of `allow-editing`. If neither is set, any user who can already log in is allowed to edit. To limit a specific user to only certain pages, use `restrict-editing` on that user instead, see [Editing Access Control](authentication.md#editing-access-control) for details.
 
 ## Document
 If you want to insert custom HTML into the `<head>` of the document for all pages, you can do so by using the `document` property. Example:
@@ -582,10 +618,10 @@ A keybind is one or more keys separated by spaces. Each key is a single letter o
 
 | Config value | Behavior |
 | ------------ | -------- |
-| `h` | Automatically expanded to `d h` — press `d` then `h` |
+| `h` | Automatically expanded to `d h` - press `d` then `h` |
 | `d h` | Press `d`, release, then press `h` within 1 second |
 | `d a c` | Three-key sequence: `d` → `a` → `c` |
-| `1` | Automatically expanded to `d 1` — press `d` then `1` |
+| `1` | Automatically expanded to `d 1` - press `d` then `1` |
 
 > [!NOTE]
 >
@@ -822,6 +858,8 @@ Preview:
 | ---- | ---- | -------- | ------- |
 | first-day-of-week | string | no | monday |
 | hosts | array | no | |
+| release-types | list of strings | no | cinema, physical, digital, episode |
+| show-release-state | boolean | no | false |
 | update-interval | string | no | 15m |
 
 ##### `first-day-of-week`
@@ -872,6 +910,65 @@ Optionally override the URL used for the release links in the popover. Useful wh
 `allow-insecure`
 
 Whether to allow invalid/self-signed certificates when making requests to the instance.
+
+##### `release-types`
+Which kinds of release to show. Each release is shown as its own entry on the day it lands, with a small icon next to the title indicating the type:
+
+- `cinema` - Radarr, in cinemas (film icon)
+- `physical` - Radarr, physical/disc release (minidisc icon)
+- `digital` - Radarr, digital/home release (monitor icon)
+- `episode` - Sonarr episodes (television icon)
+
+A **Radarr** movie can have a cinema, a physical and a digital release date, so it may appear on up to three days. This option controls both Radarr and Sonarr - for example dropping `episode` hides Sonarr episodes entirely.
+
+By default all types are shown. Restrict it by listing only the ones you want. 
+
+```yaml
+- type: calendar
+  release-types:
+    - cinema
+    - digital
+  hosts:
+    - url: radarr:https://radarr.domain.com
+      token: ${RADARR_KEY}
+```
+
+```yaml
+- type: calendar
+  release-types: digital
+  hosts:
+    - url: radarr:https://radarr.domain.com
+      token: ${RADARR_KEY}
+```
+
+##### `show-release-state`
+By default, the line under a day with releases is always your theme's <span style="color: #b98adf">⬤</span> `primary-color` (the purple in the default theme). It is a static marker that only tells you something lands on that day, with no indication of whether it is out yet or downloaded.
+
+Set `show-release-state` to `true` to instead color that line by the availability status of the day's releases, pulled from Sonarr/Radarr. Each state maps to one of your theme colors:
+
+| Color | State | Meaning |
+| ----- | ----- | ------- |
+| <span style="color: #4caf50">⬤</span> `positive-color` | `available` | Out and already downloaded, ready to watch |
+| <span style="color: #e05252">⬤</span> `negative-color` | `released` | Out now, but not downloaded yet |
+| <span style="color: #d8b46a">⬤</span> `color-upcoming` | `upcoming` | Not out yet, its release date is still in the future |
+
+`available` uses your theme's `positive-color` and `released` uses `negative-color`. `upcoming` has its own amber color so it always stands out from the other two.
+
+> [!NOTE]
+>
+> `positive-color` defaults to `primary-color`. If you want downloaded (`available`) days to look distinct, set a separate [`positive-color`](#positive-color) in your theme (for example a green). The `upcoming` amber can be overridden with the `--color-upcoming` CSS variable via a [`custom-css-file`](#custom-css-file).
+
+If a day has several releases with different states, the line shows the least available one, so it stays on the `released` or `upcoming` color until nothing is left pending. The priority is `released` → `upcoming` → `available`.
+
+Only relevant when `hosts` is configured.
+
+```yaml
+- type: calendar
+  show-release-state: true
+  hosts:
+    - url: radarr:https://radarr.domain.com
+      token: ${RADARR_KEY}
+```
 
 ##### `update-interval`
 How often the calendar polls for release updates without reloading the page. The value is a string and must be a number followed by one of s (seconds), m (minutes) or h (hours). Only relevant when `hosts` is configured. Default is `15m`.
@@ -1321,15 +1418,16 @@ The slug of the widget from the dynawidgets repository. This is the only require
 widget: daily-chess-puzzle
 ```
 
+The cached template is update automatically, so you don't have to worry about anything.
+
 ##### `repo`
-The branch/repository to fetch the widget from. This allows you to test widgets from different branches or forks. Defaults to `main`. Example:
+The branch of the dynawidgets repository to fetch the widget from. This allows you to test widgets that are not on `main` yet.
 
 ```yaml
 widget: daily-chess-puzzle
 repo: testing/main
 ```
 
-This will fetch from `https://raw.githubusercontent.com/Panonim/dynawidgets/refs/heads/testing/main/...`
 
 ##### `url`, `headers`, `method`, `body-type`, `body`, `frameless`, `allow-insecure`, `skip-json-validation`
 These properties work the same as in the [custom-api widget](#custom-api). They override the default values defined in the widget's template `required` section.
@@ -1340,7 +1438,7 @@ These properties work the same as in the [custom-api widget](#custom-api) and al
 Learn more about building and contributing widgets in the [Contributing to Dynawidgets](contributing.md) guide.
 
 ### DNS Stats
-Display statistics from a self-hosted ad-blocking DNS resolver such as AdGuard Home, Pi-hole, or Technitium.
+Display statistics from a self-hosted ad-blocking DNS resolver such as AdGuard Home, Pi-hole, Technitium, or Blocky.
 
 Example:
 
@@ -1358,7 +1456,7 @@ Preview:
 
 > [!NOTE]
 >
-> When using AdGuard Home the 3rd statistic on top will be the average latency and when using Pi-hole or Technitium it will be the total number of blocked domains from all adlists.
+> When using AdGuard Home or Blocky the 3rd statistic on top will be the average latency and when using Pi-hole or Technitium it will be the total number of blocked domains from all adlists.
 
 #### Properties
 
@@ -1375,13 +1473,15 @@ Preview:
 | hour-format | string | no | 12h |
 
 ##### `service`
-Either `adguard`, `technitium`, or `pihole` (major version 5 and below) or `pihole-v6` (major version 6 and above).
+Either `adguard`, `technitium`, `blocky`, or `pihole` (major version 5 and below) or `pihole-v6` (major version 6 and above).
 
 ##### `allow-insecure`
 Whether to allow invalid/self-signed certificates when making the request to the service.
 
 ##### `url`
 The base URL of the service.
+
+When using Blocky this is the base URL of the **Prometheus** instance scraping Blocky, not of Blocky itself, since Blocky has no stats API of its own. The widget queries it through `/api/v1/query` and `/api/v1/query_range`.
 
 ##### `username`
 Only required when using AdGuard Home. The username used to log into the admin dashboard.
@@ -1404,6 +1504,38 @@ Whether to hide the list of top blocked domains.
 
 ##### `hour-format`
 Whether to display the relative time in the graph in `12h` or `24h` format.
+
+#### Using Blocky
+
+Blocky needs its Prometheus metrics enabled and scraped before the widget has anything to read:
+
+`config.yml` (Blocky)
+```yaml
+prometheus:
+  enable: true
+  path: /metrics
+```
+
+`prometheus.yml`
+```yaml
+scrape_configs:
+  - job_name: blocky
+    static_configs:
+      - targets:
+          - blocky:4000
+```
+
+Then point the widget at Prometheus:
+
+```yaml
+- type: dns-stats
+  service: blocky
+  url: http://prometheus:9090
+```
+
+Neither `username`, `password` nor `token` are used for Blocky, so the Prometheus instance has to be reachable from Dynacat without authentication.
+
+The statistics come from the `blocky_query_total`, `blocky_response_total`, `blocky_request_duration_seconds` and `blocky_denylist_cache_entries` metrics. Blocky exposes no per-domain counters, so the top blocked domains list is always empty regardless of `hide-top-domains`.
 
 ### Docker Containers
 
@@ -1451,6 +1583,24 @@ Alternatively, you can also define the values within your `dynacat.yml` via the 
       url: https://container.domain.com
       icon: si:container-icon
       hide: false
+```
+
+This also works for grouping child containers under a parent, same as with labels — the "main" container needs an `id` and each "child" needs a matching `parent`:
+
+```yaml
+- type: docker-containers
+  containers:
+    cloud_service:
+      name: Cloud
+      url: https://mydomain.com
+      icon: si:googlecloud
+      id: cloudreve
+    cloud_service_postgresql:
+      name: cloud.postgresql
+      parent: cloudreve
+    cloud_service_redis:
+      name: cloud.redis
+      parent: cloudreve
 ```
 
 For services with multiple containers you can specify a `dynacat.id` on the "main" container and `dynacat.parent` on each "child" container:
@@ -1517,7 +1667,7 @@ Whether to hide the containers by default. If set to `true` you'll have to manua
 When set to `true`, automatically converts container names such as `container_name_1` into `Container Name 1`.
 
 ##### `sock-path`
-The path to the Docker socket. This can also be a [remote socket](https://docs.docker.com/engine/daemon/remote-access/) or proxied socket using something like [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy).
+The path to the Docker socket. This can also be a `tcp://host:port` or `http://host:port` address to connect to a [remote Docker host](https://docs.docker.com/engine/daemon/remote-access/), or a proxied socket using something like [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy).
 
 ###### `category`
 Filter to only the containers which have this category specified via the `dynacat.category` label. Useful if you want to have multiple containers widgets, each showing a different set of containers.
@@ -1630,7 +1780,7 @@ Controls what to display in the widget. Possible values are:
 - `both` - Display both containers and images (default)
 
 ##### `sock-path`
-The path to the Docker socket. This can also be a [remote socket](https://docs.docker.com/engine/daemon/remote-access/) or proxied socket using something like [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy).
+The path to the Docker socket. This can also be a `tcp://host:port` or `http://host:port` address to connect to a [remote Docker host](https://docs.docker.com/engine/daemon/remote-access/), or a proxied socket using something like [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy).
 
 ##### `format-container-names`
 When set to `true`, automatically converts container names such as `container_name_1` into `Container Name 1`.
@@ -1993,10 +2143,20 @@ You can hover over the "ERROR" text to view more information.
 | sites | array | yes | |
 | style | string | no | |
 | show-failing-only | boolean | no | false |
+| show-history | boolean | no | false |
 | update-interval | string | no | 2m |
 
 ##### `show-failing-only`
 Shows only a list of failing sites when set to `true`.
+
+##### `show-history`
+When set to `true`, a small strip of ticks is shown on the right of each site, one tick per status check, oldest on the left and newest on the right. Ticks use your theme's `positive-color` when the check was OK and `negative-color` when it failed.
+
+The strip holds the last 15 checks and nothing older than an hour, so how far back it reaches depends on your `update-interval` - with the default of `2m` it covers the last 30 minutes, with `4m` it covers the full hour. Sites with `disabled: true` are not tracked.
+
+> [!NOTE]
+>
+> The history is kept in memory only, meaning that it is lost when Dynacat restarts.
 
 ##### `style`
 Used to change the appearance of the widget. Possible values are `compact`.
@@ -2021,6 +2181,7 @@ Properties for each site:
 | timeout | string | no | 3s |
 | allow-insecure | boolean | no | false |
 | same-tab | boolean | no | false |
+| disabled | boolean | no | false |
 | alt-status-codes | array | no | |
 | basic-auth | object | no | |
 
@@ -2059,6 +2220,17 @@ Whether to ignore invalid/self-signed certificates.
 `same-tab`
 
 Whether to open the link in the same or a new tab.
+
+`disabled`
+
+Set to `true` to stop monitoring this site without removing it from the config. The site is still shown in the list, but no request is made to it and it's displayed with a "Disabled" status instead of "OK"/"ERROR". Disabled sites are never counted towards `show-failing-only`.
+
+```yaml
+sites:
+  - title: Jellyfin
+    url: https://jellyfin.yourdomain.com
+    disabled: true
+```
 
 `alt-status-codes`
 
@@ -2528,12 +2700,19 @@ Preview:
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | search-engine | string | no | duckduckgo |
+| degoog-url | string | when using `degoog` | |
 | new-tab | boolean | no | false |
 | autofocus | boolean | no | false |
 | target | string | no | _blank |
 | placeholder | string | no | Type here to search… |
 | autocomplete | boolean | no | true |
 | autocomplete-provider | string | no | duckduckgo |
+| include-bookmarks | boolean | no | false |
+| cross-page-bookmarks | boolean | no | false |
+| include-docker | boolean | no | false |
+| cross-page-docker | boolean | no | false |
+| include-monitor | boolean | no | false |
+| cross-page-monitor | boolean | no | false |
 | bangs | array | no | |
 
 ##### `search-engine`
@@ -2548,6 +2727,19 @@ Either a value from the table below or a URL to a custom search engine. Use `{QU
 | kagi | `https://kagi.com/search?q={QUERY}` |
 | startpage | `https://www.startpage.com/search?q={QUERY}` |
 | qwant | `https://www.qwant.com/?q={QUERY}&t=web` |
+| brave | `https://search.brave.com/search?q={QUERY}` |
+| degoog | your own instance, see [`degoog-url`](#degoog-url) |
+
+##### `degoog-url`
+The base URL of your [Degoog](https://github.com/degoog-org/degoog) instance, used when `search-engine` is set to `degoog`. Searches are sent to `/search?q=` and, unless you set your own [`autocomplete-provider`](#autocomplete-provider), suggestions come from that same instance through its `/api/suggest/opensearch` endpoint.
+
+```yaml
+- type: search
+  search-engine: degoog
+  degoog-url: https://degoog.example.com
+```
+
+Because the instance is yours, it may live on a private address such as `http://192.168.1.10:4444` — the suggestion request is made server-side by Dynacat, so the browser never sees the URL.
 
 ##### `new-tab`
 When set to `true`, swaps the shortcuts for showing results in the same or new tab, defaulting to showing results in a new tab.
@@ -2565,12 +2757,57 @@ When set, modifies the text displayed in the input field before typing.
 When set to `true` (default), displays search suggestions as you type. Navigate suggestions with <kbd>↑</kbd> and <kbd>↓</kbd> arrow keys, select with <kbd>Enter</kbd>, or dismiss with <kbd>Escape</kbd>. Set to `false` to disable autocompletion.
 
 ##### `autocomplete-provider`
-The provider used for search suggestions. Possible values are `duckduckgo` (default) and `brave`.
+Either `duckduckgo` (default), `brave`, or a URL to a custom suggestion endpoint — works the same way as [`search-engine`](#search-engine): pick a known provider by name, or supply your own URL directly.
 
 | Value | Provider |
 | ----- | -------- |
 | duckduckgo | DuckDuckGo autocomplete |
 | brave | Brave Search autocomplete |
+| a URL containing `{QUERY}` | Your own suggestion endpoint |
+
+A custom URL must return the [OpenSearch suggestions format](https://github.com/dewitt/opensearch/blob/master/opensearch-1-1-draft-6.md#the-json-format) (`["query", ["suggestion 1", "suggestion 2", ...]]`), which is what most self-hosted and public search engines (SearXNG, Wikipedia, etc.) expose. Use `{QUERY}` to indicate where the typed query gets placed. The request is made server-side, so the URL is never sent to the browser. Example:
+
+```yaml
+- type: search
+  search-engine: https://en.wikipedia.org/wiki/Special:Search?search={QUERY}
+  autocomplete-provider: https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search={QUERY}
+```
+
+> [!NOTE]
+>
+> Older configs written with `autocomplete-provider: custom` alongside a separate `autocomplete-url: <url>` still work, but should be migrated to the single-field form above — the `autocomplete-url` property is deprecated and no longer shown in the interactive editor.
+
+##### `include-bookmarks`
+When set to `true`, matches what you type against the titles of your [bookmarks](#bookmarks) (case-insensitive, matching from the start of the title) and shows matching bookmarks above the regular search suggestions. Clicking a bookmark match navigates straight to its URL instead of performing a search. Up to 3 matches are shown.
+
+By default only bookmarks on the same page as the search widget are matched. Use [`cross-page-bookmarks`](#cross-page-bookmarks) to match bookmarks from every page.
+
+Each match shows the bookmark's own [icon](#icons) if it has one, or a small arrow otherwise, exactly like in the bookmarks widget itself.
+
+```yaml
+- type: search
+  include-bookmarks: true
+```
+
+##### `cross-page-bookmarks`
+When set to `true`, implies [`include-bookmarks`](#include-bookmarks) and widens the search to bookmarks on every page, not just the page the search widget is on.
+
+```yaml
+- type: search
+  cross-page-bookmarks: true
+```
+
+##### `include-docker`
+When set to `true`, matches what you type against the container names from the [docker containers](#docker-containers) widgets on the same page. Only containers with a URL are matched and each match shows the container's [icon](#icons).
+
+##### `cross-page-docker`
+When set to `true`, widens the search to containers from every page.
+
+##### `include-monitor`
+When set to `true`, matches what you type against the site titles from the [monitor](#monitor) widgets on the same page. Each match shows the site's [icon](#icons) and points at the same URL as the widget.
+
+##### `cross-page-monitor`
+When set to `true`, widens the search to sites from every page.
 
 ##### `bangs`
 What now? [Bangs](https://duckduckgo.com/bangs). They're shortcuts that allow you to use the same search box for many different sites. Assuming you have it configured, if for example you start your search input with `!yt` you'd be able to perform a search on YouTube:
@@ -2646,6 +2883,15 @@ In the event that the CPU temperature goes over 80°C, a flame icon will appear 
 
 ![](images/server-stats-flame-icon.png)
 
+When running in a container the reported platform is the one of the image (usually `alpine`) because the host's `/etc/os-release` is not visible from inside. Mount it to have the host's distribution shown instead:
+
+```yaml
+volumes:
+  - /etc/os-release:/host/etc/os-release:ro
+```
+
+Alternatively, set [`HOST_ETC`](docker-options.md#host_etc) if you'd rather bind mount the host's whole `/etc` to a custom path.
+
 #### Properties
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
@@ -2684,7 +2930,21 @@ Whether to hide the swap usage.
 | mountpoints | map\[string\]object | no |  |
 
 ###### `cpu-temp-sensor`
-The name of the sensor to use for the CPU temperature. When not provided the widget will attempt to find the correct one, if it fails to do so the temperature will not be displayed. To view the available sensors you can use `sensors` command.
+The name of the sensor to use for the CPU temperature. When not provided the widget will attempt to find the correct one, if it fails to do so the temperature will not be displayed. To view the available sensors you can use the `sensors` command.
+
+Both the chip name and the `chip/Label` form printed by `sensors` are accepted, as is a bare label. For a chip listed as:
+
+```
+k10temp-pci-00c3
+Adapter: PCI adapter
+Tctl:         +44.0°C
+Tccd1:        +40.5°C
+```
+
+any of `k10temp-pci-00c3`, `k10temp`, `k10temp-pci-00c3/Tctl` or `Tctl` will work. When only the chip is given and it reports several temperatures, the one representing the whole package is picked. If the sensor cannot be matched, the names Dynacat can see are listed in the log so you can pick one of them.
+
+> [!NOTE]
+> Inside a container the sensors are only visible if `/sys` is readable, which is the case by default. Temperatures reported by `sensors` on the host but missing from the log usually mean the corresponding kernel module is not loaded.
 
 ###### `hide-mountpoints-by-default`
 If set to `true` you'll have to manually make each mountpoint visible by adding a `hide: false` property to it like so:
@@ -3297,6 +3557,7 @@ Preview:
 | show-progress-bar | boolean | no | true |
 | show-progress-info | boolean | no | true |
 | group-by-host | boolean | no | false |
+| hide-username | boolean | no | false |
 | update-interval | string | no | 30s |
 | episode-title-format | string | no | series |
 
@@ -3366,6 +3627,9 @@ Example:
 
 ##### `group-by-host`
 When `true`, groups sessions by their media server. When `false`, displays all sessions in a unified list.
+
+##### `hide-username`
+When `true`, hides the user row for each session - both the username and the play-state indicator (or `[playing]`/`[paused]` text).
 
 #### API Access & Tokens
 

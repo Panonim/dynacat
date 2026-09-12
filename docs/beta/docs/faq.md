@@ -2,6 +2,10 @@
 ## Does the information on the page update automatically?
 Yes! That's the whole point of Dynacat
 
+## Do I have to edit YAML by hand?
+
+No. Click the pencil icon in the header to open the UI editor, which lets you add pages, drag widgets into columns, change their options and set your theme from the dashboard itself. It writes normal YAML back into your config files, so you can switch between the two whenever you want.
+
 ## Can I create my own widgets?
 
 Yes, there are multiple ways to create custom widgets:
@@ -35,11 +39,7 @@ If you're not make sure you copied the installation command correctly:
 
 ```bash
 mkdir dynacat && cd dynacat && \
-curl -sL https://github.com/glanceapp/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2 && \
-sed -i \
-  -e 's/^  glance:/  dynacat:/' \
-  -e 's/^    container_name: glance/    container_name: dynacat/' \
-  -e 's/^    image: glanceapp\/glance/    image: panonim\/dynacat/' \
-  docker-compose.yml && \
-mv config/glance.yml config/dynacat.yml
+curl -sL https://github.com/Panonim/dynacat-compose-template/releases/latest/download/dynacat.tar.gz | tar -xzf -
 ```
+
+The archive already contains `config/dynacat.yml`, so nothing needs renaming.

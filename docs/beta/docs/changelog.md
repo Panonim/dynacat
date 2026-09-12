@@ -1,3 +1,34 @@
+# Changes for 3.0.0
+- Moved the compose template to [Panonim/dynacat-compose-template](https://github.com/Panonim/dynacat-compose-template), the install command is now a single `curl | tar` with no `sed` renaming
+- Added support for `tcp://`/`http://` remote Docker hosts to `sock-path` in the `docker-controller` widget, matching `docker-containers` -> https://github.com/Panonim/dynacat/issues/137
+- Documented `id`/`parent` grouping for the `containers` property in `docker-containers` widget -> https://github.com/Panonim/dynacat/issues/134
+- Fixed an issue where subrequests were not detected properly in `dynawidgets`
+- Added automatic update checks for cached `dynawidgets` templates, with a notice on the widget when one changed
+- Fixed `dynawidgets` protocol handling 
+- Added an option to visually edit your configuration
+- API, so you can now easily get all your data in external apps
+- Fixed Navidrome in currently playing
+- Added an option to see bookmarks, docker containers and monitors in search widget -> https://github.com/Panonim/dynacat/issues/126
+- Fixed issues with releases performence in `calendar` widget 
+- Made image fetching in `currently playing` more reliable
+- Added a function in `calendar` widget when showing releases to also show release type
+- Added a function in `calendar` widget to also show current state of the media e.g. grabbed
+- Fixed issue with `search` widget highlighting
+- Fixed Jellyfin issue where `playing` widget couldn't be resolved because of the api changes.
+- Added a read-only JSON API for accessing widget data
+- Added option to mark `monitor` as disabled
+- Added `show-history` option to `monitor` widget showing a bar of the last hour of status checks
+- Added a comparison to the previous run in `speedtest` widget
+- Fixed a few security issues
+- Fixed trash icon disappearing while dragging a `todo` item on mobile
+- Fixed `todo` checkbox sitting too close to widget edge on mobile
+- Fixed a lot of smaller ui issues (I lost count at some point tbh)
+- Added [degoog](https://github.com/degoog-org/degoog) theme and engine 
+- Fixed Reddit widget and Reddit RSS feeds returning `403` again after Reddit renamed the JS challenge token field -> https://github.com/Panonim/dynacat/issues/141
+- Updated Go packages
+- Updated docs to include missing blocky information
+- Server stats not showing CPU temp and wrong platform name -> https://github.com/Panonim/dynacat/issues/135
+
 # Changes for 2.4.0
 - Added Brave Search as an autocompletion engine and normal one
 - Added support for icons in the page title 

@@ -110,17 +110,6 @@ author: your-github-username
 
 ## Widget Guidelines
 
-### Use suffixed CSS classes
-
-If you need custom CSS, suffix classes with the widget name so styles stay isolated:
-
-```css
-.{class}-{widget-name} {
-  text-align: center;
-  margin-top: 1.5rem;
-}
-```
-
 ### Use environment variables for configurable values
 
 Do not hardcode local addresses or secrets.
