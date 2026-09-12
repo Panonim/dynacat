@@ -1,4 +1,3 @@
-
 import { clamp } from "./utils.js";
 
 export function setupMasonries() {
@@ -27,10 +26,10 @@ export function setupMasonries() {
 
             if (columnsCount === previousColumnsCount) {
                 return;
-            } else {
-                container.textContent = "";
-                previousColumnsCount = columnsCount;
             }
+
+            container.textContent = "";
+            previousColumnsCount = columnsCount;
 
             const columnsFragment = document.createDocumentFragment();
 
@@ -47,7 +46,13 @@ export function setupMasonries() {
             container.append(columnsFragment);
         };
 
+        // A morph reuses the container while wiping data-initialized, so it drops the previous observer.
+        if (container._masonryObserver) {
+            container._masonryObserver.disconnect();
+        }
+
         const observer = new ResizeObserver(() => requestAnimationFrame(render));
+        container._masonryObserver = observer;
         observer.observe(container);
     }
 }

@@ -376,8 +376,6 @@ func isRedditHost(host string) bool {
 	return host == "reddit.com" || strings.HasSuffix(host, ".reddit.com")
 }
 
-// Reddit (or its CDN) blocks Go's default TLS fingerprint on Linux with 403,
-// so mimic a real browser handshake via uTLS to bypass the detection.
 var redditHTTPClient = &http.Client{Transport: &http2.Transport{
 	DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(addr)
@@ -405,11 +403,9 @@ var redditHTTPClient = &http.Client{Transport: &http2.Transport{
 
 var (
 	redditChallengePattern = regexp.MustCompile(`await\(async \w+\s*=>\s*\w+\s*\+\s*\w+\)\("([^"]+)"\)`)
-	redditTokenPattern     = regexp.MustCompile(`name="token"\s+value="([^"]+)"`)
+	redditTokenPattern     = regexp.MustCompile(`name="jsc_token"\s+value="([^"]+)"`)
 )
 
-// Share one loid cookie across all reddit widgets - the JS-challenge flow
-// that produces it is noisy, so don't run it more than necessary.
 var getRedditLoidCookie = func() func() (string, error) {
 	var lastUpdate time.Time
 	var cachedLoid string
@@ -474,7 +470,7 @@ func fetchRedditLoidCookie() (string, error) {
 	params := url.Values{
 		"solution":     {solution},
 		"js_challenge": {"1"},
-		"token":        {token},
+		"jsc_token":    {token},
 	}
 	request, err = http.NewRequest("GET", "https://www.reddit.com/?"+params.Encode(), nil)
 	if err != nil {

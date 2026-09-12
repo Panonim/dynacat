@@ -63,6 +63,18 @@ func (widget *dockerContainersWidget) update(ctx context.Context) {
 	containers.sortByStateIconThenTitle()
 	widget.cacheContainerIcons(containers)
 	widget.Containers = containers
+	widget.publishSearchTargets(containers)
+}
+
+func (widget *dockerContainersWidget) publishSearchTargets(containers dockerContainerList) {
+	matches := make([]searchTargetMatch, 0, len(containers))
+
+	for i := range containers {
+		container := &containers[i]
+		matches = appendSearchTarget(matches, "docker", container.Name, container.URL, container.SameTab, container.Icon)
+	}
+
+	publishSearchTargets(widget, widget.Providers, matches)
 }
 
 func (widget *dockerContainersWidget) Render() template.HTML {
@@ -124,8 +136,7 @@ func (l *dockerContainerLabels) getOrDefault(label, def string) string {
 		return v
 	}
 
-	// If the label is a dynacat key and the label is not found,
-	// try to find a glance key for backward compatibility with existing user configs
+	// Fall back to the legacy glance.* key for backward compatibility.
 	if strings.HasPrefix(label, "dynacat.") {
 		legacy := "glance." + strings.TrimPrefix(label, "dynacat.")
 		if v, ok := (*l)[legacy]; ok && v != "" {
@@ -383,8 +394,7 @@ func fetchDockerContainersFromSource(
 		}
 	}
 
-	// We have to filter here instead of using the `filters` parameter of Docker's API
-	// because the user may define a category override within their config
+	// Filter here rather than via Docker's filters param since category may come from a config override.
 	if category != "" {
 		filtered := make([]dockerContainerJsonResponse, 0, len(containers))
 

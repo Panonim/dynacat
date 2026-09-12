@@ -1,0 +1,39 @@
+- name: Gaming
+  columns:
+    - size: small
+      widgets:
+        - type: twitch-top-games
+          limit: 20
+          collapse-after: 13
+          exclude:
+            - just-chatting
+            - pools-hot-tubs-and-beaches
+            - music
+            - art
+            - asmr
+
+    - size: full
+      widgets:
+        - type: group
+          widgets:
+            - type: reddit
+              show-thumbnails: true
+              subreddit: pcgaming
+            - type: reddit
+              subreddit: games
+
+        - type: videos
+          style: grid-cards
+          collapse-after-rows: 3
+          channels:
+            - UCNvzD7Z-g64bPXxGzaQaa4g # gameranx
+            - UCZ7AeeVbyslLM_8-nVy2B8Q # Skill Up
+            - UCHDxYLv8iovIbhrfl16CNyg # GameLinked
+            - UC9PBzalIcEQCsiIkq36PyUA # Digital Foundry
+
+    - size: small
+      widgets:
+        - type: reddit
+          subreddit: gamingnews
+          limit: 7
+          style: vertical-cards

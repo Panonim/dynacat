@@ -165,7 +165,8 @@
 }
 
 .todo-item.is-being-dragged .todo-item-delete {
-    opacity: 0;
+    opacity: 0.3;
+    pointer-events: none;
 }
 
 @media (pointer: fine) {
@@ -201,7 +202,7 @@
 
 @media (pointer: coarse) {
     .todo-item {
-        padding: 0.55rem 0;
+        padding: 0.55rem 0 0.55rem 1rem;
     }
 
     .todo-item-checkbox {

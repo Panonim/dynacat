@@ -19,7 +19,7 @@ type oidcSession struct {
 }
 
 type sessionStore struct {
-	sessions sync.Map // map[sessionID]*oidcSession
+	sessions sync.Map
 }
 
 func newSessionStore() *sessionStore {

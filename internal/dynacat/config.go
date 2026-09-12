@@ -40,6 +40,9 @@ type config struct {
 		BaseURL           string       `yaml:"base-url"`
 		DBPath            string       `yaml:"db-path"`
 		AllowedEmbedHosts []string     `yaml:"allowed-embed-hosts"`
+		AllowEditing      bool         `yaml:"allow-editing"`
+		EditingUsers      []string     `yaml:"editing-users"`
+		EditingGroups     []string     `yaml:"editing-groups"`
 		trustedProxyNets  []*net.IPNet `yaml:"-"`
 	} `yaml:"server"`
 
@@ -50,6 +53,15 @@ type config struct {
 		Users           map[string]*user `yaml:"users"`
 		OIDC            *oidcConfig      `yaml:"oidc"`
 	} `yaml:"auth"`
+
+	API struct {
+		Enabled                bool     `yaml:"enabled"`
+		Token                  string   `yaml:"token"`
+		EnforcePagePermissions *bool    `yaml:"enforce-page-permissions"`
+		RateLimit              *int     `yaml:"rate-limit"`
+		AllowedPages           []string `yaml:"allowed-pages"`
+		AllowedOrigins         []string `yaml:"allowed-origins"`
+	} `yaml:"api"`
 
 	Document struct {
 		Head template.HTML `yaml:"head"`
@@ -94,9 +106,11 @@ type oidcConfig struct {
 }
 
 type user struct {
-	Password           string `yaml:"password"`
-	PasswordHashString string `yaml:"password-hash"`
-	PasswordHash       []byte `yaml:"-"`
+	Password           string   `yaml:"password"`
+	PasswordHashString string   `yaml:"password-hash"`
+	PasswordHash       []byte   `yaml:"-"`
+	RestrictEditing    []string `yaml:"restrict-editing"`
+	usernameHash       []byte   `yaml:"-"`
 }
 
 type page struct {
@@ -143,6 +157,7 @@ func newConfigFromYAML(contents []byte) (*config, error) {
 
 	config := &config{}
 	config.Server.Port = 8080
+	config.Server.AllowEditing = true
 
 	err = yaml.Unmarshal(contents, config)
 	if err != nil {
@@ -177,15 +192,17 @@ func newConfigFromYAML(contents []byte) (*config, error) {
 var envVariableNamePattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
 var configVariablePattern = regexp.MustCompile(`(^|.)\$\{(?:([a-zA-Z]+):)?([a-zA-Z0-9_-]+)\}`)
 
-// Parses variables defined in the config such as:
-// ${API_KEY} 				            - gets replaced with the value of the API_KEY environment variable
-// \${API_KEY} 					        - escaped, gets used as is without the \ in the config
-// ${secret:api_key} 			        - value gets loaded from /run/secrets/api_key
-// ${readFileFromEnv:PATH_TO_SECRET}    - value gets loaded from the file path specified in the environment variable PATH_TO_SECRET
-//
-// TODO: don't match against commented out sections, not sure exactly how since
-// variables can be placed anywhere and used to modify the YAML structure itself
+// TODO: don't match against commented out sections
 func parseConfigVariables(contents []byte) ([]byte, error) {
+	return expandConfigVariables(contents, true)
+}
+
+// Expands ${ENV_VAR} only, so a remote template cannot pull a mounted secret into the URL it calls.
+func parseEnvVariablesOnly(contents []byte) ([]byte, error) {
+	return expandConfigVariables(contents, false)
+}
+
+func expandConfigVariables(contents []byte, allowTypedVariables bool) ([]byte, error) {
 	var err error
 
 	replaced := configVariablePattern.ReplaceAllFunc(contents, func(match []byte) []byte {
@@ -195,8 +212,6 @@ func parseConfigVariables(contents []byte) ([]byte, error) {
 
 		groups := configVariablePattern.FindSubmatch(match)
 		if len(groups) != 4 {
-			// we can't handle this match, this shouldn't happen unless the number of groups
-			// in the regex has been changed without updating the below code
 			return match
 		}
 
@@ -210,6 +225,9 @@ func parseConfigVariables(contents []byte) ([]byte, error) {
 		}
 
 		typeAsString, variableName := string(groups[2]), string(groups[3])
+		if typeAsString != "" && !allowTypedVariables {
+			return match
+		}
 		variableType := ternary(typeAsString == "", configVarTypeEnv, typeAsString)
 
 		parsedValue, returnOriginal, localErr := parseConfigVariableOfType(variableType, variableName)
@@ -232,7 +250,6 @@ func parseConfigVariables(contents []byte) ([]byte, error) {
 	return replaced, nil
 }
 
-// When the bool return value is true, it indicates that the caller should use the original value
 func parseConfigVariableOfType(variableType, variableName string) (string, bool, error) {
 	switch variableType {
 	case configVarTypeEnv:
@@ -420,7 +437,6 @@ func configFilesWatcher(
 
 	updateWatchedFiles(nil, lastIncludes)
 
-	// needed for lastContents and lastIncludes because they get updated in multiple goroutines
 	mu := sync.Mutex{}
 
 	parseAndCompareBeforeCallback := func() {
@@ -475,19 +491,9 @@ func configFilesWatcher(
 				if event.Has(fsnotify.Write) {
 					debouncedParseAndCompareBeforeCallback()
 				} else if event.Has(fsnotify.Rename) {
-					// on linux the file will no longer be watched after a rename, on windows
-					// it will continue to be watched with the new name but we have no access to
-					// the new name in this event in order to stop watching it manually and match the
-					// behavior in linux, may lead to weird unintended behaviors on windows as we're
-					// only handling renames from linux's perspective
 					// see https://github.com/fsnotify/fsnotify/issues/255
-
-					// remove the old file from our manually tracked includes, calling
-					// debouncedParseAndCompareBeforeCallback will re-add it if it's still
-					// required after it triggers
 					deleteLastInclude(event.Name)
 
-					// wait for file to maybe get created again
 					// see https://github.com/Panonim/dynacat/pull/358
 					for range 10 {
 						if _, err := os.Stat(event.Name); err == nil {
@@ -521,10 +527,7 @@ func configFilesWatcher(
 	}, nil
 }
 
-// TODO: Refactor, we currently validate in two different places, this being
-// one of them, which doesn't modify the data and only checks for logical errors
-// and then again when creating the application which does modify the data and do
-// further validation. Would be better if validation was done in a single place.
+// TODO: validation happens in two places, would be better in a single place
 func isConfigStateValid(config *config) error {
 	if len(config.Pages) == 0 {
 		return fmt.Errorf("no pages configured")
@@ -640,10 +643,58 @@ func isConfigStateValid(config *config) error {
 		}
 	}
 
+	if err := validateAPIIDsAreUnique(config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Read-only way to store ordered maps from a YAML structure
+func validateAPIIDsAreUnique(config *config) error {
+	seen := make(map[string]struct{})
+
+	var walk func(ws widgets) error
+	walk = func(ws widgets) error {
+		for _, w := range ws {
+			if id := w.GetAPIID(); id != "" {
+				if _, taken := seen[id]; taken {
+					return fmt.Errorf("api-id %q is used by more than one widget", id)
+				}
+				seen[id] = struct{}{}
+			}
+
+			switch v := w.(type) {
+			case *groupWidget:
+				if err := walk(v.Widgets); err != nil {
+					return err
+				}
+			case *splitColumnWidget:
+				if err := walk(v.Widgets); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	}
+
+	for i := range config.Pages {
+		page := &config.Pages[i]
+
+		if err := walk(page.HeadWidgets); err != nil {
+			return err
+		}
+
+		for j := range page.Columns {
+			if err := walk(page.Columns[j].Widgets); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 type orderedYAMLMap[K comparable, V any] struct {
 	keys []K
 	data map[K]V

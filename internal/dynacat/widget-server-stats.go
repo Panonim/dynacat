@@ -47,7 +47,6 @@ func (widget *serverStatsWidget) initialize() error {
 }
 
 func (widget *serverStatsWidget) update(context.Context) {
-	// Refactor later, most of it may change depending on feedback
 	var wg sync.WaitGroup
 
 	for i := range widget.Servers {
@@ -103,8 +102,6 @@ type serverStatsRequest struct {
 	URL                        string              `yaml:"url"`
 	Token                      string              `yaml:"token"`
 	Timeout                    durationField       `yaml:"timeout"`
-	// Support for other agents
-	// Provider                   string              `yaml:"provider"`
 }
 
 func (s *serverStatsRequest) DiskUsedPercent() uint8 {

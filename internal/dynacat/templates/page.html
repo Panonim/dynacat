@@ -5,6 +5,20 @@
 {{ define "document-head-after" }}
 <script type="module" src='{{ .App.StaticAssetPath "js/page.js" }}'></script>
 <script src='{{ .App.StaticAssetPath "js/docker-controller.js" }}'></script>
+{{ if .App.EditorEnabled }}
+<script type="module">
+    // The visual editor is desktop only (drag and drop), so skip it on mobile.
+    if (!window.matchMedia("(max-width: 768px)").matches) {
+        // Lazy-load the editor only when needed so it adds zero overhead otherwise.
+        const loadEditor = async () => (await import('{{ .App.StaticAssetPath "js/editor.js" }}')).toggleEditor();
+        const editorToggle = document.getElementById("editor-toggle");
+        editorToggle?.addEventListener("click", loadEditor);
+        // Re-enter edit mode after a save reloads the page. No toggle button means
+        // editing is disabled for this page, so don't.
+        if (editorToggle && sessionStorage.getItem("dynacat-editing") === "1") loadEditor();
+    }
+</script>
+{{ end }}
 {{ end }}
 
 {{ define "navigation-links" }}
@@ -61,6 +75,13 @@
                     <div class="theme-choices"></div>
                 </div>
             </div>
+            {{ end }}
+            {{ if and (or (not .App.AnyAuthEnabled) .AuthUser) (.App.UserAllowedToEdit .AuthUser) (.App.EditingAllowedForPage .AuthUser .Page) }}
+            <button type="button" id="editor-toggle" class="self-center" title="Edit page" style="display:flex;align-items:center;justify-content:center;width:1.8rem;height:2rem;background:none;border:none;padding:0;cursor:pointer">
+                <svg class="editor-toggle-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path transform="translate(-1.6 1.8)" stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                </svg>
+            </button>
             {{ end }}
             {{- if .AuthUser }}
             <div class="flex items-center gap-10 self-center">

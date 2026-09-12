@@ -69,9 +69,7 @@
 .weather-column-rain::before {
     content: '';
     position: absolute;
-    /* TODO: figure out a way to make it look continuous between columns, right now */
-    /* depending on the width of the page the rain inside two columns next to each other */
-    /* can overlap and look bad */
+    /* TODO: rain can overlap between adjacent columns */
     background: radial-gradient(circle at 4px 4px, hsl(200, 90%, 70%, 0.4) 1px, transparent 0);
     background-size: 8px 8px;
     transform: rotate(45deg) translate(-50%, 25%);

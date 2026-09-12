@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"regexp"
@@ -47,6 +48,24 @@ var (
 
 const defaultClientTimeout = 5 * time.Second
 
+// Upstreams are not trusted to stop sending, so every buffered response body is bounded.
+const maxResponseBytes = 16 << 20
+
+var errResponseTooLarge = errors.New("response exceeds the maximum size of 16MB")
+
+func readLimited(body io.Reader) ([]byte, error) {
+	contents, err := io.ReadAll(io.LimitReader(body, maxResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(contents) > maxResponseBytes {
+		return nil, errResponseTooLarge
+	}
+
+	return contents, nil
+}
+
 var defaultHTTPClient = &http.Client{
 	Transport: &http.Transport{
 		MaxIdleConnsPerHost: 10,
@@ -62,6 +81,27 @@ var defaultInsecureHTTPClient = &http.Client{
 		Proxy:           http.ProxyFromEnvironment,
 	},
 }
+
+// Re-checks every hop so a public host cannot redirect the fetch to a private address.
+func checkPublicRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+
+	return validatePublicFetchURL(req.URL.String())
+}
+
+func newPublicOnlyHTTPClient(base *http.Client) *http.Client {
+	return &http.Client{
+		Transport:     base.Transport,
+		Timeout:       defaultClientTimeout,
+		CheckRedirect: checkPublicRedirect,
+	}
+}
+
+var publicOnlyHTTPClient = newPublicOnlyHTTPClient(defaultHTTPClient)
+
+var publicOnlyInsecureHTTPClient = newPublicOnlyHTTPClient(defaultInsecureHTTPClient)
 
 type requestDoer interface {
 	Do(*http.Request) (*http.Response, error)
@@ -83,8 +123,11 @@ func setBrowserUserAgentHeader(request *http.Request) {
 	request.Header.Set("User-Agent", getBrowserUserAgentHeader())
 }
 
-// fetchRequestBody fetches a request body, sharing the result with other
-// widgets when the request is a cacheable GET, otherwise issuing it directly.
+// Jellyfin/Emby 12+ rejects the legacy ?api_key= query param; use the header instead.
+func jellyfinAuthHeader(token string) string {
+	return fmt.Sprintf(`MediaBrowser Token="%s"`, token)
+}
+
 func fetchRequestBody(client requestDoer, request *http.Request) (int, []byte, error) {
 	if request.Method == "" || request.Method == http.MethodGet {
 		status, _, body, err := globalSharedFetcher.do(client, request, sharedFetchMaxAgeForRequest(request))
@@ -186,14 +229,6 @@ func (job *workerPoolJob[I, O]) withWorkers(workers int) *workerPoolJob[I, O] {
 
 	return job
 }
-
-// func (job *workerPoolJob[I, O]) withContext(ctx context.Context) *workerPoolJob[I, O] {
-// 	if ctx != nil {
-// 		job.ctx = ctx
-// 	}
-
-// 	return job
-// }
 
 func newJob[I any, O any](task func(I) (O, error), data []I) *workerPoolJob[I, O] {
 	return &workerPoolJob[I, O]{

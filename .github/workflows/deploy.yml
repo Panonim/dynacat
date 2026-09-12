@@ -16,7 +16,9 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    outputs:
+      is_latest: ${{ steps.latest_tag.outputs.is_latest }}
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
@@ -107,7 +109,7 @@ jobs:
 
   release-binaries:
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -143,3 +145,48 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" dynacat-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz --clobber
+
+  notify-discord:
+    needs: [deploy, release-binaries]
+    if: startsWith(github.ref, 'refs/tags/') && needs.deploy.outputs.is_latest == 'true'
+    runs-on: ubuntu-slim
+    permissions: {}
+    steps:
+      - name: Announce the release on Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK_URL}" ]; then
+            echo "DISCORD_WEBHOOK_URL is not set, skipping the announcement"
+            exit 0
+          fi
+
+          payload="$(jq -n \
+            --arg version "${TAG#v}" \
+            --arg timestamp "$(TZ=Europe/Warsaw date +%Y-%m-%dT%H:%M:%S.%3N%:z)" \
+            '{
+              username: "Github Update",
+              avatar_url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/github-light.svg",
+              embeds: [{
+                title: "New Dynacat Release - \($version)",
+                url: "https://github.com/Panonim/dynacat/releases/latest",
+                color: 5793266,
+                timestamp: $timestamp,
+                footer: { text: "Europe/Warsaw" }
+              }]
+            }')"
+
+          status="$(printf 'url = "%s"\n' "${DISCORD_WEBHOOK_URL}" | curl --config - \
+            --silent --show-error --output response.txt --write-out '%{http_code}' \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data "${payload}")"
+
+          if [ "${status}" -lt 200 ] || [ "${status}" -ge 300 ]; then
+            echo "Discord webhook failed with HTTP ${status}"
+            cat response.txt
+            exit 1
+          fi
+
+          echo "Announced ${TAG#v} on Discord (HTTP ${status})"

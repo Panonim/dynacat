@@ -9,36 +9,52 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 var allowedMonitorMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions}
 
 var (
-	monitorWidgetTemplate        = mustParseTemplate("monitor.html", "widget-base.html")
-	monitorWidgetCompactTemplate = mustParseTemplate("monitor-compact.html", "widget-base.html")
+	monitorWidgetTemplate        = mustParseTemplate("monitor.html", "widget-base.html", "monitor-history.html")
+	monitorWidgetCompactTemplate = mustParseTemplate("monitor-compact.html", "widget-base.html", "monitor-history.html")
+)
+
+const (
+	monitorHistoryDuration  = time.Hour
+	monitorHistoryMaxPoints = 15
 )
 
 type monitorWidget struct {
 	widgetBase `yaml:",inline"`
-	Frameless  bool   `yaml:"frameless"`
+	Frameless  bool `yaml:"frameless"`
 	Sites      []struct {
 		*SiteStatusRequest `yaml:",inline"`
-		Status             *siteStatus     `yaml:"-"`
-		URL                string          `yaml:"-"`
-		ErrorURL           string          `yaml:"error-url"`
-		Title              string          `yaml:"title"`
-		Description        string          `yaml:"description"`
-		Icon               customIconField `yaml:"icon"`
-		SameTab            bool            `yaml:"same-tab"`
-		StatusText         string          `yaml:"-"`
-		StatusLabel        string          `yaml:"-"`
-		StatusStyle        string          `yaml:"-"`
-		AltStatusCodes     []int           `yaml:"alt-status-codes"`
+		Status             *siteStatus           `yaml:"-"`
+		URL                string                `yaml:"-"`
+		ErrorURL           string                `yaml:"error-url"`
+		Title              string                `yaml:"title"`
+		Description        string                `yaml:"description"`
+		Icon               customIconField       `yaml:"icon"`
+		SameTab            bool                  `yaml:"same-tab"`
+		Disabled           bool                  `yaml:"disabled"`
+		StatusText         string                `yaml:"-"`
+		StatusLabel        string                `yaml:"-"`
+		StatusStyle        string                `yaml:"-"`
+		AltStatusCodes     []int                 `yaml:"alt-status-codes"`
+		History            []monitorHistoryPoint `yaml:"-"`
 	} `yaml:"sites"`
 	Style           string `yaml:"style"`
 	ShowFailingOnly bool   `yaml:"show-failing-only"`
+	ShowHistory     bool   `yaml:"show-history"`
 	HasFailing      bool   `yaml:"-"`
+}
+
+type monitorHistoryPoint struct {
+	Time         time.Time
+	Style        string
+	Label        string
+	ResponseTime time.Duration
 }
 
 func (widget *monitorWidget) initialize() error {
@@ -78,13 +94,47 @@ func (widget *monitorWidget) setProviders(providers *widgetProviders) {
 	for i := range widget.Sites {
 		widget.Sites[i].Icon.prepare(widget.Providers)
 	}
+
+	widget.publishSearchTargets()
+}
+
+func (widget *monitorWidget) publishSearchTargets() {
+	matches := make([]searchTargetMatch, 0, len(widget.Sites))
+
+	for i := range widget.Sites {
+		site := &widget.Sites[i]
+
+		// URL is only filled in once the site has been checked at least once.
+		url := site.URL
+		if url == "" && site.SiteStatusRequest != nil {
+			url = site.DefaultURL
+		}
+
+		matches = appendSearchTarget(matches, "monitor", site.Title, url, site.SameTab, site.Icon)
+	}
+
+	publishSearchTargets(widget, widget.Providers, matches)
 }
 
 func (widget *monitorWidget) update(ctx context.Context) {
-	requests := make([]*SiteStatusRequest, len(widget.Sites))
+	enabledIndices := make([]int, 0, len(widget.Sites))
+	requests := make([]*SiteStatusRequest, 0, len(widget.Sites))
 
 	for i := range widget.Sites {
-		requests[i] = widget.Sites[i].SiteStatusRequest
+		site := &widget.Sites[i]
+
+		if site.Disabled {
+			site.Status = &siteStatus{}
+			site.URL = site.DefaultURL
+			site.StatusText = "Disabled"
+			site.StatusLabel = "Disabled"
+			site.StatusStyle = "disabled"
+			site.History = nil
+			continue
+		}
+
+		enabledIndices = append(enabledIndices, i)
+		requests = append(requests, site.SiteStatusRequest)
 	}
 
 	statuses, err := fetchStatusForSites(requests)
@@ -95,9 +145,9 @@ func (widget *monitorWidget) update(ctx context.Context) {
 
 	widget.HasFailing = false
 
-	for i := range widget.Sites {
+	for j, i := range enabledIndices {
 		site := &widget.Sites[i]
-		status := &statuses[i]
+		status := &statuses[j]
 		site.Status = status
 
 		if !slices.Contains(site.AltStatusCodes, status.Code) && (status.Code >= 400 || status.Error != nil) {
@@ -113,7 +163,59 @@ func (widget *monitorWidget) update(ctx context.Context) {
 		site.StatusText = statusCodeToText(status.Code, site.AltStatusCodes)
 		site.StatusLabel = monitorStatusLabel(status, site.StatusText, site.AltStatusCodes)
 		site.StatusStyle = statusCodeToStyle(status.Code, site.AltStatusCodes)
+
+		if widget.ShowHistory {
+			site.History = recordMonitorHistory(site.statusURL(), monitorHistoryPoint{
+				Time:         time.Now(),
+				Style:        site.StatusStyle,
+				Label:        site.StatusLabel,
+				ResponseTime: status.ResponseTime,
+			})
+		}
 	}
+
+	widget.publishSearchTargets()
+}
+
+// Kept outside of the widgets so that the history survives a config reload, which
+// discards and recreates every widget
+var monitorHistoryStore = struct {
+	mu      sync.Mutex
+	perSite map[string][]monitorHistoryPoint
+}{perSite: make(map[string][]monitorHistoryPoint)}
+
+func recordMonitorHistory(key string, point monitorHistoryPoint) []monitorHistoryPoint {
+	monitorHistoryStore.mu.Lock()
+	defer monitorHistoryStore.mu.Unlock()
+
+	cutoff := point.Time.Add(-monitorHistoryDuration)
+	for site, history := range monitorHistoryStore.perSite {
+		if len(history) == 0 || history[len(history)-1].Time.Before(cutoff) {
+			delete(monitorHistoryStore.perSite, site)
+		}
+	}
+
+	history := appendMonitorHistory(monitorHistoryStore.perSite[key], point)
+	monitorHistoryStore.perSite[key] = history
+
+	return slices.Clone(history)
+}
+
+func appendMonitorHistory(history []monitorHistoryPoint, point monitorHistoryPoint) []monitorHistoryPoint {
+	history = append(history, point)
+
+	cutoff := point.Time.Add(-monitorHistoryDuration)
+	expired := 0
+	for expired < len(history) && history[expired].Time.Before(cutoff) {
+		expired++
+	}
+	history = history[expired:]
+
+	if len(history) > monitorHistoryMaxPoints {
+		history = history[len(history)-monitorHistoryMaxPoints:]
+	}
+
+	return history
 }
 
 func (widget *monitorWidget) Render() template.HTML {
@@ -183,6 +285,14 @@ type SiteStatusRequest struct {
 	} `yaml:"basic-auth"`
 }
 
+func (statusRequest *SiteStatusRequest) statusURL() string {
+	if statusRequest.CheckURL != "" {
+		return statusRequest.CheckURL
+	}
+
+	return statusRequest.DefaultURL
+}
+
 type siteStatus struct {
 	Code         int
 	TimedOut     bool
@@ -191,12 +301,7 @@ type siteStatus struct {
 }
 
 func fetchSiteStatusTask(statusRequest *SiteStatusRequest) (siteStatus, error) {
-	var url string
-	if statusRequest.CheckURL != "" {
-		url = statusRequest.CheckURL
-	} else {
-		url = statusRequest.DefaultURL
-	}
+	url := statusRequest.statusURL()
 
 	timeout := ternary(statusRequest.Timeout > 0, time.Duration(statusRequest.Timeout), 3*time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

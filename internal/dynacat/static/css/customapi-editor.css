@@ -1,0 +1,835 @@
+.editor-open-builder {
+    margin-right: auto;
+}
+
+@media (max-width: 1023px) {
+    .editor-open-builder {
+        display: none;
+    }
+}
+
+.capi-editor .editor-input {
+    background-color: var(--color-widget-background-highlight);
+}
+
+.capi-editor .capi-column .editor-input,
+.capi-editor .capi-source .editor-input,
+.capi-editor .capi-inspector .editor-input {
+    background-color: var(--color-background);
+}
+
+.capi-editor {
+    --capi-preview-width: 480px;
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background: var(--color-background);
+    color: var(--color-text-base);
+}
+
+/* While previewing the field list is out of play, so it reads as locked. */
+.capi-previewing .capi-data {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.capi-previewing .capi-data > * {
+    pointer-events: none;
+}
+
+/* Selection means nothing while the rendered widget is on screen. */
+.capi-previewing .capi-column.capi-column-selected {
+    border-color: var(--color-separator);
+}
+
+/* Confirm dialogs opened from the editor are appended after it, so they need to sit above it. */
+.capi-editor ~ .editor-modal-overlay {
+    z-index: 66;
+}
+
+.capi-topbar {
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    padding: 9px 20px;
+    border-bottom: 1px solid var(--color-separator);
+}
+
+/* The rule keeps the data tools reading apart from the save actions they sit next to. */
+.capi-topbar-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding-right: 12px;
+    border-right: 1px solid var(--color-separator);
+}
+
+.capi-topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+    gap: 12px;
+    min-width: 0;
+}
+
+.capi-topbar .editor-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.capi-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.capi-field-label,
+.capi-pane-title {
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-subdue);
+}
+
+.capi-empty {
+    font-size: 1.2rem;
+    color: var(--color-text-subdue);
+}
+
+.capi-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text-subdue);
+    font: inherit;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.capi-icon-btn:hover {
+    color: var(--color-text-highlight);
+    background: var(--color-widget-background-highlight);
+}
+
+.capi-icon-btn svg {
+    display: block;
+    width: 15px;
+    height: 15px;
+}
+
+.capi-icon-btn-danger:hover,
+.capi-cell-remove:hover,
+.capi-source .capi-icon-btn:hover {
+    color: var(--color-negative);
+}
+
+.capi-icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.capi-icon-btn:disabled:hover {
+    color: var(--color-text-subdue);
+    background: transparent;
+}
+
+.capi-mini-btn {
+    padding: 4px 10px;
+    font-size: 1.1rem;
+}
+
+.capi-dragging {
+    opacity: 0.4;
+}
+
+.capi-body {
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 300px 1fr 320px;
+    min-height: 0;
+}
+
+.capi-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    padding: 16px;
+    overflow-y: auto;
+    background: var(--color-widget-background);
+    scrollbar-width: thin;
+}
+
+.capi-data {
+    border-right: 1px solid var(--color-separator);
+}
+
+.capi-inspector {
+    border-left: 1px solid var(--color-separator);
+}
+
+.capi-net {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-text-subdue) 45%, var(--color-separator));
+}
+
+.capi-net-collapsed {
+    gap: 4px;
+}
+
+.capi-net-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.capi-net-toggle svg {
+    transition: transform 0.15s ease;
+}
+
+.capi-net-toggle[aria-expanded="true"] svg {
+    transform: rotate(90deg);
+}
+
+.capi-net-summary {
+    font-size: 1.2rem;
+    color: var(--color-text-subdue);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capi-net-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.capi-headers {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.capi-header-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.capi-header-row > .editor-input {
+    min-width: 0;
+    padding: 5px 8px;
+    font-size: 1.2rem;
+}
+
+.capi-header-row > .editor-input:last-child {
+    grid-column: 1 / -1;
+}
+
+.capi-palette {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.capi-palette .capi-pane-title {
+    grid-column: 1 / -1;
+}
+
+.capi-palette-btn {
+    padding: 8px 10px;
+    font-size: 1.2rem;
+    text-align: center;
+    cursor: grab;
+    user-select: none;
+}
+
+.capi-palette-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text-highlight);
+}
+
+.capi-source {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+}
+
+.capi-source .editor-input {
+    padding: 5px 8px;
+    font-size: 1.2rem;
+}
+
+.capi-source .capi-field-label {
+    font-size: 1rem;
+}
+
+/* The pane is narrow, so the remove button rides on the label row instead of taking a column. */
+.capi-source .capi-field-with-action > .capi-icon-btn {
+    position: absolute;
+    top: -4px;
+    right: 0;
+}
+
+.capi-net .capi-mini-btn {
+    width: 100%;
+    color: var(--color-text-subdue);
+}
+
+.capi-net .capi-mini-btn:hover {
+    color: var(--color-text-highlight);
+}
+
+.capi-data-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.capi-data-group + .capi-data-group .capi-data-group-title,
+.capi-fields > .capi-data-group:not(:first-child) .capi-data-group-title {
+    margin-top: 10px;
+}
+
+.capi-data-group-title {
+    font-size: 1.2rem;
+    color: var(--color-text-highlight);
+}
+
+.capi-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+    cursor: grab;
+    user-select: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.capi-chip:hover {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 8%, var(--color-widget-background-highlight));
+}
+
+.capi-chip-array {
+    border-style: dashed;
+}
+
+.capi-chip-array .capi-chip-path {
+    color: var(--color-primary);
+}
+
+.capi-chip-path {
+    font-size: 1.2rem;
+    color: var(--color-text-base);
+    overflow-wrap: anywhere;
+}
+
+.capi-chip-value {
+    flex-shrink: 0;
+    max-width: 45%;
+    font-size: 1.1rem;
+    color: var(--color-text-subdue);
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.capi-canvas {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 0;
+    padding: 28px 24px 40px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    background-color: var(--color-background);
+    background-image: radial-gradient(var(--color-separator) 1px, transparent 1px);
+    background-size: 16px 16px;
+}
+
+.capi-canvas::-webkit-scrollbar {
+    display: none;
+}
+
+.capi-warning {
+    width: 100%;
+    max-width: var(--capi-preview-width);
+    font-size: 1.2rem;
+    color: var(--color-negative);
+}
+
+.capi-preview .expand-toggle-button.container-expanded {
+    position: static;
+}
+
+.capi-preview {
+    width: 100%;
+    max-width: var(--capi-preview-width);
+}
+
+.capi-row-wrapper + .capi-row-wrapper {
+    margin-top: 1.2rem;
+}
+
+.capi-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    border: 1px dashed transparent;
+    border-radius: var(--border-radius);
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.capi-row-wrapper .capi-row-selected {
+    border-color: var(--color-separator);
+}
+
+.capi-row-wrapper .capi-row-drop {
+    border-style: solid;
+    border-color: var(--color-primary);
+}
+
+.capi-cell {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+/* An icon block never stretches in the output, so it must not stretch here either. */
+.capi-cell-icon {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 62px;
+}
+
+.capi-cell:hover {
+    border-color: color-mix(in srgb, var(--color-text-subdue) 55%, transparent);
+}
+
+.capi-cell.capi-cell-selected {
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+
+.capi-cell.capi-cell-drop {
+    border-style: dashed;
+    border-color: var(--color-primary);
+}
+
+.capi-cell-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.capi-cell-remove svg {
+    width: 12px;
+    height: 12px;
+}
+
+.capi-cell:hover .capi-cell-remove,
+.capi-cell-remove:focus-visible {
+    opacity: 1;
+}
+
+.capi-cell-add {
+    flex: 0 0 34px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px dashed var(--color-separator);
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text-subdue);
+    font: inherit;
+    /* The button is icon only, so any label text collapses instead of widening the row. */
+    font-size: 0;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.capi-cell-add:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.capi-cell-add svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Both reuse the right-pointing chevron. */
+.capi-row-up svg {
+    transform: rotate(-90deg);
+}
+
+.capi-row-down svg {
+    transform: rotate(90deg);
+}
+
+.capi-row-tools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.capi-row-wrapper:hover .capi-row-tools,
+.capi-row-tools:focus-within {
+    opacity: 1;
+}
+
+/* Relative so the rows draw over the band layer behind them. */
+.capi-list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+}
+
+.capi-list-cell {
+    min-width: 0;
+    padding: 2px 5px;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius);
+    overflow-wrap: anywhere;
+    transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.capi-list-cell:hover {
+    background: color-mix(in srgb, var(--color-text-subdue) 8%, transparent);
+}
+
+/* Fade everything outside the selected column, so the selection reads without any boxes. */
+.capi-list-cell-muted {
+    opacity: 0.35;
+    transition: opacity 0.15s;
+}
+
+.capi-list-cell.capi-list-cell-muted:hover {
+    opacity: 1;
+}
+
+/* A drop replaces the column it lands on, so its cells come back to full strength under the band. */
+.capi-list-cell-over,
+.capi-list-cell.capi-list-cell-over,
+.capi-list-cell.capi-list-cell-muted.capi-list-cell-over {
+    opacity: 1;
+    background: transparent;
+}
+
+/* Header cells are plain divs, so they need the .capi-list-cell padding to line up with the values. */
+.capi-list-head > div {
+    padding: 0 5px;
+}
+
+/* Matches the .ui-icon inside it, so the column takes the same space as in the rendered widget. */
+.capi-list-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.3rem;
+    min-width: 2.3rem;
+    flex: 0 0 2.3rem;
+}
+
+.capi-list-cell.capi-list-icon,
+.capi-list-head > .capi-list-icon {
+    padding: 0;
+}
+
+.capi-list-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.capi-list-body {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.capi-list-stack {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Both layers repeat the column widths of a row, so they line up without measuring anything. */
+.capi-col-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.capi-col-bands {
+    pointer-events: none;
+}
+
+/* A column is a drop target over its whole height, not only where its text happens to sit. */
+.capi-col-hits {
+    pointer-events: none;
+}
+
+.capi-drag-active .capi-col-hits {
+    pointer-events: auto;
+}
+
+/* One band down the whole column, so the target reads as a single area instead of a box per cell. */
+.capi-col-band {
+    position: relative;
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+
+.capi-col-band::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: var(--border-radius);
+    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.capi-col-band.capi-col-band-on {
+    opacity: 1;
+}
+
+/* The header draws over the band layer, so the highlight sits behind the labels. */
+.capi-list-head {
+    position: relative;
+}
+
+/* Adding a column is a drop only affordance, so it appears once a field is in flight. */
+.capi-col-add {
+    display: none;
+    flex: 0 0 34px;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--color-separator);
+    border-radius: var(--border-radius);
+    color: var(--color-text-subdue);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.capi-drag-active .capi-col-add {
+    display: flex;
+}
+
+.capi-col-add:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.capi-col-add.capi-col-add-over {
+    border-style: solid;
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    color: var(--color-primary);
+}
+
+.capi-col-add svg {
+    width: 12px;
+    height: 12px;
+}
+
+.capi-hidden-by-rule {
+    opacity: 0.45;
+}
+
+.capi-column-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.capi-field-with-action {
+    position: relative;
+}
+
+.capi-field-with-action > .editor-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text-base);
+    font-size: 1.1rem;
+}
+
+.capi-field-with-action > .editor-btn:hover {
+    color: var(--color-negative);
+}
+
+.capi-list-caption {
+    font-size: 1.1rem;
+    color: var(--color-text-subdue);
+}
+
+.capi-data-group-item .capi-chip {
+    border-color: var(--color-separator);
+}
+
+.capi-add-row {
+    width: 100%;
+    max-width: var(--capi-preview-width);
+    padding: 9px;
+    border-style: dashed;
+    border-color: var(--color-text-subdue);
+    background: transparent;
+    color: var(--color-text-base);
+    font-size: 1.25rem;
+}
+
+.capi-add-row:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.capi-value {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.capi-static {
+    padding: 6px 10px;
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    font-size: 1.2rem;
+    color: var(--color-text-subdue);
+    overflow-wrap: anywhere;
+}
+
+.capi-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.capi-column.capi-column-selected {
+    border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-background));
+}
+
+.capi-column-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.capi-column-title {
+    min-width: 0;
+    font-size: 1.35rem;
+    font-weight: 500;
+    color: var(--color-text-base);
+    overflow-wrap: anywhere;
+}
+
+.capi-column-toggle svg {
+    transition: transform 0.15s ease;
+}
+
+.capi-column-toggle[aria-expanded="true"] svg {
+    transform: rotate(90deg);
+}
+
+.capi-column-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.capi-column-collapsed .capi-column-body {
+    display: none;
+}
+
+.capi-check {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.2rem;
+    color: var(--color-text-base);
+    cursor: pointer;
+}
+
+.capi-status {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 1.2rem;
+    color: var(--color-text-subdue);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capi-status-warn {
+    color: var(--color-upcoming);
+}
+
+.capi-status-error {
+    color: var(--color-negative);
+}

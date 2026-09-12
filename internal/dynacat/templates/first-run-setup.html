@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-scheme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Welcome to Dynacat</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/css/bundle.css">
+    <link rel="stylesheet" href="/static/css/login.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 4rem 1.5rem;
+        }
+
+        .setup-bounds {
+            width: 100%;
+            max-width: 66rem;
+        }
+
+        .setup-card {
+            padding: 2rem;
+        }
+
+        .setup-input {
+            height: 4.2rem;
+            display: flex;
+            align-items: center;
+            transition: border-color .2s;
+        }
+
+        .setup-input:focus-within {
+            border-color: var(--color-text-subdue);
+        }
+
+        /* The padding sits on the input so the selection never starts flush against its edge. */
+        .setup-input input {
+            padding: 0 1.5rem;
+            outline: none;
+        }
+
+        .setup-presets {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .setup-preset {
+            display: block;
+            cursor: pointer;
+            padding: 1.4rem;
+            transition: background-color .2s;
+        }
+
+        .setup-preset.selected {
+            background-color: var(--color-widget-background-highlight);
+        }
+
+        .setup-preset input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .setup-preset-icon {
+            width: 1.8rem;
+            height: 1.8rem;
+            flex-shrink: 0;
+            stroke: var(--color-text-subdue);
+            transition: stroke .2s;
+        }
+
+        .setup-preset.selected .setup-preset-icon {
+            stroke: var(--color-primary);
+        }
+
+        /* Translucent so the chips stay visible on the brighter selected tile too. */
+        .setup-chip {
+            background-color: color-mix(in srgb, var(--color-text-base) 12%, transparent);
+            border-radius: var(--border-radius);
+            padding: .2rem .8rem;
+        }
+
+        .setup-button, .setup-button:not(:disabled) {
+            margin-top: 2rem;
+            box-shadow: none;
+        }
+
+        @media (max-width: 700px) {
+            .setup-presets { grid-template-columns: minmax(0, 1fr); }
+            .setup-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<main class="setup-bounds">
+    <p class="uppercase size-h6 color-subdue">Welcome to Dynacat</p>
+    <h1 class="size-h1 color-highlight margin-top-10">Create your first page</h1>
+    <p class="margin-top-10 color-paragraph">
+        There is no config file yet. Pick a name and a starting point - every widget can be
+        rearranged afterwards with the built in editor.
+    </p>
+
+    <div class="setup-card widget-content-frame margin-top-20">
+        <label class="form-label widget-header block" for="page-name">Page name</label>
+        <div class="setup-input widget-content-frame margin-top-10">
+            <input type="text" id="page-name" value="{{ (index .Presets 0).DefaultName }}" maxlength="{{ .MaxNameLength }}" autocomplete="off" spellcheck="false">
+        </div>
+
+        <p class="form-label widget-header margin-top-20">Start from</p>
+
+        <div class="setup-presets margin-top-10">
+            {{- range $index, $preset := .Presets }}
+            <label class="setup-preset widget-content-frame{{ if eq $index 0 }} selected{{ end }}" data-name="{{ $preset.DefaultName }}">
+                <input type="radio" name="preset" value="{{ $preset.Key }}"{{ if eq $index 0 }} checked{{ end }}>
+                <div class="flex gap-10 items-center">
+                    <svg class="setup-preset-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                        {{ $preset.Icon }}
+                    </svg>
+                    <span class="color-highlight">{{ $preset.Label }}</span>
+                </div>
+                <p class="size-h6 color-subdue margin-top-10">{{ $preset.Description }}</p>
+                {{- if $preset.Widgets }}
+                <div class="flex flex-wrap gap-10 margin-top-10 size-h6 color-base">
+                    {{- range $preset.Widgets }}
+                    <span class="setup-chip">{{ . }}</span>
+                    {{- end }}
+                </div>
+                {{- end }}
+            </label>
+            {{- end }}
+        </div>
+
+        <div class="login-error-message" id="setup-error"></div>
+
+        <button class="login-button setup-button" id="setup-submit">CREATE PAGE</button>
+    </div>
+
+    <p class="margin-top-15 size-h6 color-subdue">
+        Writing to {{ .ConfigPath }} &middot;
+        <a href="https://dynacat.artur.zone" target="_blank" rel="noreferrer" style="text-decoration: underline">docs</a>
+    </p>
+</main>
+
+<script>
+    const nameInput = document.getElementById("page-name");
+    const errorElement = document.getElementById("setup-error");
+    const submitButton = document.getElementById("setup-submit");
+    const presets = [...document.querySelectorAll(".setup-preset")];
+
+    let nameEdited = false;
+    nameInput.addEventListener("input", () => nameEdited = true);
+
+    presets.forEach((preset) => {
+        preset.addEventListener("click", () => {
+            presets.forEach(other => other.classList.toggle("selected", other === preset));
+            if (!nameEdited) nameInput.value = preset.dataset.name;
+        });
+    });
+
+    // The setup server shuts down once the config is written, so wait for the app to answer.
+    const waitForApp = async () => {
+        for (let i = 0; i < 75; i++) {
+            try {
+                const response = await fetch("/api/healthz", { cache: "no-store" });
+                if (response.ok) return true;
+            } catch { /* the app is not listening yet */ }
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+        }
+
+        return false;
+    };
+
+    const create = async () => {
+        errorElement.textContent = "";
+        submitButton.disabled = true;
+
+        const body = {
+            name: nameInput.value,
+            preset: document.querySelector("input[name=preset]:checked").value,
+        };
+
+        let response;
+
+        try {
+            response = await fetch("/api/setup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+        } catch {
+            errorElement.textContent = "Could not reach the server";
+            submitButton.disabled = false;
+            return;
+        }
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            errorElement.textContent = data.error || "Could not create the config";
+            submitButton.disabled = false;
+            return;
+        }
+
+        submitButton.textContent = "STARTING";
+        sessionStorage.setItem("dynacat-editing", "1");
+        await waitForApp();
+        location.replace("/");
+    };
+
+    submitButton.addEventListener("click", create);
+    nameInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") create();
+    });
+</script>
+
+</body>
+</html>

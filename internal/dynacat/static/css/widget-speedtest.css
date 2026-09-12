@@ -36,6 +36,23 @@
     line-height: 1;
 }
 
+.speedtest-metric-change {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    gap: 0.15rem;
+}
+
+.speedtest-change-arrow {
+    width: 0.9em;
+    height: 0.9em;
+    flex-shrink: 0;
+}
+
+.speedtest-change-arrow-down {
+    transform: scaleY(-1);
+}
+
 @container widget (min-width: 450px) {
     .speedtest-metrics {
         flex-direction: row;
@@ -54,5 +71,18 @@
 
     .speedtest-metric-label {
         margin-right: 0;
+    }
+
+    /* Restore value → unit → change order */
+    .speedtest-metric-value {
+        order: 1;
+    }
+
+    .speedtest-metric-unit {
+        order: 2;
+    }
+
+    .speedtest-metric-change {
+        order: 3;
     }
 }

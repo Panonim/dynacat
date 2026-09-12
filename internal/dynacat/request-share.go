@@ -3,43 +3,20 @@ package dynacat
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
-// Shared HTTP request layer.
-//
-// Multiple widgets often request the same external endpoint (for example two
-// repository widgets watching the same repo). Routing their GET requests
-// through globalSharedFetcher collapses identical concurrent requests into a
-// single fetch (singleflight) and keeps a short response cache so near
-// sequential requests reuse the result instead of hitting the endpoint again.
-//
-// The cache is requester tolerant: each caller passes its own maxAge (its
-// widget cacheDuration) and only reuses an entry younger than that. A short
-// cache widget refetches on its own schedule while a long cache widget reuses
-// freely, so every widget's configured cache is respected.
-//
-// Only GET requests are shared. POST and other methods (auth, GraphQL) always
-// go out directly.
-
 const (
-	// defaultSharedFetchMaxAge is used when a caller does not supply a maxAge
-	// (no widget cacheDuration in the request context).
 	defaultSharedFetchMaxAge = 1 * time.Minute
 
-	// sharedFetchMaxPruneAge is the age past which a cached entry is dropped
-	// during a sweep. Longer than any realistic widget reuse window.
 	sharedFetchMaxPruneAge = 1 * time.Hour
 
-	// sharedFetchPruneThreshold triggers a lazy sweep once the map grows past it.
 	sharedFetchPruneThreshold = 256
 
-	// sharedFetchInfiniteMaxAge is handed to infinite cache widgets so they
-	// reuse any entry that has not been pruned yet.
 	sharedFetchInfiniteMaxAge = sharedFetchMaxPruneAge
 )
 
@@ -59,15 +36,7 @@ type sharedFetcher struct {
 
 var globalSharedFetcher = &sharedFetcher{entries: make(map[string]*sharedFetchEntry)}
 
-// sharedFetchRelevantHeaders are folded into the cache key so requests that
-// differ in auth, content negotiation or conditional state never share.
-var sharedFetchRelevantHeaders = []string{
-	"Authorization",
-	"Accept",
-	"Content-Type",
-	"If-None-Match",
-	"If-Modified-Since",
-}
+var sharedFetchIgnoredHeaders = []string{"User-Agent"}
 
 func sharedFetchKey(client requestDoer, req *http.Request) string {
 	var b strings.Builder
@@ -76,22 +45,26 @@ func sharedFetchKey(client requestDoer, req *http.Request) string {
 	b.WriteByte(0)
 	b.WriteString(req.URL.String())
 	b.WriteByte(0)
-	// Client discriminator: requests issued through different clients (secure,
-	// insecure TLS, reddit uTLS, per widget proxy) must never share a response.
 	b.WriteString(fmt.Sprintf("%p", client))
 
-	for _, h := range sharedFetchRelevantHeaders {
+	names := make([]string, 0, len(req.Header))
+	for name := range req.Header {
+		if !slices.Contains(sharedFetchIgnoredHeaders, name) {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+
+	for _, name := range names {
 		b.WriteByte(0)
-		b.WriteString(req.Header.Get(h))
+		b.WriteString(name)
+		b.WriteByte(0)
+		b.WriteString(strings.Join(req.Header.Values(name), ","))
 	}
 
 	return hashString(b.String())
 }
 
-// do returns a shared response for a GET request. Concurrent identical requests
-// share a single in flight fetch; a completed entry is reused while it is no
-// older than maxAge. The returned body is shared read only across callers and
-// must not be mutated (callers only unmarshal it).
 func (f *sharedFetcher) do(client requestDoer, req *http.Request, maxAge time.Duration) (int, http.Header, []byte, error) {
 	key := sharedFetchKey(client, req)
 
@@ -101,20 +74,16 @@ func (f *sharedFetcher) do(client requestDoer, req *http.Request, maxAge time.Du
 		if entry, ok := f.entries[key]; ok {
 			select {
 			case <-entry.done:
-				// Completed. Reuse if fresh and successful.
 				if entry.err == nil && time.Since(entry.fetchedAt) <= maxAge {
 					f.mu.Unlock()
 					return entry.status, entry.header, entry.body, nil
 				}
-				// Stale or errored. If another caller already replaced it, loop
-				// and re evaluate; otherwise claim the refetch ourselves.
 				if f.entries[key] != entry {
 					f.mu.Unlock()
 					continue
 				}
 				delete(f.entries, key)
 			default:
-				// In flight. Wait for it, then re evaluate from the top.
 				f.mu.Unlock()
 				<-entry.done
 				continue
@@ -130,7 +99,6 @@ func (f *sharedFetcher) do(client requestDoer, req *http.Request, maxAge time.Du
 
 		f.mu.Lock()
 		if err != nil {
-			// Do not cache transport errors; let the next caller retry.
 			if f.entries[key] == newEntry {
 				delete(f.entries, key)
 			}
@@ -151,8 +119,6 @@ func (f *sharedFetcher) do(client requestDoer, req *http.Request, maxAge time.Du
 	}
 }
 
-// pruneLocked drops entries older than sharedFetchMaxPruneAge once the map has
-// grown past the threshold. Caller must hold f.mu.
 func (f *sharedFetcher) pruneLocked() {
 	if len(f.entries) <= sharedFetchPruneThreshold {
 		return
@@ -166,13 +132,10 @@ func (f *sharedFetcher) pruneLocked() {
 				delete(f.entries, key)
 			}
 		default:
-			// Still in flight; keep it.
 		}
 	}
 }
 
-// doRequestReadAll issues a request and reads the full response body. The
-// returned header is a clone so concurrent readers never race the http stack.
 func doRequestReadAll(client requestDoer, req *http.Request) (int, http.Header, []byte, error) {
 	resp, err := client.Do(req)
 	if err != nil {
@@ -180,7 +143,7 @@ func doRequestReadAll(client requestDoer, req *http.Request) (int, http.Header, 
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -199,8 +162,6 @@ func sharedFetchMaxAgeFromContext(ctx context.Context) (time.Duration, bool) {
 	return d, ok
 }
 
-// sharedFetchMaxAgeForRequest derives the reuse window for a request from its
-// context, falling back to the default when no widget cacheDuration is present.
 func sharedFetchMaxAgeForRequest(req *http.Request) time.Duration {
 	d, ok := sharedFetchMaxAgeFromContext(req.Context())
 	if !ok {
@@ -208,7 +169,6 @@ func sharedFetchMaxAgeForRequest(req *http.Request) time.Duration {
 	}
 
 	if d < 0 {
-		// Infinite cache widget: reuse any entry that has not been pruned.
 		return sharedFetchInfiniteMaxAge
 	}
 	if d == 0 {

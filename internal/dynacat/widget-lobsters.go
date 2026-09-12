@@ -35,7 +35,7 @@ func (widget *lobstersWidget) initialize() error {
 		widget.withTitleURL(widget.InstanceURL)
 	}
 
-	if widget.SortBy == "" || (widget.SortBy != "hot" && widget.SortBy != "new") {
+	if widget.SortBy != "hot" && widget.SortBy != "new" {
 		widget.SortBy = "hot"
 	}
 
@@ -141,10 +141,5 @@ func fetchLobstersPosts(ctx context.Context, customURL string, instanceURL strin
 		}
 	}
 
-	posts, err := fetchLobstersPostsFromFeed(ctx, feedUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	return posts, nil
+	return fetchLobstersPostsFromFeed(ctx, feedUrl)
 }

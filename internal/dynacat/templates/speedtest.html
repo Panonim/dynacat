@@ -17,6 +17,7 @@
             </svg>
             <span>DOWNLOAD</span>
         </div>
+        {{ template "speedtest-change" .DownloadChange }}
         <div class="speedtest-metric-value color-highlight size-h2">{{ .Download }}</div>
         <div class="speedtest-metric-unit color-base size-h5">Mbps</div>
     </div>
@@ -27,6 +28,7 @@
             </svg>
             <span>UPLOAD</span>
         </div>
+        {{ template "speedtest-change" .UploadChange }}
         <div class="speedtest-metric-value color-highlight size-h2">{{ .Upload }}</div>
         <div class="speedtest-metric-unit color-base size-h5">Mbps</div>
     </div>
@@ -34,9 +36,21 @@
         <div class="speedtest-metric-label color-subdue size-h5">
             <span>PING</span>
         </div>
+        {{ template "speedtest-change" .PingChange }}
         <div class="speedtest-metric-value color-highlight size-h2">{{ .Ping }}</div>
         <div class="speedtest-metric-unit color-base size-h5">ms</div>
     </div>
+</div>
+{{- end }}
+{{- end }}
+
+{{- define "speedtest-change" }}
+{{- if . }}
+<div class="speedtest-metric-change size-h5 {{ if .Improved }}color-positive{{ else }}color-negative{{ end }}">
+    <svg class="speedtest-change-arrow{{ if not .Up }} speedtest-change-arrow-down{{ end }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 0 0 1.06 0l7.22-7.22v5.69a.75.75 0 0 0 1.5 0v-7.5a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0 0 1.5h5.69l-7.22 7.22a.75.75 0 0 0 0 1.06Z" clip-rule="evenodd" />
+    </svg>
+    <span>{{ printf "%+.1f" .Percent }}%</span>
 </div>
 {{- end }}
 {{- end }}

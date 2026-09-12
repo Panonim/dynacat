@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://dynacat.artur.zone/configuration">Configuration</a> •
   <a href="https://discord.gg/mUqTzrfjFP">Discord</a> •
-  <a href="https://www.paypal.com/paypalme/imartur">Sponsor</a> 
+  <a href="https://ko-fi.com/panonim">Sponsor</a> 
 </p>
 <p align="center">
   <a href="https://github.com/Panonim/dynawidgets">Dynawidgets repo</a> •
@@ -55,8 +55,49 @@ Easily create your own theme by tweaking a few numbers or choose from one of the
 
 <br>
 
+## Installation
+There are currently two ways in which you can use Dynacat, the UI editorand editing yaml files manually.
+If you'd like to use the UI here's the recommended configuration. 
+
+The quickest start is to grab the ready-made directory structure:
+
+```bash
+mkdir dynacat && cd dynacat && \
+curl -sL https://github.com/Panonim/dynacat-compose-template/releases/latest/download/dynacat.tar.gz | tar -xzf - && \
+docker compose up -d
+```
+
+<details>
+<summary><strong>Docker compose file</strong></summary>
+<br>
+
+```yaml
+services:
+  dynacat:
+    container_name: dynacat
+    image: panonim/dynacat
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config
+      - ./assets:/app/assets
+      - /etc/localtime:/etc/localtime:ro
+      # Optionally, also mount docker socket if you want to use the docker containers widget
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - 8080:8080
+    env_file: .env
+```
+</details>
+
+If you'd like a more detailed instructions they can be found in [the docs](https://dynacat.artur.zone/#installation).
+
 ## Configuration
-Configuration is done through YAML files, to learn more about how the layout works, how to add more pages and how to configure widgets, visit the [configuration documentation](https://dynacat.artur.zone/configuration#configuring-dynacat).
+There are two ways to configure Dynacat, and they work on the same files:
+
+* **UI editor** - drag widgets into columns, change their options and pick your colors from the dashboard itself. Dynacat writes the result back into your YAML. See the [UI editor documentation](https://dynacat.artur.zone/ui-editor).
+* **YAML by hand** - edit the config files directly. To learn more about how the layout works, how to add more pages and how to configure widgets, visit the [configuration documentation](https://dynacat.artur.zone/configuration#configuring-dynacat).
+
+The editor is an addition to the config file, not a replacement, so hand written config keeps working exactly as before.
 
 <details>
 <summary><strong>Preview example configuration file</strong></summary>
@@ -194,13 +235,14 @@ You can list multiple origins. Each entry must be a full origin including the sc
 
 <div style='text-align: center;'>
 
-**If you like this project, please consider [sponsoring](https://www.paypal.com/paypalme/imartur).**
+**If you like this project, please consider [sponsoring](https://ko-fi.com/panonim).**
 
-<a href="https://www.star-history.com/?repos=panonim%2Fdynacat&type=date&legend=bottom-right">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=panonim/dynacat&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=panonim/dynacat&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=panonim/dynacat&type=date&legend=bottom-right" />
- </picture>
-</a>
+<div style="display: flex; justify-content: center;">
+  <a href="https://www.star-history.com/?repos=panonim%2Fdynacat&type=date&legend=top-left">
+   <picture>
+     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=panonim/dynacat&type=date&theme=dark&legend=top-left" />
+     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=panonim/dynacat&type=date&legend=top-left" />
+     <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=panonim/dynacat&type=date&legend=top-left" />
+   </picture>
+  </a>
 </div>

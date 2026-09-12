@@ -22,7 +22,6 @@
     flex-shrink: 0;
 }
 
-/* gives a wider hit area for the 3 people that will notice the animation : ) */
 .search-icon-container::before {
     content: '';
     position: absolute;
@@ -76,6 +75,7 @@
 }
 
 .search-bangs { display: none; }
+.search-targets { display: none; }
 
 .search-bang {
     border-radius: calc(var(--border-radius) * 2);
@@ -97,7 +97,6 @@
     display: none;
 }
 
-/* Widget border adjustments when dropdown is open */
 .search.search-suggestions-below {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
@@ -110,13 +109,11 @@
     border-top-width: 0;
 }
 
-/* Dropdown base — positioned + sized by JS */
 .search-autocomplete {
     position: fixed;
     z-index: 200;
     box-sizing: border-box;
     overflow-y: auto;
-    scrollbar-gutter: stable;
     background: var(--color-widget-background);
     border: 1px solid var(--color-widget-content-border);
     border-top-width: 0;
@@ -130,7 +127,6 @@
     transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s;
 }
 
-/* Dropdown shown above input */
 .search-autocomplete.search-autocomplete-above {
     border-bottom-width: 0;
     border-top-width: 1px;
@@ -156,6 +152,9 @@
 }
 
 .search-autocomplete-item {
+    --search-autocomplete-icon-size: 16px;
+    --search-autocomplete-icon-gap: 0.7em;
+
     padding: 0.7rem 1.4rem;
     cursor: pointer;
     color: var(--color-text-base);
@@ -163,8 +162,33 @@
     transition: background 0.1s;
 }
 
+/* Indent iconless items so every label in the list starts at the same x. */
+.search-autocomplete-item:not(.search-autocomplete-item-target) {
+    padding-left: calc(1.4rem + var(--search-autocomplete-icon-size) + var(--search-autocomplete-icon-gap));
+}
+
 .search-autocomplete-item:hover,
 .search-autocomplete-item.selected {
     background: var(--color-widget-background-highlight);
     color: var(--color-text-highlight);
+}
+
+.search-autocomplete-item-target {
+    display: flex;
+    align-items: center;
+    gap: var(--search-autocomplete-icon-gap);
+}
+
+.search-autocomplete-item-target-icon {
+    width: var(--search-autocomplete-icon-size);
+    height: var(--search-autocomplete-icon-size);
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.search-autocomplete-item-target-fallback {
+    flex-shrink: 0;
+    width: var(--search-autocomplete-icon-size);
+    text-align: center;
+    color: var(--color-primary);
 }

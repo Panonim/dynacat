@@ -197,8 +197,6 @@ func fetchChannelFromTwitchOperation(channel string, response twitchGraphQLOpera
 			slog.Warn("Failed to parse Twitch stream started at", "error", err, "started_at", response.Data.User.Stream.StartedAt)
 		}
 	} else {
-		// This prevents live channels with 0 viewers from being
-		// incorrectly sorted lower than offline channels.
 		result.ViewersCount = -1
 	}
 
@@ -288,7 +286,6 @@ func fetchChannelsFromTwitch(ctx context.Context, channelLogins []string) (twitc
 		ctx = context.Background()
 	}
 
-	// Twitch channel logins are case-insensitive, so normalize before deduping requests.
 	channelLogins = dedupeTwitchChannelLogins(channelLogins)
 	result := make(twitchChannelList, 0, len(channelLogins))
 	total := len(channelLogins)

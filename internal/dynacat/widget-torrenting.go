@@ -302,29 +302,23 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 	info.IsCompleted = t.Progress >= 1.0
 
 	switch t.State {
-	// qBittorrent active states
 	case "downloading", "forcedDL", "uploading", "forcedUP":
 		info.IsActive = true
-	// Deluge active states
 	case "Downloading", "Seeding":
 		info.IsActive = true
-	// Transmission active states
 	case "tr-downloading", "tr-seeding":
 		info.IsActive = true
 	}
 
 	switch {
-	// Active seeding - show upload icon even at 100% progress
 	case t.State == "uploading" || t.State == "forcedUP" || t.State == "stalledUP":
 		info.Icon = "↑"
 	case t.State == "Seeding":
 		info.Icon = "↑"
 	case t.State == "tr-seeding":
 		info.Icon = "↑"
-	// Completed but not actively seeding
 	case info.IsCompleted:
 		info.Icon = "✔"
-	// qBittorrent states
 	case t.State == "downloading" || t.State == "forcedDL":
 		info.Icon = "↓"
 	case t.State == "error" || t.State == "missingFiles":
@@ -333,7 +327,6 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 		info.Icon = "…"
 	case t.State == "checkingResumeData":
 		info.Icon = "⟳"
-	// Deluge states
 	case t.State == "Downloading":
 		info.Icon = "↓"
 	case t.State == "Error":
@@ -346,7 +339,6 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 		info.Icon = "…"
 	case t.State == "Paused":
 		info.Icon = "❚❚"
-	// Transmission states
 	case t.State == "tr-downloading":
 		info.Icon = "↓"
 	case t.State == "tr-error":
@@ -396,8 +388,6 @@ func computeTorrentInfo(t qbTorrentJSON) torrentInfo {
 
 	return info
 }
-
-// Deluge JSON-RPC types and methods
 
 type delugeJSONRPCRequest struct {
 	ID     int           `json:"id"`
@@ -575,8 +565,6 @@ func (widget *torrentingWidget) delugeFetchTorrentsOnce(ctx context.Context, hos
 
 	return torrents, nil
 }
-
-// Transmission RPC types and methods
 
 type transmissionRPCRequest struct {
 	Method    string                 `json:"method"`

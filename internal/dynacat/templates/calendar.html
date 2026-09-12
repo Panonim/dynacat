@@ -4,6 +4,6 @@
 
 {{ define "widget-content" }}
 <div class="widget-small-content-bounds">
-    <div class="calendar" data-first-day-of-week="{{ .FirstDay }}"{{ if .HasReleases }} data-calendar-releases="true" data-calendar-releases-interval="{{ .ReleasesIntervalMs }}"{{ end }}></div>
+    <div class="calendar" data-first-day-of-week="{{ .FirstDay }}"{{ if .HasReleases }} data-calendar-releases="true" data-calendar-releases-interval="{{ .ReleasesIntervalMs }}"{{ if .ShowReleaseState }} data-calendar-release-state="true"{{ end }}{{ end }}></div>
 </div>
 {{ end }}

@@ -95,7 +95,7 @@ details[open] .summary::after {
     rotate: -90deg;
 }
 
-/* TODO: refactor, otherwise I hope I never have to change dynamic columns again */
+/* TODO: refactor dynamic columns */
 .dynamic-columns {
     --list-half-gap: 0.5rem;
     gap: var(--widget-content-vertical-padding) var(--widget-content-horizontal-padding);
@@ -315,7 +315,7 @@ details[open] .summary::after {
 
 .expand-toggle-button.container-expanded {
     position: sticky;
-    /* -1px to hide 1px gap on chrome */
+    /* chrome gap fix */
     bottom: -1px;
 }
 
@@ -347,6 +347,11 @@ details[open] .summary::after {
 
 .widget-content:has(.expand-toggle-button:last-child) {
     padding-bottom: 0;
+}
+
+.widget-content-frameless .expand-toggle-button,
+.widget-content-frameless .cards-grid.collapsible-container + .expand-toggle-button {
+    background: transparent;
 }
 
 .carousel-container {
@@ -403,7 +408,6 @@ details[open] .summary::after {
     gap: 2px;
     padding: 2px;
     height: 1.5rem;
-    /* naughty, but oh so beautiful */
     margin-inline: -3px;
 }
 
@@ -472,7 +476,6 @@ details[open] .summary::after {
     scrollbar-width: none;
 }
 
-/* Hide on Safari and Chrome */
 .hide-scrollbars::-webkit-scrollbar {
     display: none;
 }
@@ -558,6 +561,7 @@ details[open] .summary::after {
 .cursor-help { cursor: help; }
 .rounded { border-radius: var(--border-radius); }
 .break-all { word-break: break-all; }
+.wrap-anywhere { overflow-wrap: anywhere; }
 .text-left { text-align: left; }
 .text-right { text-align: right; }
 .text-center { text-align: center; }
@@ -568,6 +572,8 @@ details[open] .summary::after {
 .shrink { flex-shrink: 1; }
 .shrink-0 { flex-shrink: 0; }
 .min-width-0 { min-width: 0; }
+.width-ui-icon { width: 2.3rem; }
+.nowrap { white-space: nowrap; }
 .max-width-100 { max-width: 100%; }
 .block { display: block; }
 .inline-block { display: inline-block; }

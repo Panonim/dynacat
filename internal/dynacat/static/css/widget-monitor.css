@@ -45,4 +45,45 @@
 
 .monitor-site-response-time-compact {
     white-space: nowrap;
+    flex: 0 0 auto;
+    min-width: 3.6rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.monitor-history {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    height: 1.6rem;
+    flex: 0 1 9rem;
+    min-width: 3rem;
+    margin-left: auto;
+    overflow: hidden;
+}
+
+/* The auto margin above already pushes everything to the end of the row */
+.monitor-history + .monitor-site-status-icon,
+.monitor-history + .monitor-site-status-cluster-compact {
+    margin-left: 0;
+}
+
+.monitor-history-point {
+    flex: 1 1 0;
+    min-width: 2px;
+    max-width: 6px;
+    border-radius: 2px;
+    background-color: var(--color-positive);
+    opacity: 0.4;
+    transition: opacity .2s;
+}
+
+.monitor-history-point-error {
+    background-color: var(--color-negative);
+    opacity: 0.8;
+}
+
+.monitor-history-point:hover,
+.monitor-history-point.popover-active {
+    opacity: 1;
 }

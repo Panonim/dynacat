@@ -1,0 +1,1160 @@
+@import "customapi-editor.css";
+
+.editor-palette-dock {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    pointer-events: none;
+}
+
+.editor-palette-search {
+    --palette-notch: 12px;
+    position: relative;
+    display: flex;
+    padding: 10px 10px 6px;
+    pointer-events: auto;
+    background: var(--color-popover-background);
+    border-top-right-radius: var(--border-radius);
+}
+
+.editor-palette-search::after {
+    content: "";
+    position: absolute;
+    left: 100%;
+    bottom: 0;
+    width: var(--palette-notch);
+    height: var(--palette-notch);
+    background: var(--color-popover-background);
+    mask: radial-gradient(circle var(--palette-notch) at 100% 0, transparent 99%, #000 100%);
+    -webkit-mask: radial-gradient(circle var(--palette-notch) at 100% 0, transparent 99%, #000 100%);
+}
+
+.editor-palette-search .editor-input {
+    width: 190px;
+    max-width: 50vw;
+    padding: 4px 9px;
+    font-size: 1.2rem;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--color-separator);
+    background-color: var(--color-background);
+    color: var(--color-text-subdue);
+    font-family: inherit;
+}
+
+.editor-palette-search .editor-input::placeholder {
+    color: var(--color-text-subdue);
+}
+
+.editor-palette-search .editor-input:focus {
+    outline: none;
+}
+
+.editor-palette-empty {
+    align-self: center;
+    padding: 8px 6px;
+    font-size: 1.1rem;
+    color: var(--color-text-subdue);
+}
+
+.editor-palette {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 10px 16px;
+    pointer-events: auto;
+    background: var(--color-popover-background);
+    scrollbar-width: thin;
+}
+
+.editor-palette::-webkit-scrollbar {
+    height: 6px;
+}
+
+.editor-palette::-webkit-scrollbar-thumb {
+    background: var(--color-separator);
+    border-radius: 3px;
+}
+
+.editor-palette-item {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    width: 76px;
+    padding: 8px 6px;
+    border-radius: var(--border-radius);
+    cursor: grab;
+    user-select: none;
+    opacity: 0.75;
+    transition: opacity 0.15s, background 0.15s;
+}
+
+.editor-palette-item[hidden],
+.editor-palette-empty[hidden] {
+    display: none;
+}
+
+.editor-palette-item:hover {
+    opacity: 1;
+    background: var(--color-widget-background);
+}
+
+.editor-palette-icon {
+    width: 22px;
+    height: 22px;
+    background: var(--color-text-highlight);
+    mask: var(--icon-url) center / contain no-repeat;
+    -webkit-mask: var(--icon-url) center / contain no-repeat;
+}
+
+.editor-palette-name {
+    width: 100%;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--color-text-highlight);
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+body.editing {
+    padding-bottom: 170px;
+}
+
+/* The username crowds the header enough to squeeze out the editor toggle. */
+body.editing .nav-username {
+    display: none;
+}
+
+body.editing .footer {
+    display: none;
+}
+
+body.editing .widget + .widget {
+    margin-top: 0;
+}
+
+body.editing .page-column {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+    align-self: flex-start;
+    position: relative;
+    padding: 8px;
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background);
+}
+
+body.editing .page-column:not(:has(> .widget)) {
+    align-items: center;
+    justify-content: center;
+}
+
+body.editing .page-column:not(:has(> .widget))::after {
+    content: "Drop widgets here";
+    color: var(--color-text-subdue);
+    font-size: 1.2rem;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.editor-widget {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 14px;
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+    border: 1px solid var(--color-separator);
+    cursor: grab;
+    transition: border-color 0.15s;
+}
+
+.editor-widget:hover {
+    border-color: var(--color-text-subdue);
+}
+
+.editor-widget-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.editor-nested {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px;
+    min-height: 46px;
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background);
+}
+
+.editor-nested:not(:has(> .widget)) {
+    align-items: center;
+    justify-content: center;
+}
+
+.editor-nested:not(:has(> .widget))::after {
+    content: "Drop widgets here";
+    color: var(--color-text-subdue);
+    font-size: 1.1rem;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.editor-nested-split:has(> .widget) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+}
+
+.editor-nested-split > .editor-widget {
+    flex: 1 1 100px;
+    min-width: 100px;
+    align-self: flex-start;
+}
+
+.editor-widget.editor-dragging {
+    opacity: 0.4;
+}
+
+.editor-widget-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.editor-widget-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    background: var(--color-text-highlight);
+    mask: var(--icon-url) center / contain no-repeat;
+    -webkit-mask: var(--icon-url) center / contain no-repeat;
+}
+
+.editor-widget-title {
+    font-size: 1.3rem;
+    color: var(--color-text-highlight);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.editor-widget-tools {
+    margin-left: auto;
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.editor-widget:hover .editor-widget-tools {
+    opacity: 1;
+}
+
+.editor-tool {
+    display: flex;
+    padding: 3px;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text-subdue);
+    cursor: pointer;
+}
+
+.editor-tool:hover {
+    color: var(--color-text-highlight);
+}
+
+.editor-tool svg {
+    width: 15px;
+    height: 15px;
+}
+
+.editor-column-tools {
+    display: flex;
+    justify-content: center;
+    padding-top: 8px;
+}
+
+.editor-column-remove {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text-subdue);
+    font: inherit;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.editor-column-remove:hover {
+    color: var(--color-negative);
+}
+
+.editor-icon-inline {
+    display: flex;
+}
+
+.editor-icon-inline svg {
+    width: 14px;
+    height: 14px;
+}
+
+.editor-drop-marker {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-primary);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.editor-drop-marker-v {
+    left: auto;
+    right: auto;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    height: auto;
+}
+
+.editor-add-column {
+    position: relative;
+    flex: 0 0 14px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.editor-add-column::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-primary);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.editor-add-column-plus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: var(--color-background);
+    transform: scale(0);
+    transition: transform 0.15s ease;
+}
+
+.editor-add-column-plus svg {
+    width: 13px;
+    height: 13px;
+}
+
+.editor-add-column:hover::before {
+    opacity: 0.5;
+}
+
+.editor-add-column:hover .editor-add-column-plus {
+    transform: scale(1);
+}
+
+.editor-page-tools {
+    display: inline-flex;
+    align-self: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.editor-page-tools-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--color-separator);
+}
+
+.editor-page-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-subdue);
+    font-size: 0.82em;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.editor-page-btn .editor-icon-inline svg {
+    width: 14px;
+    height: 14px;
+}
+
+.editor-page-btn:hover {
+    color: var(--color-text-highlight);
+}
+
+.editor-add-page:hover {
+    color: var(--color-primary);
+}
+
+.editor-remove-page:hover {
+    color: var(--color-negative);
+}
+
+body.editing .editor-styling-trigger {
+    cursor: pointer;
+}
+
+.editor-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.editor-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 85vh;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background);
+    border: 1px solid var(--color-separator);
+}
+
+.editor-modal-title {
+    font-size: 1.6rem;
+    color: var(--color-text-highlight);
+}
+
+.editor-modal-title-link {
+    align-self: flex-start;
+    text-decoration: underline;
+    text-decoration-color: var(--color-text-highlight);
+    text-underline-offset: 4px;
+}
+
+.editor-theme-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.8rem;
+    padding-block: 0.4rem 0.2rem;
+}
+
+.editor-theme-picker .theme-choices {
+    justify-content: center;
+}
+
+.editor-theme-badge {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.3rem;
+    background: var(--color-widget-background-highlight);
+    color: var(--color-text-subdue);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.editor-theme-badge::before {
+    content: '';
+    position: absolute;
+    inset: -.4rem;
+    border-radius: .7rem;
+    border: 2px solid transparent;
+    transition: border-color .3s;
+}
+
+.editor-theme-badge:hover {
+    color: var(--color-text-base);
+}
+
+.editor-theme-badge:hover::before {
+    border-color: var(--color-text-subdue);
+}
+
+.editor-theme-badge.current {
+    color: var(--color-text-highlight);
+}
+
+.editor-theme-badge.current::before {
+    border-color: var(--color-text-base);
+}
+
+.editor-theme-badge svg {
+    width: 17px;
+    height: 17px;
+}
+
+.editor-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    padding-bottom: 4px;
+    overflow-y: auto;
+}
+
+.editor-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.editor-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.editor-field-label {
+    font-size: 1.3rem;
+    color: var(--color-text-base);
+}
+
+.editor-required {
+    margin-left: 3px;
+    color: var(--color-primary);
+    font-weight: bold;
+}
+
+.editor-field-hint {
+    font-size: 1.1rem;
+    color: var(--color-text-subdue);
+    margin: 0;
+}
+
+.editor-modal .editor-input,
+.capi-editor .editor-input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--color-separator);
+    background-color: var(--color-widget-background-highlight);
+    color: var(--color-text-base);
+    font: inherit;
+    color-scheme: dark;
+}
+
+.editor-modal .editor-input:focus,
+.capi-editor .editor-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.editor-check {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.editor-check-label {
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--color-text-base);
+}
+
+.editor-modal .editor-check input[type="checkbox"],
+.capi-editor input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    border: 1.5px solid var(--color-text-subdue);
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.editor-modal .editor-check input[type="checkbox"]:hover,
+.capi-editor input[type="checkbox"]:hover {
+    border-color: var(--color-primary);
+}
+
+.editor-modal .editor-check input[type="checkbox"]:checked,
+.capi-editor input[type="checkbox"]:checked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.editor-modal .editor-check input[type="checkbox"]:checked::after,
+.capi-editor input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 4px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.editor-modal select.editor-input,
+.capi-editor select.editor-input {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23888888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.75 4.5 6 7.75 9.25 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px 12px;
+    cursor: pointer;
+}
+
+.editor-section-title {
+    font-size: 1.35rem;
+    color: var(--color-text-highlight);
+    margin-bottom: -4px;
+}
+
+.editor-color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.editor-color-row .editor-color-text {
+    flex: 1;
+    font-family: monospace;
+    text-transform: uppercase;
+}
+
+.editor-modal .editor-color-swatch {
+    flex-shrink: 0;
+    width: 46px;
+    height: 34px;
+    padding: 3px;
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+    cursor: pointer;
+}
+
+.editor-modal .editor-color-swatch::-webkit-color-swatch {
+    border: none;
+    border-radius: 6px;
+}
+
+.editor-modal .editor-color-swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.editor-modal .editor-color-swatch::-moz-color-swatch {
+    border: none;
+    border-radius: 6px;
+}
+
+.editor-textarea {
+    min-height: 90px;
+    resize: vertical;
+    font-family: monospace;
+}
+
+.editor-textarea-tall {
+    min-height: 180px;
+}
+
+.editor-paste-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-separator);
+}
+
+.editor-paste-hint {
+    color: var(--color-text-subdue);
+    font-size: 1.2rem;
+}
+
+.editor-paste-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 6px 12px;
+}
+
+.editor-paste-btn .editor-icon-inline svg {
+    width: 1.4rem;
+    height: 1.4rem;
+}
+
+.editor-paste-area {
+    min-height: 260px;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+}
+
+.editor-notice {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.editor-env-vars {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+}
+
+.editor-env-var,
+.editor-code-block {
+    background: var(--color-widget-background-highlight);
+    color: var(--color-text-base);
+    font-family: monospace;
+    font-size: 1.2rem;
+}
+
+.editor-env-var {
+    max-width: 100%;
+    padding: 4px 9px;
+    border-radius: calc(var(--border-radius) * 0.75);
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.editor-code-card {
+    position: relative;
+    display: flex;
+}
+
+.editor-code-block {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 12px 44px 12px 14px;
+    border-radius: var(--border-radius);
+    line-height: 1.6;
+    overflow-x: auto;
+}
+
+.editor-code-copy {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    display: flex;
+    padding: 5px;
+    border: none;
+    border-radius: calc(var(--border-radius) * 0.6);
+    background: transparent;
+    color: var(--color-text-subdue);
+    cursor: pointer;
+}
+
+.editor-code-copy:hover {
+    color: var(--color-text-highlight);
+    background: color-mix(in srgb, var(--color-text-subdue) 14%, transparent);
+}
+
+.editor-code-copy svg {
+    width: 1.6rem;
+    height: 1.6rem;
+}
+
+.editor-code-inline {
+    padding: 1px 5px;
+    white-space: nowrap;
+    border-radius: calc(var(--border-radius) * 0.6);
+    background: color-mix(in srgb, var(--color-text-subdue) 16%, transparent);
+    color: var(--color-text-base);
+    font-family: monospace;
+    font-size: 0.95em;
+}
+
+.editor-notice-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: notice-step;
+}
+
+.editor-notice-steps li {
+    position: relative;
+    padding-left: 22px;
+    font-size: 1.25rem;
+    line-height: 1.55;
+    color: var(--color-text-base);
+}
+
+.editor-notice-steps li::before {
+    counter-increment: notice-step;
+    content: counter(notice-step) ".";
+    position: absolute;
+    left: 0;
+    color: var(--color-text-subdue);
+}
+
+.editor-notice-note {
+    padding-left: 11px;
+    border-left: 2px solid var(--color-separator);
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--color-text-subdue);
+}
+
+.editor-icon-preview {
+    width: 26px;
+    height: 26px;
+    margin-top: 4px;
+}
+
+.editor-list-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.editor-list-toggle {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text-subdue);
+    font: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.editor-list-toggle:hover {
+    color: var(--color-primary);
+}
+
+.editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Author `display` beats the UA `[hidden]` rule, so hiding these needs an explicit override. */
+.editor-btn[hidden],
+.editor-list[hidden],
+.editor-list-add[hidden] {
+    display: none;
+}
+
+.editor-list-card {
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+}
+
+.editor-list-dragging {
+    opacity: 0.4;
+}
+
+.editor-list-marker {
+    height: 2px;
+    margin: -4px 0;
+    border-radius: 2px;
+    background: var(--color-primary);
+}
+
+.editor-list-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    cursor: pointer;
+}
+
+.editor-list-grip {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    color: var(--color-text-subdue);
+    cursor: grab;
+}
+
+.editor-list-grip:hover {
+    color: var(--color-text-highlight);
+}
+
+.editor-list-card[draggable="true"] .editor-list-grip {
+    cursor: grabbing;
+}
+
+.editor-list-grip svg,
+.editor-list-chevron svg {
+    width: 100%;
+    height: 100%;
+}
+
+.editor-list-thumb {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.editor-list-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.3rem;
+    color: var(--color-text-highlight);
+}
+
+.editor-list-chevron {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    color: var(--color-text-subdue);
+    transition: transform 0.15s;
+}
+
+.editor-list-card-open .editor-list-chevron {
+    transform: rotate(90deg);
+}
+
+.editor-list-remove:hover {
+    color: var(--color-negative);
+}
+
+.editor-list-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 10px 12px;
+    border-top: 1px solid var(--color-separator);
+}
+
+/* Inputs sit on the card background, so they need a darker fill to read as inputs. */
+.editor-modal .editor-list-body .editor-input,
+.editor-modal .editor-list-row .editor-input {
+    background-color: var(--color-background);
+}
+
+.editor-list-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-list-row-field {
+    flex: 1;
+}
+
+.editor-list-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 8px;
+    border: 1px dashed var(--color-separator);
+    border-radius: var(--border-radius);
+    /* Same reason as the inputs above: the separator border matches the card background exactly. */
+    background: var(--color-background);
+    color: var(--color-text-subdue);
+    font: inherit;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.editor-list-add:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.editor-list-add svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Nested adds sit inside an already busy card, so they drop to a plain text link. */
+.editor-list-body .editor-list-add {
+    align-self: flex-start;
+    justify-content: flex-start;
+    width: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    transition: color 0.15s;
+}
+
+.editor-collapsible summary {
+    cursor: pointer;
+    padding: 6px 0;
+    color: var(--color-text-subdue);
+    font-size: 1.2rem;
+}
+
+.editor-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.editor-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--color-separator);
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text-base);
+    cursor: pointer;
+    font: inherit;
+}
+
+.editor-btn:hover {
+    border-color: var(--color-text-subdue);
+}
+
+.editor-btn-primary {
+    background: var(--color-primary);
+    color: var(--color-background);
+    border-color: var(--color-primary);
+}
+
+.editor-btn-danger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-negative);
+    border-color: color-mix(in srgb, var(--color-negative) 45%, transparent);
+}
+
+.editor-btn-danger:hover {
+    background: color-mix(in srgb, var(--color-negative) 14%, transparent);
+    color: var(--color-negative);
+    border-color: var(--color-negative);
+}
+
+.editor-btn-icon-danger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: auto;
+    padding: 8px;
+    border-color: transparent;
+    color: var(--color-text-subdue);
+}
+
+.editor-btn-icon-danger .editor-icon-inline svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.editor-btn-icon-danger:hover {
+    border-color: transparent;
+    color: var(--color-negative);
+}
+
+.editor-confirm-message {
+    font-size: 1.35rem;
+    color: var(--color-text-base);
+}
+
+.editor-confirm-note {
+    margin-top: -8px;
+    font-size: 1.2rem;
+    color: var(--color-text-subdue);
+}
+
+.editor-layout-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.editor-layout-option {
+    display: flex;
+    gap: 3px;
+    height: 54px;
+    padding: 6px;
+    border-radius: var(--border-radius);
+    border: 2px solid var(--color-separator);
+    cursor: pointer;
+}
+
+.editor-layout-option.selected {
+    border-color: var(--color-primary);
+}
+
+.editor-layout-cell {
+    background: var(--color-text-subdue);
+    border-radius: 2px;
+}
+
+.editor-layout-cell-small {
+    flex: 0 0 20%;
+}
+
+.editor-layout-cell-full {
+    flex: 1;
+}
+
+.editor-toasts {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.editor-toast {
+    padding: 9px 15px;
+    font-size: 1.2rem;
+    border-radius: var(--border-radius);
+    background: var(--color-popover-background);
+    border: 1px solid var(--color-separator);
+}

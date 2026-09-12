@@ -10,7 +10,31 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
+
+type stringListField []string
+
+func (s *stringListField) UnmarshalYAML(node *yaml.Node) error {
+	var list []string
+	if err := node.Decode(&list); err == nil {
+		*s = list
+		return nil
+	}
+
+	var single string
+	if err := node.Decode(&single); err != nil {
+		return err
+	}
+
+	for _, part := range strings.Split(single, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			*s = append(*s, trimmed)
+		}
+	}
+	return nil
+}
 
 var calendarWidgetTemplate = mustParseTemplate("calendar.html", "widget-base.html")
 
@@ -26,9 +50,6 @@ var calendarWeekdaysToInt = map[string]time.Weekday{
 
 const calendarDefaultReleasesInterval = 15 * time.Minute
 
-// calendarReleaseService mirrors the host config style of the latest-media /
-// playing widgets: the service type is a prefix on the URL (e.g.
-// "radarr:https://radarr.domain.com").
 type calendarReleaseService struct {
 	URL           string `yaml:"url"`
 	PublicURL     string `yaml:"public-url"`
@@ -40,17 +61,15 @@ type calendarReleaseService struct {
 	publicBaseURL string `yaml:"-"`
 }
 
-// calendarReleaseItem is a single release shown on a day, serialized to the client.
 type calendarReleaseItem struct {
 	Source      string `json:"source"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Thumbnail   string `json:"thumbnail"`
 	Link        string `json:"link"`
+	Type        string `json:"type"`
+	State       string `json:"state"`
 
-	// dedupKey identifies the underlying movie/episode so the same release coming
-	// from multiple hosts of the same type is only shown once. Unexported so it is
-	// not serialized to the client.
 	dedupKey string
 }
 
@@ -60,14 +79,17 @@ type calendarReleaseCacheEntry struct {
 }
 
 type calendarWidget struct {
-	widgetBase             `yaml:",inline"`
-	FirstDayOfWeek         string                   `yaml:"first-day-of-week"`
-	FirstDay               int                      `yaml:"-"`
-	Frameless              bool                     `yaml:"frameless"`
-	Hosts                  []calendarReleaseService `yaml:"hosts"`
+	widgetBase       `yaml:",inline"`
+	FirstDayOfWeek   string                   `yaml:"first-day-of-week"`
+	FirstDay         int                      `yaml:"-"`
+	Frameless        bool                     `yaml:"frameless"`
+	Hosts            []calendarReleaseService `yaml:"hosts"`
+	ReleaseTypes     stringListField          `yaml:"release-types"`
+	ShowReleaseState bool                     `yaml:"show-release-state"`
 
-	cachedHTML       template.HTML `yaml:"-"`
-	releasesInterval time.Duration `yaml:"-"`
+	cachedHTML          template.HTML   `yaml:"-"`
+	releasesInterval    time.Duration   `yaml:"-"`
+	enabledReleaseTypes map[string]bool `yaml:"-"`
 
 	releaseCacheMu sync.Mutex                           `yaml:"-"`
 	releaseCache   map[string]calendarReleaseCacheEntry `yaml:"-"`
@@ -83,6 +105,18 @@ func (widget *calendarWidget) initialize() error {
 	}
 
 	widget.FirstDay = int(calendarWeekdaysToInt[widget.FirstDayOfWeek])
+
+	widget.enabledReleaseTypes = map[string]bool{}
+	if len(widget.ReleaseTypes) == 0 {
+		widget.enabledReleaseTypes = map[string]bool{"cinema": true, "physical": true, "digital": true, "episode": true}
+	} else {
+		for _, t := range widget.ReleaseTypes {
+			switch normalized := strings.ToLower(strings.TrimSpace(t)); normalized {
+			case "cinema", "physical", "digital", "episode":
+				widget.enabledReleaseTypes[normalized] = true
+			}
+		}
+	}
 
 	widget.releasesInterval = calendarDefaultReleasesInterval
 	if widget.UpdateInterval != nil {
@@ -123,29 +157,19 @@ func (widget *calendarWidget) Render() template.HTML {
 	return widget.cachedHTML
 }
 
-// HasReleases reports whether any Sonarr/Radarr services are configured, used by
-// the template to enable the client-side release fetching.
 func (widget *calendarWidget) HasReleases() bool {
 	return len(widget.Hosts) > 0
 }
 
-// ReleasesIntervalMs is the live-refresh interval the client uses to poll for
-// release updates, in milliseconds.
 func (widget *calendarWidget) ReleasesIntervalMs() int64 {
 	return widget.releasesInterval.Milliseconds()
 }
 
-// UpdateIntervalMs is overridden to always return 0 so the page never sets up
-// HTMX content polling for the calendar (which would swap the widget and reset
-// the viewed month). The configured update-interval instead drives the
-// client-side release polling via ReleasesIntervalMs.
+// Always 0 so the page never HTMX-swaps the calendar and resets the viewed month.
 func (widget *calendarWidget) UpdateIntervalMs() int64 {
 	return 0
 }
 
-// handleRequest serves per-month release data for the action
-// "releases/{year}/{month}". Results are cached server-side for the refresh
-// interval so repeated/concurrent requests do not refetch.
 func (widget *calendarWidget) handleRequest(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.PathValue("action"), "/"), "/")
 
@@ -166,6 +190,11 @@ func (widget *calendarWidget) handleRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if !withinCalendarReleaseRange(year, time.Month(month), time.Now()) {
+		http.Error(w, "month out of range", http.StatusBadRequest)
+		return
+	}
+
 	if len(widget.Hosts) == 0 {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{}"))
@@ -177,4 +206,12 @@ func (widget *calendarWidget) handleRequest(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	json.NewEncoder(w).Encode(data)
+}
+
+// Bounds the release cache and the traffic a caller can aim at the configured services.
+func withinCalendarReleaseRange(year int, month time.Month, now time.Time) bool {
+	requested := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	current := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	return !requested.Before(current.AddDate(-2, 0, 0)) && !requested.After(current.AddDate(2, 0, 0))
 }

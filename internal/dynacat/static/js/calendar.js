@@ -30,10 +30,26 @@ const [datesEntranceLeft, datesEntranceRight] = directions(
 
 const undoEntrance = slideFade({ direction: "left", distance: "100%", duration: 300 });
 
+const releaseTypes = {
+    digital: {
+        label: "Digital release",
+        path: "M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z",
+    },
+    physical: {
+        label: "Physical release",
+        path: "M5,3C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H5M12,5C15.09,5 17.82,7.04 18.7,10H16A1,1 0 0,0 15,11V13A1,1 0 0,0 16,14H18.71C17.82,16.97 15.09,19 12,19A7,7 0 0,1 5,12A7,7 0 0,1 12,5M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z",
+    },
+    cinema: {
+        label: "In cinemas",
+        path: "M20.84 2.18L16.91 2.96L19.65 6.5L21.62 6.1L20.84 2.18M13.97 3.54L12 3.93L14.75 7.46L16.71 7.07L13.97 3.54M9.07 4.5L7.1 4.91L9.85 8.44L11.81 8.05L9.07 4.5M4.16 5.5L3.18 5.69C2.1 5.9 1.39 6.96 1.61 8.04L2 10L6.9 9.03L4.16 5.5M20 12V20H4V12H20M22 10H2V20C2 21.11 2.9 22 4 22H20C21.11 22 22 21.11 22 20V10Z",
+    },
+    episode: {
+        label: "Episode",
+        path: "M8.16,3L6.75,4.41L9.34,7H4C2.89,7 2,7.89 2,9V19C2,20.11 2.89,21 4,21H20C21.11,21 22,20.11 22,19V9C22,7.89 21.11,7 20,7H14.66L17.25,4.41L15.84,3L12,6.84L8.16,3M4,9H17V19H4V9M19.5,9A1,1 0 0,1 20.5,10A1,1 0 0,1 19.5,11A1,1 0 0,1 18.5,10A1,1 0 0,1 19.5,9M19.5,12A1,1 0 0,1 20.5,13A1,1 0 0,1 19.5,14A1,1 0 0,1 18.5,13A1,1 0 0,1 19.5,12Z",
+    },
+};
+
 export default function(element) {
-    // Guard against double-initialization: a built calendar still carries the
-    // "calendar" class, so if setup runs again it must not rebuild it (which would
-    // create a second instance and replay the month animation).
     if (element.querySelector(".calendar-dates")) return;
 
     const widgetElement = element.closest("[data-widget-id]");
@@ -43,14 +59,26 @@ export default function(element) {
         ? Releases(widgetElement.dataset.widgetId, Number(element.dataset.calendarReleasesInterval) || 0)
         : null;
 
+    const showReleaseState = element.dataset.calendarReleaseState === "true";
+
     element.swapWith(Calendar(
         Number(element.dataset.firstDayOfWeek ?? 1),
-        releases
+        releases,
+        showReleaseState
     ));
 }
 
-// Releases manages fetching + caching per-month Sonarr/Radarr release data and
-// rendering it as markers/popovers inside the calendar day cells.
+function aggregateReleaseState(items) {
+    let hasReleased = false, hasUpcoming = false;
+    for (const item of items) {
+        if (item.state === "released") hasReleased = true;
+        else if (item.state === "upcoming") hasUpcoming = true;
+    }
+    if (hasReleased) return "released";
+    if (hasUpcoming) return "upcoming";
+    return "available";
+}
+
 function Releases(widgetId, intervalMs) {
     const base = (typeof pageData !== "undefined" && pageData.baseURL) || "";
     const cache = new Map();
@@ -84,7 +112,7 @@ function Releases(widgetId, intervalMs) {
 }
 
 // TODO: when viewing the previous/next month, display the current date if it's within the spill-over days
-function Calendar(firstDay, releases) {
+function Calendar(firstDay, releases, showReleaseState) {
     let header, dates;
     let advanceTimeTicker;
     let releaseTicker;
@@ -122,14 +150,12 @@ function Calendar(firstDay, releases) {
 
     const calendar = elem().classes("calendar").append(
         header = Header(nextClicked, prevClicked, undoClicked),
-        dates = Dates(firstDay, releases)
+        dates = Dates(firstDay, releases, showReleaseState)
     );
 
     update(now);
     autoAdvanceNow();
 
-    // Only poll for live updates when the page has dynamic updates enabled, matching
-    // SSE/widget polling. The initial fetch above still runs so markers show either way.
     const dynamicUpdatesEnabled = typeof pageData !== "undefined" && pageData.dynamicUpdateEnabled;
     if (releases && releases.intervalMs > 0 && dynamicUpdatesEnabled) {
         releaseTicker = setInterval(() => loadReleases(activeDate, true), releases.intervalMs);
@@ -196,11 +222,9 @@ function Header(nextClicked, prevClicked, undoClicked) {
     });
 }
 
-function Dates(firstDay, releases) {
-    let dates, lastRenderedDate;
+function Dates(firstDay, releases, showReleaseState) {
+    let dates, lastRenderedDate, animating = false;
 
-    // applyMarkers (re)draws release indicators + popovers onto the day cells for
-    // the given month using whatever release data is currently cached.
     const applyMarkers = function(newDate) {
         if (!releases) return;
 
@@ -217,9 +241,13 @@ function Dates(firstDay, releases) {
             if (existing) existing.remove();
 
             const cellDate = new Date(firstCellDate.getFullYear(), firstCellDate.getMonth(), firstCellDate.getDate() + i);
+            if (cellDate.getMonth() !== newDate.getMonth() || cellDate.getFullYear() !== newDate.getFullYear()) {
+                continue;
+            }
+
             const items = data[isoDate(cellDate)];
             if (items && items.length) {
-                cell.append(releaseMarker(items));
+                cell.append(releaseMarker(items, showReleaseState));
             }
         }
 
@@ -260,23 +288,22 @@ function Dates(firstDay, releases) {
 
         lastRenderedDate = newDate;
 
-        // Day numbers are set via .text() which wipes any previously appended
-        // markers, so re-apply them after rendering the grid.
+        // .text() wipes appended markers, so re-apply after rendering the grid.
         applyMarkers(newDate);
     };
 
     const update = function(now, newDate) {
-        if (lastRenderedDate === undefined || datesWithinSameMonth(newDate, lastRenderedDate)) {
+        if (lastRenderedDate === undefined || datesWithinSameMonth(newDate, lastRenderedDate) || animating) {
             updateFullMonth(now, newDate);
             return;
         }
 
         const next = newDate > lastRenderedDate;
-        dates.animateUpdate(
-            () => updateFullMonth(now, newDate),
-            next ? datesExitLeft : datesExitRight,
-            next ? datesEntranceRight : datesEntranceLeft,
-        );
+        animating = true;
+        dates.animate(next ? datesExitLeft : datesExitRight, () => {
+            updateFullMonth(now, newDate);
+            dates.animate(next ? datesEntranceRight : datesEntranceLeft, () => { animating = false; });
+        });
     }
 
     return elem().append(
@@ -292,10 +319,15 @@ function Dates(firstDay, releases) {
     ).component({ update, applyMarkers });
 }
 
-function releaseMarker(items) {
+function releaseMarker(items, showReleaseState) {
     const list = elem().classes("list", "list-gap-10");
     for (const item of items) {
         list.append(releaseCard(item));
+    }
+
+    const indicator = elem().classes("calendar-release-indicator");
+    if (showReleaseState) {
+        indicator.classes("calendar-release-indicator-" + aggregateReleaseState(items));
     }
 
     return elem()
@@ -304,9 +336,10 @@ function releaseMarker(items) {
             "data-popover-type": "html",
             "data-popover-position": "above",
             "data-popover-max-width": "340px",
+            "data-popover-hide-delay": "80",
         })
         .append(
-            elem().classes("calendar-release-indicator"),
+            indicator,
             elem().attr("data-popover-html", "").append(list)
         );
 }
@@ -316,7 +349,17 @@ function releaseCard(item) {
         elem().classes("size-h6", "color-subdue").text(item.source)
     );
 
-    body.append(elem().classes("color-highlight", "text-truncate").text(item.title));
+    const titleRow = elem().classes("flex", "items-center", "gap-7", "min-width-0");
+    const type = releaseTypes[item.type];
+    if (type) {
+        titleRow.append(
+            elem().classes("calendar-release-type-icon")
+                .attr("title", type.label)
+                .html(`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0.9" stroke-linejoin="round"><path d="${type.path}"/></svg>`)
+        );
+    }
+    titleRow.append(elem().classes("color-highlight", "text-truncate").text(item.title));
+    body.append(titleRow);
 
     if (item.description) {
         body.append(elem().classes("color-base", "text-truncate-2-lines", "margin-top-3").text(item.description));
@@ -328,10 +371,15 @@ function releaseCard(item) {
     ).classes("calendar-release-card", "flex", "items-center", "gap-10");
 
     if (item.thumbnail) {
+        const spinner = elem().classes("calendar-thumb-spinner");
+        const img = elem("img").classes("thumbnail").attrs({ src: item.thumbnail, loading: "lazy", alt: "" });
+
+        const reveal = (cls) => { img.classes(cls); spinner.hide(); };
+        img.on("load", () => reveal("loaded")).on("error", () => spinner.hide());
+        if (img.complete) img.naturalWidth > 0 ? reveal("cached") : spinner.hide();
+
         card.append(
-            elem().classes("calendar-release-thumb", "thumbnail-container").append(
-                elem("img").classes("thumbnail").attrs({ src: item.thumbnail, loading: "lazy", alt: "" })
-            )
+            elem().classes("calendar-release-thumb", "thumbnail-container").append(spinner, img)
         );
     }
 

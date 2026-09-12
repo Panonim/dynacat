@@ -15,11 +15,27 @@ async function fetchPageContent(pageData) {
     };
 }
 
+let carouselResizeListenerInitialized = false;
+
 function setupCarousels() {
     const carouselElements = document.getElementsByClassName("carousel-container");
 
     if (carouselElements.length == 0) {
         return;
+    }
+
+    if (!carouselResizeListenerInitialized) {
+        carouselResizeListenerInitialized = true;
+
+        const determineAllSideCutoffs = throttledDebounce(() => {
+            const carousels = document.getElementsByClassName("carousel-container");
+
+            for (let i = 0; i < carousels.length; i++) {
+                if (carousels[i]._determineSideCutoffs) carousels[i]._determineSideCutoffs();
+            }
+        }, 20, 100);
+
+        window.addEventListener("resize", determineAllSideCutoffs);
     }
 
     for (let i = 0; i < carouselElements.length; i++) {
@@ -47,10 +63,20 @@ function setupCarousels() {
 
         const determineSideCutoffsRateLimited = throttledDebounce(determineSideCutoffs, 20, 100);
 
-        itemsContainer.addEventListener("scroll", determineSideCutoffsRateLimited);
-        window.addEventListener("resize", determineSideCutoffsRateLimited);
+        // A morph reuses the container while wiping data-initialized, so drop the previous handler.
+        if (itemsContainer._carouselScrollHandler) {
+            itemsContainer.removeEventListener("scroll", itemsContainer._carouselScrollHandler);
+        }
 
-        afterContentReady(determineSideCutoffs);
+        itemsContainer._carouselScrollHandler = determineSideCutoffsRateLimited;
+        itemsContainer.addEventListener("scroll", determineSideCutoffsRateLimited);
+        carousel._determineSideCutoffs = determineSideCutoffs;
+
+        if (pageSetupComplete) {
+            determineSideCutoffs();
+        } else {
+            afterContentReady(determineSideCutoffs);
+        }
     }
 }
 
@@ -107,7 +133,6 @@ let keybindState = { pressedKeys: [], chordTimeout: null };
 function normalizedEventKey(event) {
     const key = event.key.toLowerCase();
     if (/^[a-z0-9]$/.test(key)) return key;
-    // Use physical key codes so existing binds still work on non-English keyboard layouts
     if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
     if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5);
     return "";
@@ -255,8 +280,6 @@ function setupSearchBoxes() {
             }
 
             if (event.key == "Enter") {
-                // Prevent the form submit event from firing a second search after
-                // keydown already handled submission.
                 event.preventDefault();
                 const openInNewTab = newTab && !event.ctrlKey || !newTab && event.ctrlKey;
                 submitSearch(openInNewTab);
@@ -319,7 +342,7 @@ function setupSearchBoxes() {
         document.addEventListener("keydown", (event) => {
             if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
             if (event.code != "KeyS") return;
-            if (keybindState.pressedKeys.length > 0) return; // Don't trigger search if in chord
+            if (keybindState.pressedKeys.length > 0) return;
 
             inputElement.focus();
             event.preventDefault();
@@ -329,22 +352,29 @@ function setupSearchBoxes() {
             requestAnimationFrame(() => inputElement.focus());
         });
 
-        // Handle autofocus for dynamically loaded content
         if (inputElement.hasAttribute("autofocus")) {
-            // Use requestAnimationFrame to ensure DOM is fully ready
             requestAnimationFrame(() => {
                 inputElement.focus();
             });
         }
 
-        // Search Autocomplete
-        if (widget.dataset.autocomplete === "true") {
+        if (widget.dataset.autocomplete === "true" || widget.dataset.targetsEnabled === "true") {
+            const autocompleteEnabled = widget.dataset.autocomplete === "true";
+            const targetsEnabled = widget.dataset.targetsEnabled === "true";
             const autocompleteEl = widget.querySelector(".search-autocomplete");
+            const targets = Array.from(widget.querySelectorAll(".search-targets > input")).map((el) => ({
+                type: "target",
+                kind: el.dataset.kind || "bookmark",
+                title: el.dataset.title,
+                url: el.dataset.url,
+                target: el.dataset.target || "",
+                icon: el.dataset.icon || "",
+                iconAutoInvert: el.dataset.iconAutoInvert === "true",
+            }));
             let acItems = [];
             let acIndex = -1;
             let acDebounce = null;
             let acVisible = false;
-            let acAbove = false;
             let acRepositioner = null;
             let acRepositionFrame = null;
 
@@ -355,7 +385,6 @@ function setupSearchBoxes() {
                 const spaceAbove = rect.top;
                 const maxH = 280;
 
-                // Switch to above if not enough space below and more space above
                 const goAbove = spaceBelow < 120 && spaceAbove > spaceBelow;
 
                 autocompleteEl.style.left = rect.left + "px";
@@ -371,12 +400,6 @@ function setupSearchBoxes() {
                     autocompleteEl.style.maxHeight = Math.min(maxH, spaceBelow - 4) + "px";
                 }
 
-                if (goAbove !== acAbove) {
-                    acAbove = goAbove;
-                }
-
-                // Keep direction classes in sync on every reposition so the initial
-                // below state also receives its border adjustments.
                 autocompleteEl.classList.toggle("search-autocomplete-above", goAbove);
                 widget.classList.toggle("search-suggestions-above", goAbove);
                 widget.classList.toggle("search-suggestions-below", !goAbove);
@@ -414,7 +437,6 @@ function setupSearchBoxes() {
                 autocompleteEl.classList.remove("active", "search-autocomplete-above");
                 widget.classList.remove("search-suggestions-above", "search-suggestions-below");
                 acVisible = false;
-                acAbove = false;
                 acIndex = -1;
             };
 
@@ -424,20 +446,71 @@ function setupSearchBoxes() {
                 acIndex = i;
             };
 
-            const renderAC = (suggestions) => {
-                acItems = suggestions;
+            const TARGET_MATCH_LIMIT = 3;
+            const TARGET_FALLBACK_GLYPHS = { bookmark: "↗", docker: "▣", monitor: "◉" };
+
+            // Each kind gets its own limit so bookmarks can't crowd out containers or sites.
+            const matchTargets = (query) => {
+                if (!targetsEnabled || !query) return [];
+                const lowerQuery = query.toLowerCase();
+                const countPerKind = {};
+
+                return targets.filter((t) => {
+                    if (!t.title || !t.title.toLowerCase().startsWith(lowerQuery)) return false;
+                    countPerKind[t.kind] = (countPerKind[t.kind] || 0) + 1;
+                    return countPerKind[t.kind] <= TARGET_MATCH_LIMIT;
+                });
+            };
+
+            const selectItem = (item) => {
+                if (item.type === "target") {
+                    hideAC();
+                    if (item.target === "_blank") {
+                        window.open(item.url, item.target).focus();
+                    } else {
+                        window.location.href = item.url;
+                    }
+                    return;
+                }
+
+                inputElement.value = item.phrase;
+                hideAC();
+                submitSearch(newTab);
+            };
+
+            const renderAC = (items) => {
+                acItems = items;
                 acIndex = -1;
                 autocompleteEl.innerHTML = "";
-                if (suggestions.length === 0) { hideAC(); return; }
-                suggestions.forEach((phrase, idx) => {
+                if (items.length === 0) { hideAC(); return; }
+                items.forEach((acItem, idx) => {
                     const item = document.createElement("div");
-                    item.className = "search-autocomplete-item";
-                    item.textContent = phrase;
+
+                    if (acItem.type === "target") {
+                        item.className = "search-autocomplete-item search-autocomplete-item-target search-autocomplete-item-" + acItem.kind;
+                        if (acItem.icon) {
+                            const icon = document.createElement("img");
+                            icon.className = "search-autocomplete-item-target-icon" + (acItem.iconAutoInvert ? " flat-icon" : "");
+                            icon.src = acItem.icon;
+                            icon.alt = "";
+                            item.appendChild(icon);
+                        } else {
+                            const fallback = document.createElement("span");
+                            fallback.className = "search-autocomplete-item-target-fallback";
+                            fallback.textContent = TARGET_FALLBACK_GLYPHS[acItem.kind] || TARGET_FALLBACK_GLYPHS.bookmark;
+                            item.appendChild(fallback);
+                        }
+                        const label = document.createElement("span");
+                        label.textContent = acItem.title;
+                        item.appendChild(label);
+                    } else {
+                        item.className = "search-autocomplete-item";
+                        item.textContent = acItem.phrase;
+                    }
+
                     item.addEventListener("mousedown", (e) => {
                         e.preventDefault();
-                        inputElement.value = phrase;
-                        hideAC();
-                        submitSearch(newTab);
+                        selectItem(acItem);
                     });
                     item.addEventListener("mousemove", () => {
                         setACIndex(idx);
@@ -447,19 +520,33 @@ function setupSearchBoxes() {
                 showAC();
             };
 
+            const updateSuggestions = (query, phraseItems) => {
+                if (inputElement.value.trim() !== query) return;
+                renderAC([...matchTargets(query), ...phraseItems]);
+            };
+
             const fetchSuggestions = (query) => {
-                if (!query || query.length < 2 || currentBang != null) {
+                if (!query || currentBang != null) {
                     hideAC();
                     return;
                 }
+
+                if (!autocompleteEnabled || query.length < 2) {
+                    updateSuggestions(query, []);
+                    return;
+                }
+
                 const provider = widget.dataset.autocompleteProvider || "duckduckgo";
-                fetch("/api/search/autocomplete?q=" + encodeURIComponent(query) + "&provider=" + encodeURIComponent(provider))
+                let suggestionsUrl = "/api/search/autocomplete?q=" + encodeURIComponent(query) + "&provider=" + encodeURIComponent(provider);
+                if (provider === "custom" && widget.dataset.autocompleteWidgetId) {
+                    suggestionsUrl += "&widgetId=" + encodeURIComponent(widget.dataset.autocompleteWidgetId);
+                }
+                fetch(suggestionsUrl)
                     .then((r) => r.json())
                     .then((data) => {
-                        if (inputElement.value.trim() !== query) return;
-                        renderAC(data.map((d) => d.phrase));
+                        updateSuggestions(query, data.map((d) => ({ type: "phrase", phrase: d.phrase })));
                     })
-                    .catch(() => hideAC());
+                    .catch(() => updateSuggestions(query, []));
             };
 
             inputElement.addEventListener("input", () => {
@@ -475,20 +562,20 @@ function setupSearchBoxes() {
                     event.preventDefault();
                     setACIndex(Math.min(acIndex + 1, acItems.length - 1));
                 } else if (event.key === "ArrowUp") {
+                    // Stop the document handler from also restoring the last query.
                     event.preventDefault();
+                    event.stopPropagation();
                     setACIndex(Math.max(acIndex - 1, -1));
                 } else if (event.key === "Enter" && acIndex >= 0) {
+                    // Stop the document handler from also running a search for the query.
                     event.preventDefault();
-                    inputElement.value = acItems[acIndex];
-                    hideAC();
-                    submitSearch(newTab);
+                    event.stopPropagation();
+                    selectItem(acItems[acIndex]);
                 } else if (event.key === "Escape") {
                     hideAC();
                 }
             });
 
-            // Delay hide to guard against spurious blur (e.g. Chrome scroll-on-focus
-            // near viewport bottom). Only close if focus genuinely left the input.
             inputElement.addEventListener("blur", () => {
                 setTimeout(() => {
                     if (document.activeElement !== inputElement) {
@@ -501,7 +588,6 @@ function setupSearchBoxes() {
 }
 
 function setupDynamicRelativeTime() {
-    // Always do an immediate update pass (new elements may have arrived)
     updateRelativeTimeForElements(document.querySelectorAll("[data-dynamic-relative-time]"));
 
     if (dynamicRelativeTimeInitialized) return;
@@ -641,13 +727,20 @@ function setupGroups() {
 
 function setupImageFallbacks() {
     document.querySelectorAll("img[data-fallback-src]:not([loading=lazy])").forEach(img => {
-        img.addEventListener("error", function handler() {
+        if (img._fallbackHandler) {
+            img.removeEventListener("error", img._fallbackHandler);
+        }
+
+        const handler = function() {
             img.removeEventListener("error", handler);
             const fallback = img.dataset.fallbackSrc;
             if (fallback && img.src !== fallback) {
                 img.src = fallback;
             }
-        });
+        };
+
+        img._fallbackHandler = handler;
+        img.addEventListener("error", handler);
     });
 }
 
@@ -686,12 +779,10 @@ function setupLazyImages() {
                 };
 
                 if (image.complete) {
-                    // Check if the image loaded successfully
                     if (image.naturalHeight > 0) {
                         image.classList.add("cached");
                         setTimeout(() => imageFinishedTransition(image), 1);
                     } else {
-                        // Image failed to load, try fallback
                         handleError();
                     }
                 } else {
@@ -967,6 +1058,11 @@ function setupCollapsibleGrids() {
             applyCollapsibleItems(cardsPerRow);
         }
 
+        // This runs page wide on every widget update
+        if (gridElement._collapsibleResizeObserver) {
+            gridElement._collapsibleResizeObserver.disconnect();
+        }
+
         const observer = new ResizeObserver(() => {
             if (!isElementVisible(gridElement)) {
                 return;
@@ -982,7 +1078,13 @@ function setupCollapsibleGrids() {
             resolveCollapsibleItems();
         });
 
-        afterContentReady(() => observer.observe(gridElement));
+        gridElement._collapsibleResizeObserver = observer;
+
+        if (pageSetupComplete) {
+            observer.observe(gridElement);
+        } else {
+            afterContentReady(() => observer.observe(gridElement));
+        }
     }
 }
 
@@ -1128,8 +1230,6 @@ function setupClocks() {
 }
 
 async function setupCalendars() {
-    // Snapshot the collection: a built calendar keeps the "calendar" class, so a
-    // live collection (and any re-entry of setup) could re-process it.
     const elems = Array.from(document.getElementsByClassName("calendar"));
     if (elems.length == 0) return;
 
@@ -1177,8 +1277,6 @@ function setupTruncatedElementTitles() {
 
 const THEME_STORAGE_KEY = "dynacat-theme";
 
-// Mirror the active theme to localStorage so reloads survive a lost cookie and
-// other tabs can pick the change up via the storage event.
 function persistTheme(key, css, scheme) {
     try {
         localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ key: key, css: css, scheme: scheme }));
@@ -1266,7 +1364,6 @@ function initThemePicker() {
         });
     })
 
-    // Live sync when the theme is changed in another tab.
     window.addEventListener("storage", (e) => {
         if (e.key !== THEME_STORAGE_KEY || !e.newValue) return;
 
@@ -1337,8 +1434,6 @@ async function setupPage() {
 
     initThemePicker();
 
-    // If the early restore swapped in a theme the server did not have a cookie
-    // for, re-POST it so the server cookie is rewritten and stays in sync.
     if (pageData.serverTheme !== undefined && pageData.serverTheme !== pageData.theme) {
         fetch(`${pageData.baseURL}/api/set-theme/${pageData.theme}`, { method: "POST" }).catch(() => {});
     }
@@ -1455,7 +1550,7 @@ async function updateWidget(widgetElement) {
         }
 
         syncWidgetUpdateInterval(widgetElement, newWidget);
-}
+    }
 
     if (newWidget && widgetElement.outerHTML !== newWidget.outerHTML) {
         const oldContent = widgetElement.querySelector('.widget-content');
@@ -1544,10 +1639,6 @@ function updateContentPreservingImages(oldContent, newContent) {
     oldContent.replaceWith(newContent);
 }
 
-// syncWidgetUpdateInterval keeps the polling cadence in step with a widget that
-// reports a dynamic data-update-interval (e.g. speedtest polls fast while testing,
-// then slows down once the result is in). updateWidget only swaps inner content, so
-// the root attribute and the polling state need to be reconciled explicitly.
 function syncWidgetUpdateInterval(widgetElement, newWidget) {
     const newInterval = newWidget.dataset.updateInterval;
 
@@ -1620,7 +1711,6 @@ function remainingDelayMs(intervalMs, lastRunAt) {
 const widgetPollingStates = new Map();
 let widgetPollingVisibilityListenerInitialized = false;
 
-// Local playing progress updaters keyed by widget element
 const playingUpdaters = new Map();
 
 function clearPlayingUpdater(widget) {
@@ -2180,6 +2270,7 @@ function _initSSE() {
 window.addEventListener('beforeunload', _closeSSE);
 
 window.dynacatSetupPopovers = setupPopovers;
+window.dynacatSetupCollapsibleLists = setupCollapsibleLists;
 
 function fetchLazyWidgets() {
     document.querySelectorAll('.widget[data-lazy-load]').forEach(widget => {

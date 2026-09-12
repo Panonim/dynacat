@@ -14,6 +14,8 @@ All widgets share a common set of configuration options that control their appea
 | cache | string | no | widget-specific |
 | update-interval | string | no | widget-specific |
 | frameless | boolean | no | false |
+| lazy-load | boolean | no | false |
+| api-id | string | no | |
 
 ## Properties
 
@@ -168,7 +170,7 @@ Example:
 >
 > The actual update frequency may vary based on the page configuration and dynamic updates settings.
 
-### `lazy-load`
+### `frameless`
 
 When set to `true`, removes the border and padding (frame) around the widget, making it blend more seamlessly with the background or other content.
 
@@ -191,6 +193,31 @@ Example:
 - type: custom-api
   title: Minimal Widget
   frameless: true
+```
+
+### `lazy-load`
+
+When set to `true`, the widget skips its initial update on page load and shows a loading placeholder until it actually needs its content (for example, once it scrolls into view). Useful for pages with many widgets where you want to avoid firing every widget's update on first load.
+
+Example:
+
+```yaml
+```yaml
+- type: custom-api
+  title: Minimal Widget
+  lazy-load: true
+```
+
+### `api-id`
+
+A stable name that makes the widget readable through the [API](api.md) at `/api/v1/widgets/{api-id}`. It must be unique across your whole configuration and has no effect while the API is disabled.
+
+Example:
+
+```yaml
+- type: weather
+  api-id: home-weather
+  location: London, United Kingdom
 ```
 
 ## Combining Options

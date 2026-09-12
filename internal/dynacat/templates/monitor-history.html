@@ -1,0 +1,7 @@
+{{ define "monitor-history" }}
+<div class="monitor-history">
+    {{ range .History }}
+    <div class="monitor-history-point monitor-history-point-{{ .Style }}" data-popover-type="text" data-popover-position="above" data-popover-text="{{ .Time.Format "15:04" }} • {{ .Label }} • {{ .ResponseTime.Milliseconds | formatNumber }}ms" aria-label="{{ .Label }}"></div>
+    {{ end }}
+</div>
+{{ end }}

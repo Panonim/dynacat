@@ -25,7 +25,12 @@ func TestAuthTokenGenerationAndVerification(t *testing.T) {
 	now := time.Now()
 	username := "admin"
 
-	token, err := generateSessionToken(username, secretBytes, now)
+	computedUsernameHash, err := computeUsernameHash(username, "hunter2hunter2", secretBytes)
+	if err != nil {
+		t.Fatalf("Failed to compute username hash: %v", err)
+	}
+
+	token, err := generateSessionToken(computedUsernameHash, secretBytes, now)
 	if err != nil {
 		t.Fatalf("Failed to generate session token: %v", err)
 	}
@@ -37,11 +42,6 @@ func TestAuthTokenGenerationAndVerification(t *testing.T) {
 
 	if shouldRegen {
 		t.Fatal("Token should not need to be regenerated immediately after generation")
-	}
-
-	computedUsernameHash, err := computeUsernameHash(username, secretBytes)
-	if err != nil {
-		t.Fatalf("Failed to compute username hash: %v", err)
 	}
 
 	if !bytes.Equal(usernameHashBytes, computedUsernameHash) {

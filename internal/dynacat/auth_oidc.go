@@ -84,7 +84,6 @@ func (a *application) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	baseURL := a.Config.Server.BaseURL
 
-	// Validate state
 	stateCookie, err := r.Cookie(OIDC_STATE_COOKIE_NAME)
 	if err != nil || stateCookie.Value == "" {
 		http.Redirect(w, r, baseURL+"/login?error=invalid_state", http.StatusSeeOther)
@@ -102,7 +101,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Clear state + PKCE cookies
 	http.SetCookie(w, &http.Cookie{
 		Name:     OIDC_STATE_COOKIE_NAME,
 		Value:    "",
@@ -118,7 +116,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		HttpOnly: true,
 	})
 
-	// Exchange code for token
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		errParam := r.URL.Query().Get("error")
@@ -137,7 +134,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Extract and verify ID token
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
 		http.Redirect(w, r, baseURL+"/login?error=no_id_token", http.StatusSeeOther)
@@ -151,7 +147,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Extract claims
 	var claims map[string]interface{}
 	if err := idToken.Claims(&claims); err != nil {
 		slog.Error("OIDC could not extract claims", "error", err)
@@ -166,7 +161,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 
 	username, _ := claims[usernameClaim].(string)
 	if username == "" {
-		// Fallback to sub
 		username, _ = claims["sub"].(string)
 	}
 	if username == "" {
@@ -180,7 +174,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 	}
 	groups := extractGroupsClaim(claims, groupsClaim)
 
-	// Check OIDC-level allowed users/groups restrictions
 	oidcCfg := a.Config.Auth.OIDC
 	if len(oidcCfg.AllowedUsers) > 0 || len(oidcCfg.AllowedGroups) > 0 {
 		allowed := false
@@ -208,7 +201,6 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Generate session ID and store session
 	sessionID, err := makeAuthSecretKey(32)
 	if err != nil {
 		slog.Error("OIDC could not generate session ID", "error", err)
@@ -223,13 +215,14 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		CreatedAt: time.Now(),
 	})
 
+	// Strict would not survive the redirect back from the provider.
 	http.SetCookie(w, &http.Cookie{
 		Name:     OIDC_SESSION_COOKIE_NAME,
 		Value:    sessionID,
 		Expires:  time.Now().Add(OIDC_SESSION_VALID_PERIOD),
 		Secure:   a.isRequestHTTPS(r),
 		Path:     baseURL + "/",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 	})
 
@@ -256,7 +249,6 @@ func extractGroupsClaim(claims map[string]interface{}, claimName string) []strin
 		if v == "" {
 			return nil
 		}
-		// Try comma-separated first, then space-separated
 		if strings.Contains(v, ",") {
 			parts := strings.Split(v, ",")
 			for i := range parts {

@@ -1,0 +1,23 @@
+@media (max-width: 768px) {
+    #editor-toggle {
+        display: none;
+    }
+}
+
+.editor-toggle-icon {
+    width: 1.8rem;
+    height: 1.8rem;
+    stroke: currentColor;
+    fill: currentColor;
+    color: var(--color-text-subdue);
+    transition: color 0.2s;
+}
+
+#editor-toggle:hover .editor-toggle-icon {
+    color: var(--color-text-highlight);
+}
+
+.editor-toggle-icon-back {
+    width: 1.5rem;
+    height: 1.5rem;
+}

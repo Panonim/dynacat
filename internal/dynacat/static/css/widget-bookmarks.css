@@ -6,6 +6,10 @@
     color: var(--bookmarks-group-color);
 }
 
+.bookmarks-link:hover {
+    color: var(--bookmarks-group-color);
+}
+
 .bookmarks-link:not(.bookmarks-link-no-arrow)::after {
     content: '↗' / "";
     margin-left: 0.5em;

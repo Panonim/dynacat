@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,9 +20,17 @@ type sseClient struct {
 	user *authenticatedUser
 }
 
+// Dropped once full, widgets re-register their images on the next update.
+const imageProxyMaxEntries = 10000
+
 func (a *application) registerImageProxy(hash string, url string, allowInsecure bool) {
 	a.imageProxyMu.Lock()
 	defer a.imageProxyMu.Unlock()
+
+	if len(a.imageProxyURLs) >= imageProxyMaxEntries {
+		clear(a.imageProxyURLs)
+	}
+
 	a.imageProxyURLs[hash] = imageProxyInfo{URL: url, AllowInsecure: allowInsecure}
 }
 
@@ -31,7 +41,7 @@ func (a *application) getImageProxyInfo(hash string) (imageProxyInfo, bool) {
 	return info, ok
 }
 
-func validateImageProxyURL(rawURL string) error {
+func validatePublicFetchURL(rawURL string) error {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return err
@@ -63,7 +73,6 @@ func isDisallowedIP(ip net.IP) bool {
 		ip.IsMulticast() || ip.IsUnspecified() || ip.IsPrivate() {
 		return true
 	}
-	// Cloud metadata endpoints (169.254.x covered by link-local; include IMDSv2 fd00:ec2::254)
 	if ip.Equal(net.ParseIP("fd00:ec2::254")) {
 		return true
 	}
@@ -87,13 +96,12 @@ func (a *application) handleImageProxyRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := validateImageProxyURL(info.URL); err != nil {
+	if err := validatePublicFetchURL(info.URL); err != nil {
 		http.Error(w, "Forbidden URL", http.StatusForbidden)
 		return
 	}
 
-	// Fetch the image using the stored URL with the appropriate client
-	client := ternary(info.AllowInsecure, defaultInsecureHTTPClient, defaultHTTPClient)
+	client := ternary(info.AllowInsecure, publicOnlyInsecureHTTPClient, publicOnlyHTTPClient)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, info.URL, nil)
 	if err != nil {
 		http.Error(w, "Failed to fetch image", http.StatusInternalServerError)
@@ -115,16 +123,60 @@ func (a *application) handleImageProxyRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Set appropriate headers for the response
-	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-	w.Header().Set("Cache-Control", "public, max-age=2592000, immutable") // 30 days
-	w.WriteHeader(http.StatusOK)
-
-	// Stream the image to the client
-	if _, err := io.Copy(w, resp.Body); err != nil {
-		// Error writing response, client may have disconnected
+	// The proxied URL comes from remote widget content, so reflecting its content type would
+	// let an upstream serve HTML from this origin.
+	contentType := resp.Header.Get("Content-Type")
+	if extensionFromContentType(contentType) == "" {
+		http.Error(w, "Not an image", http.StatusUnsupportedMediaType)
 		return
 	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Security-Policy", "sandbox")
+	w.Header().Set("Cache-Control", "public, max-age=2592000, immutable")
+	w.WriteHeader(http.StatusOK)
+
+	io.Copy(w, io.LimitReader(resp.Body, maxResponseBytes))
+}
+
+func (a *application) respondWithOpenSearchSuggestions(w http.ResponseWriter, r *http.Request, requestURL string, client *http.Client) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, requestURL, nil)
+	if err != nil {
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		return
+	}
+	setBrowserUserAgentHeader(req)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Failed to fetch suggestions", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	var raw []json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil || len(raw) < 2 {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("[]"))
+		return
+	}
+
+	var suggestions []string
+	if err := json.Unmarshal(raw[1], &suggestions); err != nil {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("[]"))
+		return
+	}
+
+	type phrase struct {
+		Phrase string `json:"phrase"`
+	}
+	result := make([]phrase, len(suggestions))
+	for i, s := range suggestions {
+		result[i] = phrase{Phrase: s}
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(result)
 }
 
 func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *http.Request) {
@@ -145,44 +197,39 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 
 	if provider == "brave" {
 		braveURL := "https://search.brave.com/api/suggest?" + url.Values{"q": {query}, "rich": {"false"}}.Encode()
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, braveURL, nil)
-		if err != nil {
-			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			return
-		}
-		setBrowserUserAgentHeader(req)
+		a.respondWithOpenSearchSuggestions(w, r, braveURL, publicOnlyHTTPClient)
+		return
+	}
 
-		resp, err := defaultHTTPClient.Do(req)
+	if provider == "custom" {
+		widgetID, err := strconv.ParseUint(r.URL.Query().Get("widgetId"), 10, 64)
 		if err != nil {
-			http.Error(w, "Failed to fetch suggestions", http.StatusBadGateway)
-			return
-		}
-		defer resp.Body.Close()
-
-		// Brave returns OpenSearch format: ["query", ["s1", "s2", ...]]
-		var raw []json.RawMessage
-		if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil || len(raw) < 2 {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("[]"))
 			return
 		}
 
-		var suggestions []string
-		if err := json.Unmarshal(raw[1], &suggestions); err != nil {
+		source, ok := a.searchAutocompleteURLs[widgetID]
+		if !ok {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("[]"))
 			return
 		}
 
-		type phrase struct {
-			Phrase string `json:"phrase"`
+		customURL := strings.ReplaceAll(source.URL, "{QUERY}", url.QueryEscape(query))
+		// Self-hosted instances named in the config are allowed to sit on a private
+		// address, unlike URLs that could otherwise be probed through this endpoint.
+		client := defaultHTTPClient
+		if !source.AllowPrivate {
+			if err := validatePublicFetchURL(customURL); err != nil {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("[]"))
+				return
+			}
+			client = publicOnlyHTTPClient
 		}
-		result := make([]phrase, len(suggestions))
-		for i, s := range suggestions {
-			result[i] = phrase{Phrase: s}
-		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(result)
+
+		a.respondWithOpenSearchSuggestions(w, r, customURL, client)
 		return
 	}
 
@@ -194,7 +241,7 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 	}
 	setBrowserUserAgentHeader(req)
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := publicOnlyHTTPClient.Do(req)
 	if err != nil {
 		http.Error(w, "Failed to fetch suggestions", http.StatusBadGateway)
 		return
@@ -202,7 +249,7 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 	defer resp.Body.Close()
 
 	w.WriteHeader(http.StatusOK)
-	io.Copy(w, resp.Body)
+	io.Copy(w, io.LimitReader(resp.Body, maxResponseBytes))
 }
 
 func (a *application) handleSSEUpdates(w http.ResponseWriter, r *http.Request) {
@@ -239,7 +286,7 @@ func (a *application) handleSSEUpdates(w http.ResponseWriter, r *http.Request) {
 	a.sseRegisterClient(client)
 	defer a.sseUnregisterClient(client)
 
-	authRecheck := time.NewTicker(60 * time.Second)
+	authRecheck := time.NewTicker(15 * time.Second)
 	defer authRecheck.Stop()
 
 	for {

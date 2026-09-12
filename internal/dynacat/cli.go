@@ -69,35 +69,34 @@ func parseCliOptions() (*cliOptions, error) {
 	args = flags.Args()
 	unknownCommandErr := fmt.Errorf("unknown command: %s", strings.Join(args, " "))
 
-	if len(args) == 0 {
+	switch len(args) {
+	case 0:
 		intent = cliIntentServe
-	} else if len(args) == 1 {
-		if args[0] == "config:validate" {
+	case 1:
+		switch args[0] {
+		case "config:validate":
 			intent = cliIntentConfigValidate
-		} else if args[0] == "config:print" {
+		case "config:print":
 			intent = cliIntentConfigPrint
-		} else if args[0] == "sensors:print" {
+		case "sensors:print":
 			intent = cliIntentSensorsPrint
-		} else if args[0] == "diagnose" {
+		case "diagnose":
 			intent = cliIntentDiagnose
-		} else if args[0] == "secret:make" {
+		case "secret:make":
 			intent = cliIntentSecretMake
-		} else {
+		default:
 			return nil, unknownCommandErr
 		}
-	} else if len(args) == 2 {
-		if args[0] == "password:hash" {
+	case 2:
+		switch args[0] {
+		case "password:hash":
 			intent = cliIntentPasswordHash
-		} else {
-			return nil, unknownCommandErr
-		}
-	} else if len(args) == 2 {
-		if args[0] == "mountpoint:info" {
+		case "mountpoint:info":
 			intent = cliIntentMountpointInfo
-		} else {
+		default:
 			return nil, unknownCommandErr
 		}
-	} else {
+	default:
 		return nil, unknownCommandErr
 	}
 

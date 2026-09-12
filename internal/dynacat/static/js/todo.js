@@ -574,8 +574,7 @@ export function verticallyReorderable(itemsContainer, onItemRepositioned, onDrag
         item.initialIndex = decoy.currentIndex = itemsContainer.children.indexOf(element);
         item.clientOffset.set(client.x - elementRect.x, client.y - elementRect.y);
 
-        // We use getComputedStyle here to get width and height because .clientWidth and .clientHeight
-        // return integers and not the real float values, which can cause the decoy to be off by a pixel
+        // getComputedStyle gives float width/height; clientWidth/Height round and offset the decoy by a pixel.
         const elementStyle = getComputedStyle(element);
         const initialWidth = elementStyle.width;
 

@@ -6,7 +6,7 @@
 {{ if not (and .ShowFailingOnly (not .HasFailing)) }}
 <ul class="dynamic-columns list-gap-8">
     {{ range .Sites }}
-    {{ if and $.ShowFailingOnly (eq .StatusStyle "ok" ) }}{{ continue }}{{ end }}
+    {{ if and $.ShowFailingOnly (ne .StatusStyle "error" ) }}{{ continue }}{{ end }}
     <div class="flex items-center gap-12">
         {{ template "site" . }}
     </div>
@@ -29,7 +29,16 @@
     <div class="text-truncate size-h5">{{ .Description }}</div>
     {{- end }}
 </div>
+{{ if .History }}{{ template "monitor-history" . }}{{ end }}
 <div class="monitor-site-status-cluster-compact">
+{{ if eq .StatusStyle "disabled" }}
+    <div class="size-h5 monitor-site-response-time-compact color-subdue">{{ .StatusLabel }}</div>
+<div class="monitor-site-status-icon-compact" {{- if .Description }} data-popover-type="text" data-popover-position="above" data-popover-text="{{ .StatusLabel }}" aria-label="{{ .StatusLabel }}"{{ end }}>
+    <svg fill="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm5 0a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd" />
+    </svg>
+</div>
+{{ else }}
     <div class="size-h5 monitor-site-response-time-compact{{ if ne .StatusStyle "ok" }} color-negative{{ end }}">{{ .Status.ResponseTime.Milliseconds | formatNumber }}ms</div>
 {{ if eq .StatusStyle "ok" }}
 <div class="monitor-site-status-icon-compact" {{- if .Description }} data-popover-type="text" data-popover-position="above" data-popover-text="{{ if .Status.Error }}{{ .Status.Error }}{{ else }}{{ .StatusLabel }} • {{ .Status.ResponseTime.Milliseconds | formatNumber }}ms{{ end }}" aria-label="{{ .StatusLabel }}"{{ end }}>
@@ -43,6 +52,7 @@
         <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
     </svg>
 </div>
+{{ end }}
 {{ end }}
 </div>
 {{ end }}

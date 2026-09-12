@@ -280,6 +280,51 @@ pages:
             ...
 ```
 
+## Editing Access Control
+
+The web UI editor (drag-and-drop page/widget editing) is enabled by default for all users who can access a page. Restrict who is allowed to use it with `editing-users` and `editing-groups`, under the top-level `server` property:
+
+```yaml
+server:
+  editing-users:
+    - admin
+  editing-groups:
+    - devops
+```
+
+A user can use the web UI editor if their username appears in `editing-users` **or** they belong to any group in `editing-groups`. If neither is set, every user who can log in is allowed to edit.
+
+> [!NOTE]
+>
+> Password-based users have no groups, groups only ever come from OIDC claims. `editing-groups` has no effect unless [OIDC](#oidc-authentication) is configured.
+
+### Restricting a user to specific pages
+
+To limit which pages a particular password-based user can edit, set `restrict-editing` on that user under `auth.users`:
+
+```yaml
+auth:
+  secret-key: ...
+  users:
+    admin:
+      password: ...
+      # no restrict-editing = can edit any page, per allow-editing
+
+    alice:
+      password: ...
+      restrict-editing:
+        - home
+        - homelab
+```
+
+When a user has `restrict-editing` set, it takes precedence over `allow-editing` for them: they can only edit the listed pages (identified by `slug`) and cannot add pages or change styling, regardless of `allow-editing`. Users without `restrict-editing` fall back to `allow-editing`.
+
+> [!NOTE]
+>
+> `restrict-editing` is only available for password-based users configured under `auth.users`, since OIDC users have no corresponding config entry to attach it to.
+
+This is independent of `allow-editing` and `restrict-editing`, which control *which pages* can be edited rather than *who* can edit them, see [Server configuration](configuration.md#editing-users-editing-groups) for details.
+
 ---
 
 ## Docker / Environment Variables

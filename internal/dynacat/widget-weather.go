@@ -156,10 +156,6 @@ func expandCountryAbbreviations(name string) string {
 	return name
 }
 
-// Separates the location that Open Meteo accepts from the administrative area
-// which can then be used to filter to the correct place after the list of places
-// has been retrieved. Also expands abbreviations since Open Meteo does not accept
-// country names like "US", "USA" and "UK"
 func parsePlaceName(name string) (string, string) {
 	parts := strings.Split(name, ",")
 

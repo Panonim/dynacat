@@ -1,6 +1,6 @@
 .widget-type-docker-controller input {
     background: none;
-    border: 1px solid var(--color-text-subdue);
+    border: 1px solid var(--color-popover-border);
     border-radius: var(--border-radius);
     color: var(--color-text-highlight);
     font: inherit;
@@ -39,7 +39,7 @@
 
 .docker-ctrl-pull-btn {
     background: none;
-    border: 1px solid var(--color-text-subdue);
+    border: 1px solid var(--color-popover-border);
     border-radius: var(--border-radius);
     color: var(--color-text-base);
     cursor: pointer;

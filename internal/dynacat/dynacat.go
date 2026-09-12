@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -40,15 +41,18 @@ type imageProxyInfo struct {
 }
 
 type application struct {
-	Version   string
-	CreatedAt time.Time
-	Config    config
+	Version    string
+	CreatedAt  time.Time
+	Config     config
+	configPath string
 
 	parsedManifest []byte
 
-	slugToPage   map[string]*page
-	widgetByID   map[uint64]widget
-	widgetToPage map[uint64]*page
+	slugToPage    map[string]*page
+	widgetByID    map[uint64]widget
+	widgetByAPIID map[string]widget
+	widgetToPage  map[uint64]*page
+	searchTargets searchTargetRegistry
 
 	RequiresAuth           bool
 	OIDCEnabled            bool
@@ -69,30 +73,36 @@ type application struct {
 	sseMu                sync.RWMutex
 	sseClients           map[*sseClient]struct{}
 	DynamicUpdateEnabled bool
+	EditorEnabled        bool
+	editorMu             sync.Mutex
+
+	apiRateMu       sync.Mutex
+	apiRateRequests map[string]*apiRateWindow
 
 	imageProxyMu   sync.RWMutex
 	imageProxyURLs map[string]imageProxyInfo
+
+	searchAutocompleteURLs map[uint64]searchAutocompleteSource
 
 	imageCache *imageCache
 }
 
 func newApplication(c *config) (*application, error) {
 	app := &application{
-		Version:          buildVersion,
-		CreatedAt:        time.Now(),
-		Config:           *c,
-		slugToPage:       make(map[string]*page),
-		widgetByID:       make(map[uint64]widget),
-		widgetToPage:     make(map[uint64]*page),
-		sseClients:       make(map[*sseClient]struct{}),
-		imageProxyURLs:   make(map[string]imageProxyInfo),
-		todoListIDToPage: make(map[string]*page),
+		Version:                buildVersion,
+		CreatedAt:              time.Now(),
+		Config:                 *c,
+		slugToPage:             make(map[string]*page),
+		widgetByID:             make(map[uint64]widget),
+		widgetByAPIID:          make(map[string]widget),
+		apiRateRequests:        make(map[string]*apiRateWindow),
+		widgetToPage:           make(map[uint64]*page),
+		sseClients:             make(map[*sseClient]struct{}),
+		imageProxyURLs:         make(map[string]imageProxyInfo),
+		todoListIDToPage:       make(map[string]*page),
+		searchAutocompleteURLs: make(map[uint64]searchAutocompleteSource),
 	}
 	config := &app.Config
-
-	//
-	// Init auth
-	//
 
 	hasAnyAuth := len(config.Auth.Users) > 0 || config.Auth.OIDC != nil
 	if hasAnyAuth {
@@ -121,10 +131,17 @@ func newApplication(c *config) (*application, error) {
 
 		for username := range config.Auth.Users {
 			user := config.Auth.Users[username]
-			usernameHash, err := computeUsernameHash(username, app.authSecretKey)
+
+			credential := user.PasswordHashString
+			if credential == "" {
+				credential = user.Password
+			}
+
+			usernameHash, err := computeUsernameHash(username, credential, app.authSecretKey)
 			if err != nil {
 				return nil, fmt.Errorf("computing username hash for user %s: %v", username, err)
 			}
+			user.usernameHash = usernameHash
 			app.usernameHashToUsername[string(usernameHash)] = username
 
 			if user.PasswordHashString != "" {
@@ -153,10 +170,6 @@ func newApplication(c *config) (*application, error) {
 		app.oidcSessions = newSessionStore()
 		app.OIDCEnabled = true
 	}
-
-	//
-	// Init themes
-	//
 
 	if !config.Theme.DisablePicker {
 		themeKeys := make([]string, 0, 2)
@@ -235,10 +248,6 @@ func newApplication(c *config) (*application, error) {
 		config.Server.trustedProxyNets = append(config.Server.trustedProxyNets, ipnet)
 	}
 
-	//
-	// Init pages
-	//
-
 	app.slugToPage[""] = &config.Pages[0]
 
 	dynamicUpdateEnabled := true
@@ -247,6 +256,11 @@ func newApplication(c *config) (*application, error) {
 	}
 
 	app.DynamicUpdateEnabled = dynamicUpdateEnabled
+
+	app.EditorEnabled = editorEnabledFromEnv()
+	if !app.EditorEnabled {
+		warnAboutIgnoredEditorConfig(config)
+	}
 
 	app.imageCache = newImageCache(config.Server.BaseURL, config.Server.CacheDir)
 
@@ -257,6 +271,8 @@ func newApplication(c *config) (*application, error) {
 		DynamicUpdateEnabled: dynamicUpdateEnabled,
 		app:                  app,
 	}
+
+	usedSlugs := make(map[string]struct{}, len(config.Pages))
 
 	for p := range config.Pages {
 		page := &config.Pages[p]
@@ -271,6 +287,15 @@ func newApplication(c *config) (*application, error) {
 		if slices.Contains(reservedPageSlugs, page.Slug) {
 			return nil, fmt.Errorf("page slug \"%s\" is reserved", page.Slug)
 		}
+
+		baseSlug := page.Slug
+		for i := 2; ; i++ {
+			if _, taken := usedSlugs[page.Slug]; !taken {
+				break
+			}
+			page.Slug = fmt.Sprintf("%s-%d", baseSlug, i)
+		}
+		usedSlugs[page.Slug] = struct{}{}
 
 		app.slugToPage[page.Slug] = page
 
@@ -302,6 +327,9 @@ func newApplication(c *config) (*application, error) {
 		registerWidget = func(widget widget) {
 			app.widgetByID[widget.GetID()] = widget
 			app.widgetToPage[widget.GetID()] = page
+			if apiID := widget.GetAPIID(); apiID != "" {
+				app.widgetByAPIID[apiID] = widget
+			}
 			widget.setProviders(providers)
 
 			switch v := widget.(type) {
@@ -335,6 +363,32 @@ func newApplication(c *config) (*application, error) {
 		}
 	}
 
+	for id, w := range app.widgetByID {
+		sw, ok := w.(*searchWidget)
+		if !ok || !sw.IncludeBookmarks {
+			continue
+		}
+
+		var pageFilter *page
+		if !sw.CrossPageBookmarks {
+			pageFilter = app.widgetToPage[id]
+		}
+
+		sw.collectBookmarks(app, pageFilter)
+	}
+
+	if config.API.Enabled {
+		// Slugs are only final at this point, so allowed-pages cannot be validated during config parsing.
+		for _, slug := range config.API.AllowedPages {
+			if _, exists := app.slugToPage[slug]; !exists {
+				return nil, fmt.Errorf("api: allowed-pages references unknown page slug %q", slug)
+			}
+		}
+	}
+
+	app.warnAboutAPIExposure()
+	app.warnAboutEditorExposure()
+
 	config.Theme.CustomCSSFile = app.resolveUserDefinedAssetPath(config.Theme.CustomCSSFile)
 	config.Branding.LogoURL = app.resolveUserDefinedAssetPath(config.Branding.LogoURL)
 
@@ -367,10 +421,6 @@ func newApplication(c *config) (*application, error) {
 		return nil, fmt.Errorf("parsing manifest.json: %v", err)
 	}
 	app.parsedManifest = []byte(manifest)
-
-	//
-	// Init todo storage
-	//
 
 	needsTodoDB := false
 	for p := range config.Pages {
@@ -491,8 +541,6 @@ func getMinUpdateIntervalForWidgets(ws widgets) (time.Duration, bool) {
 		widgetFound := false
 
 		if cw, ok := w.(*customAPIWidget); ok {
-			// Only include custom-api widgets in global polling if they don't have update-interval set
-			// Widgets with update-interval will poll independently on the client side
 			if cw.UpdateInterval == nil {
 				widgetFound = true
 				interval = 1 * time.Second
@@ -556,7 +604,6 @@ func (a *application) getAccessiblePages(user *authenticatedUser) []*page {
 	for i := range a.Config.Pages {
 		p := &a.Config.Pages[i]
 		if user == nil {
-			// Unauthenticated: only pages with no restrictions (when RequireAuth is false)
 			if len(p.AllowedUsers) == 0 && len(p.AllowedGroups) == 0 {
 				pages = append(pages, p)
 			}
@@ -624,8 +671,6 @@ func (a *application) handlePageContentRequest(w http.ResponseWriter, r *http.Re
 		page.mu.Lock()
 		defer page.mu.Unlock()
 
-		// Determine cache-build status after widgets have had a chance to queue
-		// image fetches to avoid missing the initial "building cache" response.
 		page.updateOutdatedWidgets()
 		if a.imageCache != nil {
 			isCacheBuilding = a.imageCache.IsBuildingCache()
@@ -646,40 +691,39 @@ func (a *application) handlePageContentRequest(w http.ResponseWriter, r *http.Re
 	w.Write(responseBytes.Bytes())
 }
 
-func (a *application) addressOfRequest(r *http.Request) string {
-	remoteAddrWithoutPort := func() string {
-		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-			return host
+func remoteAddrWithoutPort(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+func (a *application) ipIsTrustedProxy(ipStr string) bool {
+	ip := net.ParseIP(strings.TrimSpace(ipStr))
+	if ip == nil {
+		return false
+	}
+	for _, n := range a.Config.Server.trustedProxyNets {
+		if n.Contains(ip) {
+			return true
 		}
-		return r.RemoteAddr
 	}
+	return false
+}
 
-	if !a.Config.Server.Proxied {
-		return remoteAddrWithoutPort()
-	}
+// Without trusted-proxies there is nothing to check the peer against.
+func (a *application) requestCameThroughTrustedProxy(r *http.Request) bool {
+	return len(a.Config.Server.trustedProxyNets) == 0 || a.ipIsTrustedProxy(remoteAddrWithoutPort(r))
+}
 
-	remote := remoteAddrWithoutPort()
-	trustedNets := a.Config.Server.trustedProxyNets
+func (a *application) addressOfRequest(r *http.Request) string {
+	remote := remoteAddrWithoutPort(r)
 
-	// Without a trusted-proxies allow-list, honoring XFF would let clients spoof.
-	if len(trustedNets) == 0 {
+	if !a.Config.Server.Proxied || len(a.Config.Server.trustedProxyNets) == 0 {
 		return remote
 	}
 
-	ipIsTrusted := func(ipStr string) bool {
-		ip := net.ParseIP(strings.TrimSpace(ipStr))
-		if ip == nil {
-			return false
-		}
-		for _, n := range trustedNets {
-			if n.Contains(ip) {
-				return true
-			}
-		}
-		return false
-	}
-
-	if !ipIsTrusted(remote) {
+	if !a.ipIsTrustedProxy(remote) {
 		return remote
 	}
 
@@ -689,13 +733,12 @@ func (a *application) addressOfRequest(r *http.Request) string {
 	}
 
 	ips := strings.Split(forwardedFor, ",")
-	// Walk right-to-left, skipping trusted proxies; return the first untrusted hop.
 	for i := len(ips) - 1; i >= 0; i-- {
 		candidate := strings.TrimSpace(ips[i])
 		if candidate == "" {
 			continue
 		}
-		if ipIsTrusted(candidate) {
+		if a.ipIsTrustedProxy(candidate) {
 			continue
 		}
 		return candidate
@@ -775,6 +818,9 @@ func (a *application) handleWidgetActionRequest(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	page.mu.Lock()
+	defer page.mu.Unlock()
+
 	widget.handleRequest(w, r)
 }
 
@@ -787,7 +833,7 @@ func (a *application) VersionedAssetPath(asset string) string {
 		"?v=" + strconv.FormatInt(a.CreatedAt.Unix(), 10)
 }
 
-const todoMaxBodyBytes = 1 << 20 // 1 MiB
+const todoMaxBodyBytes = 1 << 20
 
 func (a *application) authorizeTodoRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	listID := r.PathValue("listID")
@@ -849,10 +895,8 @@ func (a *application) handleTodoSave(w http.ResponseWriter, r *http.Request) {
 
 func (a *application) securityHeadersMiddleware(next http.Handler) http.Handler {
 	frameAncestors := "'self'"
-	xFrameOptions := "SAMEORIGIN"
 	if len(a.Config.Server.AllowedEmbedHosts) > 0 {
 		frameAncestors = "'self' " + strings.Join(a.Config.Server.AllowedEmbedHosts, " ")
-		xFrameOptions = "ALLOW-FROM " + strings.Join(a.Config.Server.AllowedEmbedHosts, " ")
 	}
 	csp := "default-src 'self'; " +
 		"img-src 'self' data: blob: https: http:; " +
@@ -869,7 +913,10 @@ func (a *application) securityHeadersMiddleware(next http.Handler) http.Handler 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("X-Frame-Options", xFrameOptions)
+		// Only the default case is expressible in this header, embed hosts are covered by frame-ancestors.
+		if len(a.Config.Server.AllowedEmbedHosts) == 0 {
+			h.Set("X-Frame-Options", "SAMEORIGIN")
+		}
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("Content-Security-Policy", csp)
 		if a.Config.Server.HTTPS || a.isRequestHTTPS(r) {
@@ -879,6 +926,40 @@ func (a *application) securityHeadersMiddleware(next http.Handler) http.Handler 
 	})
 }
 
+// Blocks cross-site writes such as a form POST to the editor from another website. Browsers
+// always send Origin on unsafe methods; API clients that send none are left alone.
+func sameOriginMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+		default:
+			if origin == "" {
+				// No Origin and no cookies means an API client, not a browser.
+				if len(r.Cookies()) > 0 {
+					http.Error(w, "cross-origin request rejected", http.StatusForbidden)
+					return
+				}
+			} else if originHost(origin) != r.Host {
+				http.Error(w, "cross-origin request rejected", http.StatusForbidden)
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func originHost(origin string) string {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return ""
+	}
+
+	return parsed.Host
+}
+
 func (a *application) isRequestHTTPS(r *http.Request) bool {
 	if a.Config.Server.HTTPS {
 		return true
@@ -886,7 +967,7 @@ func (a *application) isRequestHTTPS(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
 	}
-	if a.Config.Server.Proxied {
+	if a.Config.Server.Proxied && a.requestCameThroughTrustedProxy(r) {
 		return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 	}
 	return false
@@ -932,19 +1013,38 @@ func (a *application) server() (func() error, func() error) {
 		mux.HandleFunc("PUT /api/todo/{listID}", a.handleTodoSave)
 	}
 
+	if a.Config.API.Enabled {
+		mux.HandleFunc("GET /api/v1/pages", a.handleAPIPages)
+		mux.HandleFunc("GET /api/v1/pages/{page}", a.handleAPIPage)
+		mux.HandleFunc("GET /api/v1/widgets/{apiID}", a.handleAPIWidget)
+		mux.HandleFunc("OPTIONS /api/v1/{path...}", a.handleAPIPreflight)
+	}
+
+	if a.EditorEnabled {
+		mux.HandleFunc("GET /api/editor/schema", a.handleEditorSchema)
+		mux.HandleFunc("GET /api/editor/status", a.handleEditorStatus)
+		mux.HandleFunc("GET /api/editor/config", a.handleEditorConfigLoad)
+		mux.HandleFunc("POST /api/editor/config", a.handleEditorConfigSave)
+		mux.HandleFunc("POST /api/editor/convert", a.handleEditorConvert)
+		mux.HandleFunc("POST /api/editor/custom-api/preview", a.handleEditorCustomAPIPreview)
+		mux.HandleFunc("GET /api/editor/dynawidgets/variables", a.handleEditorDynawidgetVariables)
+	}
+
 	mux.Handle(
 		fmt.Sprintf("GET /static/%s/{path...}", getStaticFSHash()),
-		http.StripPrefix(
+		gzipTextAssets(http.StripPrefix(
 			"/static/"+getStaticFSHash(),
 			fileServerWithCache(http.FS(staticFS), STATIC_ASSETS_CACHE_DURATION),
-		),
+		)),
 	)
 
 	if a.Config.Server.CacheDir != "" {
-		cacheHandler := http.StripPrefix(
+		// Cached files are fetched from remote widget content and an SVG among them would
+		// otherwise run scripts on this origin when opened directly.
+		cacheHandler := sandboxedHandler(http.StripPrefix(
 			"/.cache",
 			fileServerWithCache(http.Dir(a.Config.Server.CacheDir), REMOTE_IMAGE_CACHE_DURATION),
-		)
+		))
 
 		if a.RequiresAuth {
 			mux.Handle("GET /.cache/{path...}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -964,11 +1064,16 @@ func (a *application) server() (func() error, func() error) {
 		int(STATIC_ASSETS_CACHE_DURATION.Seconds()),
 	)
 
-	mux.HandleFunc(fmt.Sprintf("GET /static/%s/css/bundle.css", getStaticFSHash()), func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Cache-Control", assetCacheControlValue)
-		w.Header().Add("Content-Type", "text/css; charset=utf-8")
-		w.Write(bundledCSSContents)
-	})
+	serveCSSBundle := func(contents []byte) http.Handler {
+		return gzipTextAssets(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Cache-Control", assetCacheControlValue)
+			w.Header().Add("Content-Type", "text/css; charset=utf-8")
+			w.Write(contents)
+		}))
+	}
+
+	mux.Handle(fmt.Sprintf("GET /static/%s/css/bundle.css", getStaticFSHash()), serveCSSBundle(bundledCSSContents))
+	mux.Handle(fmt.Sprintf("GET /static/%s/css/editor-bundle.css", getStaticFSHash()), serveCSSBundle(bundledEditorCSSContents))
 
 	mux.HandleFunc("GET /manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Cache-Control", assetCacheControlValue)
@@ -998,7 +1103,7 @@ func (a *application) server() (func() error, func() error) {
 
 	server := http.Server{
 		Addr:    fmt.Sprintf("%s:%d", a.Config.Server.Host, a.Config.Server.Port),
-		Handler: a.securityHeadersMiddleware(mux),
+		Handler: a.securityHeadersMiddleware(sameOriginMiddleware(mux)),
 	}
 
 	start := func() error {

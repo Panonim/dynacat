@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -86,9 +87,6 @@ type MointpointRequest struct {
 	Hide *bool  `yaml:"hide"`
 }
 
-// Currently caches hostname indefinitely which isn't ideal
-// Potential issue with caching boot time as it may not initially get reported correctly:
-// https://github.com/shirou/gopsutil/issues/842#issuecomment-1908972344
 type cacheableHostInfo struct {
 	available bool
 	hostname  string
@@ -97,6 +95,34 @@ type cacheableHostInfo struct {
 }
 
 var cachedHostInfo cacheableHostInfo
+
+// Paths the host's os-release can be bind mounted to when Dynacat runs in a container,
+// where /etc/os-release describes the image instead of the machine.
+var hostOSReleasePaths = []string{"/host/etc/os-release", "/host/os-release"}
+
+func hostOSRelease() string {
+	paths := hostOSReleasePaths
+	if hostEtc := os.Getenv("HOST_ETC"); hostEtc != "" {
+		paths = append([]string{filepath.Join(hostEtc, "os-release")}, paths...)
+	}
+
+	for _, path := range paths {
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		for _, line := range strings.Split(string(contents), "\n") {
+			if id, ok := strings.CutPrefix(strings.TrimSpace(line), "ID="); ok {
+				if id = strings.Trim(id, `"'`); id != "" {
+					return id
+				}
+			}
+		}
+	}
+
+	return ""
+}
 
 func getHostInfo() (cacheableHostInfo, error) {
 	var err error
@@ -110,6 +136,10 @@ func getHostInfo() (cacheableHostInfo, error) {
 	info.platform, _, _, err = host.PlatformInformation()
 	if err != nil {
 		return info, err
+	}
+
+	if platform := hostOSRelease(); platform != "" {
+		info.platform = platform
 	}
 
 	bootTime, err := host.BootTime()
@@ -163,10 +193,6 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 		if err == nil {
 			info.CPU.LoadIsAvailable = true
 			if runtime.GOOS == "windows" {
-				// The numbers returned here seem unreliable on Windows. Even with the CPU pegged
-				// at close to 50% for multiple minutes, load1 is sometimes way under or way over
-				// with no clear pattern. Dividing by core count gives numbers that are way too
-				// low so that's likely not necessary as it is with unix.
 				info.CPU.Load1Percent = uint8(math.Min(loadAvg.Load1*100, 100))
 				info.CPU.Load15Percent = uint8(math.Min(loadAvg.Load15*100, 100))
 			} else {
@@ -200,26 +226,19 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 		addErr(fmt.Errorf("getting swap memory info: %v", err))
 	}
 
-	// currently disabled on Windows because it requires elevated privilidges, otherwise
-	// keeps returning a single sensor with key "ACPI\\ThermalZone\\TZ00_0" which
-	// doesn't seem to be the CPU sensor or correspond to anything useful when
-	// compared against the temperatures Libre Hardware Monitor reports.
-	// Also disabled on the bsd's because it's not implemented by go-psutil for them
 	if runtime.GOOS != "windows" && runtime.GOOS != "openbsd" && runtime.GOOS != "netbsd" && runtime.GOOS != "freebsd" {
 		sensorReadings, err := sensors.SensorsTemperatures()
 		_, errIsWarning := err.(*sensors.Warnings)
 		if err == nil || errIsWarning {
 			if req.CPUTempSensor != "" {
-				for i := range sensorReadings {
-					if sensorReadings[i].SensorKey == req.CPUTempSensor {
-						info.CPU.TemperatureIsAvailable = true
-						info.CPU.TemperatureC = uint8(sensorReadings[i].Temperature)
-						break
-					}
-				}
-
-				if !info.CPU.TemperatureIsAvailable {
-					addErr(fmt.Errorf("CPU temperature sensor %s not found", req.CPUTempSensor))
+				if sensor := findTempSensor(sensorReadings, req.CPUTempSensor); sensor != nil {
+					info.CPU.TemperatureIsAvailable = true
+					info.CPU.TemperatureC = uint8(sensor.Temperature)
+				} else {
+					addErr(fmt.Errorf(
+						"CPU temperature sensor %s not found, available sensors: %s",
+						req.CPUTempSensor, strings.Join(sensorKeys(sensorReadings), ", "),
+					))
 				}
 			} else if cpuTempSensor := inferCPUTempSensor(sensorReadings); cpuTempSensor != nil {
 				info.CPU.TemperatureIsAvailable = true
@@ -250,8 +269,6 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 			usedMB := usage.Used / 1024 / 1024
 			usedPercent := uint8(math.Min(usage.UsedPercent, 100))
 
-			// ZFS pool roots return Used=0 via statfs(2) when data is stored in child
-			// datasets (e.g. TrueNAS SCALE). Override with accurate values from `zfs list`.
 			if usage.Fstype == "zfs" {
 				if zfsTotal, zfsUsed, zfsErr := getZFSUsage(requestedPath); zfsErr == nil {
 					totalMB = zfsTotal / 1024 / 1024
@@ -287,10 +304,6 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 			addErr(fmt.Errorf("getting filesystems: %v", err))
 		}
 
-		// Inside containers (e.g. Docker), disk.Partitions(false) only returns
-		// devices starting with /dev/ — the overlay root filesystem is skipped.
-		// Fall back to "/" so disk usage is still reported without requiring a
-		// host bind-mount.
 		if len(addedMountpoints) == 0 {
 			addMountpointInfo("/", req.Mountpoints["/"])
 		}
@@ -307,11 +320,6 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 	return info, errs
 }
 
-// getZFSUsage returns accurate (totalBytes, usedBytes) for a ZFS mountpoint by
-// invoking `zfs list`. This is necessary because statfs(2) on a ZFS pool root
-// returns Used=0 when all data lives in child datasets (e.g. TrueNAS SCALE).
-// Returns an error if the `zfs` binary is unavailable or the mountpoint is not
-// found, so callers can fall back to the statfs values.
 func getZFSUsage(mountpoint string) (totalBytes, usedBytes uint64, err error) {
 	cmd := exec.Command("zfs", "list", "-H", "-p", "-o", "used,available,mountpoint")
 	out, err := cmd.Output()
@@ -335,16 +343,131 @@ func getZFSUsage(mountpoint string) (totalBytes, usedBytes uint64, err error) {
 	return 0, 0, fmt.Errorf("no ZFS dataset found for mountpoint %s", mountpoint)
 }
 
-func inferCPUTempSensor(sensors []sensors.TemperatureStat) *sensors.TemperatureStat {
-	for i := range sensors {
-		switch sensors[i].SensorKey {
-		case
-			"coretemp_package_id_0", // intel / linux
-			"coretemp",              // intel / linux
-			"k10temp",               // amd / linux
-			"zenpower",              // amd / linux
-			"cpu_thermal":           // raspberry pi / linux
-			return &sensors[i]
+// Chips that expose a CPU temperature, in the order they should be preferred. Readings are
+// keyed as "<chip>" or "<chip>_<label>", so these are matched as chip prefixes.
+var cpuTempChips = []string{
+	"coretemp",    // intel / linux
+	"k10temp",     // amd / linux
+	"zenpower",    // amd / linux
+	"cpu_thermal", // raspberry pi / linux
+	"acpitz",      // generic fallback
+}
+
+// Labels preferred when a chip reports several temperatures, e.g. k10temp exposes Tctl
+// alongside a per-die Tccd1 and Tccd2.
+var cpuTempLabels = []string{"package_id_0", "tctl", "tdie", "cpu"}
+
+func inferCPUTempSensor(readings []sensors.TemperatureStat) *sensors.TemperatureStat {
+	for _, chip := range cpuTempChips {
+		if sensor := sensorForChip(readings, chip, ""); sensor != nil {
+			return sensor
+		}
+	}
+
+	return nil
+}
+
+func sensorKeys(readings []sensors.TemperatureStat) []string {
+	keys := make([]string, len(readings))
+	for i := range readings {
+		keys[i] = readings[i].SensorKey
+	}
+
+	return keys
+}
+
+func normalizeSensorName(name string) string {
+	var b strings.Builder
+
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else if b.Len() > 0 && !strings.HasSuffix(b.String(), "_") {
+			b.WriteByte('_')
+		}
+	}
+
+	return strings.TrimSuffix(b.String(), "_")
+}
+
+func chipCandidates(chip string) []string {
+	parts := strings.Split(chip, "_")
+
+	candidates := make([]string, 0, len(parts))
+	for i := len(parts); i > 0; i-- {
+		candidates = append(candidates, strings.Join(parts[:i], "_"))
+	}
+
+	return candidates
+}
+
+func sensorForChip(readings []sensors.TemperatureStat, chip, label string) *sensors.TemperatureStat {
+	var matches []int
+
+	for i := range readings {
+		key := normalizeSensorName(readings[i].SensorKey)
+		if readings[i].Temperature <= 0 || (key != chip && !strings.HasPrefix(key, chip+"_")) {
+			continue
+		}
+
+		if label != "" {
+			if key == chip+"_"+label {
+				return &readings[i]
+			}
+			continue
+		}
+
+		matches = append(matches, i)
+	}
+
+	if len(matches) == 0 {
+		return nil
+	}
+
+	for _, preferred := range append([]string{""}, cpuTempLabels...) {
+		want := chip
+		if preferred != "" {
+			want = chip + "_" + preferred
+		}
+
+		for _, i := range matches {
+			if normalizeSensorName(readings[i].SensorKey) == want {
+				return &readings[i]
+			}
+		}
+	}
+
+	return &readings[matches[0]]
+}
+
+func findTempSensor(readings []sensors.TemperatureStat, want string) *sensors.TemperatureStat {
+	for i := range readings {
+		if readings[i].SensorKey == want {
+			return &readings[i]
+		}
+	}
+
+	chip, label, hasLabel := strings.Cut(want, "/")
+	normChip, normLabel := normalizeSensorName(chip), normalizeSensorName(label)
+
+	if normChip != "" {
+		for _, candidate := range chipCandidates(normChip) {
+			if sensor := sensorForChip(readings, candidate, normLabel); sensor != nil {
+				return sensor
+			}
+		}
+	}
+
+	// A name given without a chip is a label, e.g. "Tctl" for "k10temp_tctl".
+	if !hasLabel {
+		normLabel = normChip
+	}
+
+	if normLabel != "" {
+		for i := range readings {
+			if strings.HasSuffix(normalizeSensorName(readings[i].SensorKey), "_"+normLabel) {
+				return &readings[i]
+			}
 		}
 	}
 

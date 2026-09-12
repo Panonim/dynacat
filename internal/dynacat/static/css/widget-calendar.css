@@ -70,8 +70,6 @@
     margin-left: 0.7rem;
 }
 
-/* The release trigger covers the whole day cell so hovering anywhere on the
-   date (not just the underline) opens the popover. */
 .calendar-release {
     position: absolute;
     inset: 0;
@@ -89,13 +87,41 @@
     background: var(--color-primary);
 }
 
+.calendar-release-indicator-available {
+    background: var(--color-positive);
+}
+
+.calendar-release-indicator-released {
+    background: var(--color-negative);
+}
+
+.calendar-release-indicator-upcoming {
+    background: var(--color-upcoming);
+}
+
 .calendar-release-card {
     text-decoration: none;
     text-align: left;
 }
 
-/* Fixed poster thumbnail keeping the standard 2:3 movie/series ratio. */
+.calendar-release-type-icon {
+    flex-shrink: 0;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -0.3rem;
+    color: var(--color-text-subdue);
+}
+
+.calendar-release-type-icon svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    display: block;
+}
+
 .calendar-release-thumb {
+    position: relative;
     width: 3.4rem;
     aspect-ratio: 2 / 3;
     flex-shrink: 0;
@@ -106,4 +132,28 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.calendar-thumb-spinner {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-popover-border);
+}
+
+.calendar-thumb-spinner::before {
+    content: '';
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    border: 2px solid var(--color-text-subdue);
+    border-top-color: var(--color-primary);
+    animation: calendarThumbSpin 700ms infinite linear;
+}
+
+@keyframes calendarThumbSpin {
+    to { transform: rotate(360deg); }
 }

@@ -123,10 +123,6 @@ func (c *imageCache) findExistingFile(hashHex string, urlPath string) (string, b
 	return "", false
 }
 
-func (c *imageCache) downloadAndCache(ctx context.Context, rawURL string, hashHex string, urlPath string) (string, error) {
-	return c.downloadAndCacheWithClient(ctx, rawURL, hashHex, urlPath, false)
-}
-
 func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL string, hashHex string, urlPath string, allowInsecure bool) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -152,7 +148,7 @@ func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL stri
 		ext = extensionFromContentType(resp.Header.Get("Content-Type"))
 	}
 	if ext == "" {
-		ext = ".img"
+		return "", fmt.Errorf("unsupported content type %q for %s", resp.Header.Get("Content-Type"), rawURL)
 	}
 
 	tmpPath := filepath.Join(c.dir, hashHex+".tmp")
@@ -161,8 +157,11 @@ func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL stri
 		return "", err
 	}
 
-	_, copyErr := io.Copy(file, resp.Body)
+	written, copyErr := io.Copy(file, io.LimitReader(resp.Body, maxResponseBytes+1))
 	closeErr := file.Close()
+	if copyErr == nil && written > maxResponseBytes {
+		copyErr = errResponseTooLarge
+	}
 	if copyErr != nil {
 		_ = os.Remove(tmpPath)
 		return "", copyErr

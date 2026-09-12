@@ -55,9 +55,6 @@ func (widget *videosWidget) initialize() error {
 		widget.CollapseAfter = 7
 	}
 
-	// A bit cheeky, but from a user's perspective it makes more sense when channels and
-	// playlists are separate things rather than specifying a list of channels and some of
-	// them awkwardly have a "playlist:" prefix
 	if len(widget.Playlists) > 0 {
 		initialLen := len(widget.Channels)
 		widget.Channels = append(widget.Channels, make([]string, len(widget.Playlists))...)
@@ -198,7 +195,6 @@ func fetchYoutubeChannelUploads(ctx context.Context, channelOrPlaylistIDs []stri
 		return nil, fmt.Errorf("%w: %v", errNoContent, err)
 	}
 
-	// UULF playlists don't exist for all channels; fall back to channel_id on 404
 	type fallbackEntry struct {
 		originalIdx int
 		request     *http.Request

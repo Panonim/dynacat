@@ -150,11 +150,43 @@ func getSelfContainerID() string {
 	return string(m[:12])
 }
 
-func newDockerCtrlClient(sockPath string) *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", sockPath)
+// dockerCtrlClient carries the http.Client together with the host to put in request
+// URLs, since that host differs between a unix socket dial (dummy "docker") and a
+// real tcp/http docker daemon (actual host:port).
+type dockerCtrlClient struct {
+	http *http.Client
+	host string
+}
+
+func (c *dockerCtrlClient) newRequest(ctx context.Context, method, path string) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, method, "http://"+c.host+path, nil)
+}
+
+func newDockerCtrlClient(sockPath string) *dockerCtrlClient {
+	if strings.HasPrefix(sockPath, "tcp://") || strings.HasPrefix(sockPath, "http://") {
+		parsed, err := url.Parse(sockPath)
+		if err != nil {
+			return &dockerCtrlClient{http: &http.Client{}, host: sockPath}
+		}
+
+		port := parsed.Port()
+		if port == "" {
+			port = "80"
+		}
+
+		return &dockerCtrlClient{
+			http: &http.Client{},
+			host: parsed.Hostname() + ":" + port,
+		}
+	}
+
+	return &dockerCtrlClient{
+		host: "docker",
+		http: &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+					return net.Dial("unix", sockPath)
+				},
 			},
 		},
 	}
@@ -179,8 +211,7 @@ func (widget *dockerControllerWidget) update(ctx context.Context) {
 			selfImageName = imgName
 		}
 	} else {
-		// Still need self image name to filter images even if not showing containers.
-		// Fetch it from the containers endpoint without showing results.
+		// Still need the self image name to filter images even when not showing containers.
 		_, imgName, _ := fetchDockerCtrlContainers(client, false, selfID)
 		selfImageName = imgName
 	}
@@ -324,16 +355,16 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 	}
 }
 
-func fetchDockerCtrlContainers(client *http.Client, formatNames bool, selfID string) ([]dockerCtrlContainer, string, error) {
+func fetchDockerCtrlContainers(client *dockerCtrlClient, formatNames bool, selfID string) ([]dockerCtrlContainer, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://docker/containers/json?all=true", nil)
+	req, err := client.newRequest(ctx, "GET", "/containers/json?all=true")
 	if err != nil {
 		return nil, "", err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.http.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -382,16 +413,16 @@ func fetchDockerCtrlContainers(client *http.Client, formatNames bool, selfID str
 	return containers, selfImageName, nil
 }
 
-func fetchDockerCtrlImages(client *http.Client, selfImageName string) ([]dockerCtrlImage, error) {
+func fetchDockerCtrlImages(client *dockerCtrlClient, selfImageName string) ([]dockerCtrlImage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://docker/images/json", nil)
+	req, err := client.newRequest(ctx, "GET", "/images/json")
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.http.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +509,7 @@ func formatDockerImageSize(bytes int64) string {
 	return fmt.Sprintf("%.1f GB", float64(bytes)/(1024*1024*1024))
 }
 
-func dockerCtrlContainerAction(client *http.Client, id, action string) error {
+func dockerCtrlContainerAction(client *dockerCtrlClient, id, action string) error {
 	var method, path string
 
 	switch action {
@@ -497,12 +528,12 @@ func dockerCtrlContainerAction(client *http.Client, id, action string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, method, "http://docker"+path, nil)
+	req, err := client.newRequest(ctx, method, path)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -516,17 +547,16 @@ func dockerCtrlContainerAction(client *http.Client, id, action string) error {
 	return nil
 }
 
-func dockerCtrlPullImageWithProgress(client *http.Client, image string, pull *dockerActivePull) error {
+func dockerCtrlPullImageWithProgress(client *dockerCtrlClient, image string, pull *dockerActivePull) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	pullURL := "http://docker/images/create?fromImage=" + url.QueryEscape(image)
-	req, err := http.NewRequestWithContext(ctx, "POST", pullURL, nil)
+	req, err := client.newRequest(ctx, "POST", "/images/create?fromImage="+url.QueryEscape(image))
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -566,16 +596,16 @@ func dockerCtrlPullImageWithProgress(client *http.Client, image string, pull *do
 	return scanner.Err()
 }
 
-func dockerCtrlRemoveImage(client *http.Client, id string) error {
+func dockerCtrlRemoveImage(client *dockerCtrlClient, id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "DELETE", "http://docker/images/"+id, nil)
+	req, err := client.newRequest(ctx, "DELETE", "/images/"+id)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.http.Do(req)
 	if err != nil {
 		return err
 	}

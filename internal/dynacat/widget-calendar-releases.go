@@ -12,9 +12,6 @@ import (
 
 const calendarReleaseDateLayout = "2006-01-02"
 
-// parseCalendarReleaseURL splits a "serverType:url" value (e.g.
-// "radarr:https://radarr.domain.com") into its service type and normalized base
-// URL, mirroring the host URL parsing used by the latest-media/playing widgets.
 func parseCalendarReleaseURL(rawURL string) (serverType string, baseURL string, err error) {
 	parts := strings.SplitN(rawURL, ":", 2)
 	if len(parts) < 2 {
@@ -45,6 +42,16 @@ type arrImage struct {
 	URL       string `json:"url"`
 }
 
+func calendarReleaseState(dateISO string, hasFile bool, todayISO string) string {
+	if hasFile {
+		return "available"
+	}
+	if dateISO <= todayISO {
+		return "released"
+	}
+	return "upcoming"
+}
+
 func arrPosterURL(images []arrImage) string {
 	for _, image := range images {
 		if image.CoverType == "poster" {
@@ -63,6 +70,7 @@ type sonarrCalendarEpisode struct {
 	SeasonNumber  int    `json:"seasonNumber"`
 	EpisodeNumber int    `json:"episodeNumber"`
 	Overview      string `json:"overview"`
+	HasFile       bool   `json:"hasFile"`
 	Series        struct {
 		Title     string     `json:"title"`
 		TitleSlug string     `json:"titleSlug"`
@@ -73,15 +81,17 @@ type sonarrCalendarEpisode struct {
 type radarrCalendarMovie struct {
 	Title           string     `json:"title"`
 	Overview        string     `json:"overview"`
+	Status          string     `json:"status"`
 	TmdbID          int        `json:"tmdbId"`
+	HasFile         bool       `json:"hasFile"`
 	TitleSlug       string     `json:"titleSlug"`
+	InCinemas       string     `json:"inCinemas"`
 	DigitalRelease  string     `json:"digitalRelease"`
 	PhysicalRelease string     `json:"physicalRelease"`
+	ReleaseDate     string     `json:"releaseDate"`
 	Images          []arrImage `json:"images"`
 }
 
-// getReleasesForMonth returns release items keyed by ISO date for the given
-// month, serving from the per-month server cache when it is still fresh.
 func (widget *calendarWidget) getReleasesForMonth(ctx context.Context, year int, month time.Month) map[string][]calendarReleaseItem {
 	key := fmt.Sprintf("%04d-%02d", year, month)
 
@@ -92,22 +102,18 @@ func (widget *calendarWidget) getReleasesForMonth(ctx context.Context, year int,
 	}
 	widget.releaseCacheMu.Unlock()
 
-	// Pad the range so spillover days shown in the grid also get markers.
 	monthStart := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
 	monthEnd := monthStart.AddDate(0, 1, -1)
 	start := monthStart.AddDate(0, 0, -7)
 	end := monthEnd.AddDate(0, 0, 7)
 
 	data := make(map[string][]calendarReleaseItem)
-
-	// Track which releases have already been added so the same movie/episode
-	// served by multiple hosts of the same type is not shown twice.
 	seen := make(map[string]struct{})
 
 	for i := range widget.Hosts {
 		service := &widget.Hosts[i]
 
-		items, err := fetchCalendarReleases(ctx, service, start, end)
+		items, err := fetchCalendarReleases(ctx, service, start, end, widget.enabledReleaseTypes)
 		if err != nil {
 			slog.Warn("calendar: failed to fetch releases", "service", service.serverType, "url", service.baseURL, "error", err)
 			continue
@@ -123,6 +129,12 @@ func (widget *calendarWidget) getReleasesForMonth(ctx context.Context, year int,
 					seen[seenKey] = struct{}{}
 				}
 
+				if widget.Providers != nil && widget.Providers.app != nil && item.Thumbnail != "" {
+					hash := hashString(item.Thumbnail)
+					widget.Providers.app.registerImageProxy(hash, item.Thumbnail, service.AllowInsecure)
+					item.Thumbnail = widget.GetBaseURL() + "/api/image-proxy/" + hash
+				}
+
 				data[date] = append(data[date], item)
 			}
 		}
@@ -135,12 +147,15 @@ func (widget *calendarWidget) getReleasesForMonth(ctx context.Context, year int,
 	return data
 }
 
-func fetchCalendarReleases(ctx context.Context, service *calendarReleaseService, start, end time.Time) (map[string][]calendarReleaseItem, error) {
+func fetchCalendarReleases(ctx context.Context, service *calendarReleaseService, start, end time.Time, enabledTypes map[string]bool) (map[string][]calendarReleaseItem, error) {
 	switch service.serverType {
 	case "sonarr":
+		if !enabledTypes["episode"] {
+			return nil, nil
+		}
 		return fetchSonarrReleases(ctx, service, start, end)
 	case "radarr":
-		return fetchRadarrReleases(ctx, service, start, end)
+		return fetchRadarrReleases(ctx, service, start, end, enabledTypes)
 	default:
 		return nil, fmt.Errorf("unknown service type %q", service.serverType)
 	}
@@ -182,7 +197,14 @@ func fetchSonarrReleases(ctx context.Context, service *calendarReleaseService, s
 		return nil, err
 	}
 
-	result := make(map[string][]calendarReleaseItem)
+	type sonarrGroupKey struct {
+		date    string
+		groupID string
+		season  int
+	}
+
+	groups := make(map[sonarrGroupKey][]sonarrCalendarEpisode)
+	order := make(map[string][]sonarrGroupKey)
 
 	for _, episode := range episodes {
 		date := arrParseDate(episode.AirDateUtc)
@@ -190,31 +212,79 @@ func fetchSonarrReleases(ctx context.Context, service *calendarReleaseService, s
 			continue
 		}
 
-		title := episode.Series.Title
-		title += fmt.Sprintf(" S%02dE%02d", episode.SeasonNumber, episode.EpisodeNumber)
-		if episode.Title != "" {
-			title += " - " + episode.Title
+		groupID := episode.Series.TitleSlug
+		if groupID == "" {
+			groupID = episode.Series.Title
 		}
 
-		link := ""
-		if episode.Series.TitleSlug != "" {
-			link = service.publicBaseURL + "/series/" + episode.Series.TitleSlug
+		key := sonarrGroupKey{date: date, groupID: groupID, season: episode.SeasonNumber}
+		if _, ok := groups[key]; !ok {
+			order[date] = append(order[date], key)
 		}
+		groups[key] = append(groups[key], episode)
+	}
 
-		result[date] = append(result[date], calendarReleaseItem{
-			Source:      "Sonarr",
-			Title:       title,
-			Description: episode.Overview,
-			Thumbnail:   arrPosterURL(episode.Series.Images),
-			Link:        link,
-			dedupKey:    fmt.Sprintf("sonarr:%s:s%de%d", episode.Series.TitleSlug, episode.SeasonNumber, episode.EpisodeNumber),
-		})
+	result := make(map[string][]calendarReleaseItem)
+	todayISO := time.Now().UTC().Format(calendarReleaseDateLayout)
+
+	for date, keys := range order {
+		for _, key := range keys {
+			eps := groups[key]
+			first := eps[0]
+
+			hasFile := true
+			for _, ep := range eps {
+				if !ep.HasFile {
+					hasFile = false
+					break
+				}
+			}
+
+			link := ""
+			if first.Series.TitleSlug != "" {
+				link = service.publicBaseURL + "/series/" + first.Series.TitleSlug
+			}
+
+			var title, description, dedupKey string
+			if len(eps) == 1 {
+				title = first.Series.Title + fmt.Sprintf(" S%02dE%02d", first.SeasonNumber, first.EpisodeNumber)
+				if first.Title != "" {
+					title += " - " + first.Title
+				}
+				description = first.Overview
+				dedupKey = fmt.Sprintf("sonarr:%s:s%de%d", key.groupID, first.SeasonNumber, first.EpisodeNumber)
+			} else {
+				minEp, maxEp := first.EpisodeNumber, first.EpisodeNumber
+				for _, ep := range eps {
+					if ep.EpisodeNumber < minEp {
+						minEp = ep.EpisodeNumber
+					}
+					if ep.EpisodeNumber > maxEp {
+						maxEp = ep.EpisodeNumber
+					}
+				}
+				title = first.Series.Title + fmt.Sprintf(" S%02d E%02d-E%02d", first.SeasonNumber, minEp, maxEp)
+				description = fmt.Sprintf("%d episodes", len(eps))
+				dedupKey = fmt.Sprintf("sonarr:%s:s%d:group", key.groupID, first.SeasonNumber)
+			}
+
+			result[date] = append(result[date], calendarReleaseItem{
+				Source:      "Sonarr",
+				Title:       title,
+				Description: description,
+				Thumbnail:   arrPosterURL(first.Series.Images),
+				Link:        link,
+				Type:        "episode",
+				State:       calendarReleaseState(date, hasFile, todayISO),
+				dedupKey:    dedupKey,
+			})
+		}
 	}
 
 	return result, nil
 }
 
-func fetchRadarrReleases(ctx context.Context, service *calendarReleaseService, start, end time.Time) (map[string][]calendarReleaseItem, error) {
+func fetchRadarrReleases(ctx context.Context, service *calendarReleaseService, start, end time.Time, enabledTypes map[string]bool) (map[string][]calendarReleaseItem, error) {
 	client := ternary[requestDoer](service.AllowInsecure, defaultInsecureHTTPClient, defaultHTTPClient)
 
 	request, err := newArrCalendarRequest(ctx, service, start, end, nil)
@@ -227,42 +297,52 @@ func fetchRadarrReleases(ctx context.Context, service *calendarReleaseService, s
 		return nil, err
 	}
 
+	startISO := start.Format(calendarReleaseDateLayout)
+	endISO := end.Format(calendarReleaseDateLayout)
+	todayISO := time.Now().UTC().Format(calendarReleaseDateLayout)
+
 	result := make(map[string][]calendarReleaseItem)
 
 	for _, movie := range movies {
-		// Digital/physical home release date, preferring digital when both exist.
-		raw := movie.DigitalRelease
-		if raw == "" {
-			raw = movie.PhysicalRelease
-		}
-
-		date := arrParseDate(raw)
-		if date == "" {
-			continue
-		}
-
 		link := ""
-		dedupKey := "radarr:slug:" + movie.TitleSlug
+		dedupBase := "radarr:slug:" + movie.TitleSlug
 		if movie.TmdbID != 0 {
 			link = fmt.Sprintf("%s/movie/%d", service.publicBaseURL, movie.TmdbID)
-			dedupKey = fmt.Sprintf("radarr:tmdb:%d", movie.TmdbID)
+			dedupBase = fmt.Sprintf("radarr:tmdb:%d", movie.TmdbID)
 		}
 
-		result[date] = append(result[date], calendarReleaseItem{
-			Source:      "Radarr",
-			Title:       movie.Title,
-			Description: movie.Overview,
-			Thumbnail:   arrPosterURL(movie.Images),
-			Link:        link,
-			dedupKey:    dedupKey,
-		})
+		poster := arrPosterURL(movie.Images)
+
+		for _, candidate := range []struct{ releaseType, raw string }{
+			{"cinema", movie.InCinemas},
+			{"physical", movie.PhysicalRelease},
+			{"digital", movie.DigitalRelease},
+		} {
+			if !enabledTypes[candidate.releaseType] {
+				continue
+			}
+
+			date := arrParseDate(candidate.raw)
+			if date == "" || date < startISO || date > endISO {
+				continue
+			}
+
+			result[date] = append(result[date], calendarReleaseItem{
+				Source:      "Radarr",
+				Title:       movie.Title,
+				Description: movie.Overview,
+				Thumbnail:   poster,
+				Link:        link,
+				Type:        candidate.releaseType,
+				State:       calendarReleaseState(date, movie.HasFile, todayISO),
+				dedupKey:    dedupBase + ":" + candidate.releaseType,
+			})
+		}
 	}
 
 	return result, nil
 }
 
-// arrParseDate extracts the ISO date (YYYY-MM-DD) from an arr API timestamp,
-// returning "" when the value is empty or unparseable.
 func arrParseDate(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -273,7 +353,6 @@ func arrParseDate(value string) string {
 		return parsed.Format(calendarReleaseDateLayout)
 	}
 
-	// Fall back to a bare date if the API returned one.
 	if len(value) >= len(calendarReleaseDateLayout) {
 		if _, err := time.Parse(calendarReleaseDateLayout, value[:len(calendarReleaseDateLayout)]); err == nil {
 			return value[:len(calendarReleaseDateLayout)]

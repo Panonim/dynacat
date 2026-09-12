@@ -56,7 +56,6 @@ var diagnosticSteps = []diagnosticStep{
 	{
 		name: "fetch data from Twitch.tv GQL",
 		fn: func() (string, error) {
-			// this should always return 0 bytes, we're mainly looking for a 200 status code
 			return testHttpRequest("OPTIONS", "https://gql.twitch.tv/gql", 200)
 		},
 	},

@@ -1247,10 +1247,12 @@ body {
 .home-community-icon--discord { color: #7289DA; }
 .home-community-icon--issues  { color: #FBBF24; }
 .home-community-icon--paypal  { color: #0070BA; }
+.home-community-icon--kofi    { color: #D9605C; }
 
 .home-community-card--discord { background: rgba(88, 101, 242, 0.12); }
 .home-community-card--issues  { background: rgba(245, 158, 11, 0.1); }
 .home-community-card--paypal  { background: rgba(0, 112, 186, 0.12); }
+.home-community-card--kofi    { background: rgba(217, 96, 92, 0.1); }
 
 .home-community-label {
   display: inline-block;

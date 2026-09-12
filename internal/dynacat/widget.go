@@ -139,10 +139,13 @@ func (w *widgets) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type widget interface {
-	// These need to be exported because they get called in templates
 	Render() template.HTML
 	GetType() string
 	GetID() uint64
+	GetAPIID() string
+	GetTitle() string
+	GetError() error
+	IsLazyLoad() bool
 
 	initialize() error
 	requiresUpdate(*time.Time) bool
@@ -164,6 +167,7 @@ const (
 
 type widgetBase struct {
 	ID                  uint64               `yaml:"-"`
+	APIID               string               `yaml:"api-id"`
 	Providers           *widgetProviders     `yaml:"-"`
 	Type                string               `yaml:"type"`
 	Title               string               `yaml:"title"`
@@ -194,9 +198,6 @@ type widgetProviders struct {
 	app                  *application
 }
 
-// SecureImageURL processes an image URL through the caching and proxy system.
-// Returns either a cached URL, a proxy URL without credentials, or empty string on error.
-// If allowInsecure is true, self-signed certificates will be accepted.
 func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, allowInsecure bool) string {
 	if imageURL == "" {
 		return ""
@@ -209,22 +210,18 @@ func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, a
 
 	hash := hashString(imageURL)
 
-	// Register with the application's image proxy for on-demand serving
 	if p.app != nil {
 		p.app.registerImageProxy(hash, imageURL, allowInsecure)
 	}
 
-	// Try to cache the image
 	if p.imageCache != nil {
 		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure)
 		if err == nil && cachedURL != "" {
-			// Successfully cached, return the cached URL
 			return cachedURL
 		}
 	}
 
-	// Fall back to proxy URL (doesn't expose credentials)
-	return fmt.Sprintf("/api/image-proxy/%s", hash)
+	return p.baseURL + "/api/image-proxy/" + hash
 }
 
 func (w *widgetBase) requiresUpdate(now *time.Time) bool {
@@ -233,7 +230,6 @@ func (w *widgetBase) requiresUpdate(now *time.Time) bool {
 	}
 
 	if w.nextUpdate.IsZero() {
-		// Lazy widgets skip the initial blocking fetch; JS triggers it after page load
 		if w.LazyLoad {
 			return false
 		}
@@ -247,9 +243,6 @@ func (w *widgetBase) IsWIP() bool {
 	return w.WIP
 }
 
-// UpdateIntervalMs is the polling interval the page uses for this widget, in
-// milliseconds. Widgets can override it to poll dynamically (e.g. faster while a
-// background job runs, then back to the configured interval once it finishes).
 func (w *widgetBase) UpdateIntervalMs() int64 {
 	if w.UpdateInterval == nil {
 		return 0
@@ -265,9 +258,6 @@ func (w *widgetBase) update(ctx context.Context) {
 
 }
 
-// getCacheDuration returns the effective time between updates for this widget,
-// used as the reuse window for shared HTTP requests. Returns -1 for infinite
-// cache widgets so they reuse shared responses freely.
 func (w *widgetBase) getCacheDuration() time.Duration {
 	switch w.cacheType {
 	case cacheTypeDuration:
@@ -289,6 +279,18 @@ func (w *widgetBase) GetID() uint64 {
 
 func (w *widgetBase) setID(id uint64) {
 	w.ID = id
+}
+
+func (w *widgetBase) GetAPIID() string {
+	return w.APIID
+}
+
+func (w *widgetBase) GetTitle() string {
+	return w.Title
+}
+
+func (w *widgetBase) GetError() error {
+	return w.Error
 }
 
 func (w *widgetBase) setHideHeader(value bool) {
@@ -328,17 +330,13 @@ func (w *widgetBase) renderTemplate(data any, t *template.Template) template.HTM
 
 		slog.Error("Failed to render template", "error", err)
 
-		// need to immediately re-render with the error,
-		// otherwise risk breaking the page since the widget
-		// will likely be partially rendered with tags not closed.
 		w.templateBuffer.Reset()
 		err2 := t.Execute(&w.templateBuffer, data)
 
 		if err2 != nil {
 			slog.Error("Failed to render error within widget", "error", err2, "initial_error", err)
 			w.templateBuffer.Reset()
-			// TODO: add some kind of a generic widget error template when the widget
-			// failed to render, and we also failed to re-render the widget with the error
+			// TODO: add a generic widget error template for double render failures.
 		}
 	}
 
@@ -380,7 +378,7 @@ func (w *widgetBase) withCacheOnTheHour() *widgetBase {
 }
 
 func (w *widgetBase) withNotice(err error) *widgetBase {
-	w.Notice = err
+	w.Notice = redactedError(err)
 
 	return w
 }
@@ -390,25 +388,14 @@ func (w *widgetBase) withError(err error) *widgetBase {
 		w.ContentAvailable = true
 	}
 
-	w.Error = err
+	// Fetch errors carry the request URL, which for some widgets holds the upstream credential.
+	w.Error = redactedError(err)
 
 	return w
 }
 
 func (w *widgetBase) canContinueUpdateAfterHandlingErr(err error) bool {
-	// TODO: needs covering more edge cases.
-	// if there's partial content and we update early there's a chance
-	// the early update returns even less content than the initial update.
-	// need some kind of mechanism that tells us whether we should update early
-	// or not depending on the number of things that failed during the initial
-	// and subsequent update and how they failed - ie whether it was server
-	// error (like gateway timeout, do retry early) or client error (like
-	// hitting a rate limit, don't retry early). will require reworking a
-	// good amount of code in the feed package and probably having a custom
-	// error type that holds more information because screw wrapping errors.
-	// alternatively have a resource cache and only refetch the failed resources,
-	// then rebuild the widget.
-
+	// TODO: needs covering more edge cases around early-update retry policy.
 	if err != nil {
 		w.scheduleEarlyUpdate()
 

@@ -28,6 +28,7 @@
     --color-primary: hsl(278.01, 79.31%, 60.2%);
     --color-positive: var(--color-primary);
     --color-negative: hsl(0, 70%, 70%);
+    --color-upcoming: hsl(43, 74%, 64%);
     --color-background: hsl(var(--bghs), var(--bgl));
     --color-widget-background-hsl-values: var(--bghs), calc(var(--bgl) + 1%);
     --color-widget-background: hsl(var(--color-widget-background-hsl-values));
@@ -63,4 +64,5 @@
 @import "widgets.css";
 @import "popover.css";
 @import "utils.css";
+@import "editor-toggle.css";
 @import "mobile.css";

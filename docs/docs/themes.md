@@ -124,6 +124,17 @@ theme:
   negative-color: 360 100 71
 ```
 
+### Degoog Dark
+![screenshot](images/themes/degoog-dark.png)
+```yaml
+theme:
+  background-color: 227 11 16
+  contrast-multiplier: 1.2
+  primary-color: 220 34 51
+  positive-color: 136 53 43
+  negative-color: 5 81 56
+```
+
 ## Light
 
 ### Catppuccin Latte
@@ -177,4 +188,16 @@ theme:
   light: true
   background-color: 270 12 97
   primary-color: 270 35 50
+```
+
+### Degoog Light
+![screenshot](images/themes/degoog-light.png)
+```yaml
+theme:
+  light: true
+  background-color: 0 0 95
+  contrast-multiplier: 1.1
+  primary-color: 217 36 36
+  positive-color: 136 53 40
+  negative-color: 5 81 56
 ```

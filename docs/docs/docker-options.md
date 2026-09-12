@@ -59,6 +59,50 @@ environment:
   - BIND=127.0.0.1
 ```
 
+### ENABLE_EDITOR
+
+Permanently disables the interactive page editor. Set it to `false`, `0`, `f`, `no`, or `off` to hide the edit button on every page, stop the editor assets from loading, and unregister the `/api/editor/*` endpoints:
+
+```yaml
+environment:
+  - ENABLE_EDITOR=false
+```
+
+Editor-specific configuration (`server.allow-editing`, `server.editing-users`, `server.editing-groups`, and any user's `restrict-editing`) stays valid YAML and is **not** an error - it is simply ignored. On startup Dynacat logs a single warning naming the settings it skipped.
+
+
+> [!NOTE]
+>
+> With the editor disabled, the config file is the only way to change pages. Requests to the editor API return `404` instead of `403`.
+
+### EDITOR_SEPARATE_PAGE_FILES
+
+Controls where the interactive page editor stores a new page. By default each new page is written to its own file (e.g. `my-page.yml`) in the config directory and linked into the main config with a `$include` line, which keeps multiple pages easy to manage.
+
+Set it to `false`, `0`, or `f` to write new pages inline into the main config file (`dynacat.yml`) instead:
+
+```yaml
+environment:
+  - EDITOR_SEPARATE_PAGE_FILES=false
+```
+
+> [!NOTE]
+>
+> This only affects pages created after the change. Existing pages, whether inline or included, keep their current location.
+
+### HOST_ETC
+
+Points the `server-stats` widget at a bind-mounted copy of the host's `/etc` directory so it reports the host's OS instead of the container image's (usually `alpine`). Dynacat reads `$HOST_ETC/os-release`.
+
+This is an alternative to mounting the file directly to `/host/etc/os-release` (see [Server Stats](configuration.md#server-stats)) - useful if you'd rather bind mount the whole host `/etc` to a path of your choosing:
+
+```yaml
+environment:
+  - HOST_ETC=/host-etc
+volumes:
+  - /etc:/host-etc:ro
+```
+
 ## Dynamic Refreshing
 
 Dynamic refreshing allows widgets to automatically update their data at specified intervals. This behavior can be controlled through two mechanisms:
@@ -101,6 +145,8 @@ The global page update interval can be disabled by:
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `ENABLE_DYNAMIC_UPDATE` | `true` | Set to `false`, `0`, or `f` to disable automatic widget refresh. Useful for static views or default glance behaviour. |
+| `EDITOR_SEPARATE_PAGE_FILES` | `true` | Set to `false`, `0`, or `f` to write new pages inline into the main config instead of a separate `$include` file. |
+| `ENABLE_EDITOR` | `true` | Set to `false`, `0`, `f`, `no`, or `off` to disable the page editor everywhere. Editor config keys are ignored with a startup warning. |
 
 ## ZFS Mountpoint Support
 

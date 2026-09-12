@@ -20,7 +20,6 @@ const toggleVisibilityButton = find("#toggle-password-visibility");
 
 container.clearStyles("display");
 
-// Password form only wired up if elements exist
 if (usernameInput && passwordInput && loginButton) {
     const state = {
         lastUsername: "",
@@ -59,7 +58,6 @@ if (usernameInput && passwordInput && loginButton) {
         const usernameValue = usernameInput.value.trim();
         const passwordValue = passwordInput.value.trim();
 
-        // Keep client-side validation permissive and let the server decide auth validity.
         const usernameValid = usernameValue.length > 0;
         const passwordValid = passwordValue.length > 0;
 
@@ -79,7 +77,6 @@ if (usernameInput && passwordInput && loginButton) {
     usernameInput.on("input", enableLoginButtonIfCriteriaMet);
     passwordInput.on("input", enableLoginButtonIfCriteriaMet);
 
-    // Allow pressing Enter in either input to submit the login when enabled
     usernameInput.on("keydown", function(e) {
         if (e.key === "Enter") {
             e.preventDefault();
@@ -121,7 +118,7 @@ if (usernameInput && passwordInput && loginButton) {
                 if (data && typeof data.redirect === "string" && data.redirect.startsWith("/") && !data.redirect.startsWith("//")) {
                     destination = data.redirect;
                 }
-            } catch (_) { /* no body; fall back to home */ }
+            } catch (_) {}
             setTimeout(() => { window.location.href = destination; }, 300);
 
             container.animate({

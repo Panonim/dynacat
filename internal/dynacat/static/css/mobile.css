@@ -149,7 +149,7 @@
     }
 
     .ios .search-input {
-        /* so that iOS Safari does not zoom the page when the input is focused */
+        /* ios safari zoom fix */
         font-size: 16px;
     }
 }

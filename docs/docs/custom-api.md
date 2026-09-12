@@ -1,3 +1,7 @@
+> [!TIP]
+>
+> You can also build simple `custom-api` widgets visually with the [Widget Editor](widget-editor.md), which writes the template for you.
+
 ## Update Intervals
 
 Custom API widgets support configurable client-side update intervals using the `update-interval` property. This controls how often the browser fetches new data from the server for the widget.
@@ -488,6 +492,7 @@ The following helper functions provided by Dynacat are available:
 - `hide() template.HTML`: Hides the current `custom-api` widget for this render. Useful when an API response should not be displayed (for example, a `204 No Content` response).
 - `toFloat(i int) float`: Converts an integer to a float.
 - `toInt(f float) int`: Converts a float to an integer.
+- `formatBytes(v any) string`: Formats a byte count as B, KB, MB, GB, TB or PB, e.g. `7.4 GB`.
 - `toRelativeTime(t time.Time) template.HTMLAttr`: Converts Time to a relative time such as 2h, 1d, etc which dynamically updates. **NOTE:** the value of this function should be used as an attribute in an HTML tag, e.g. `<span {{ toRelativeTime .Time }}></span>`.
 - `now() time.Time`: Returns the current time.
 - `offsetNow(offset string) time.Time`: Returns the current time with an offset. The offset can be positive or negative and must be in the format "3h" "-1h" or "2h30m10s".

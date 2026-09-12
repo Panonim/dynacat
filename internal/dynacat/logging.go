@@ -83,6 +83,11 @@ func levelColor(level slog.Level) string {
 	}
 }
 
+// Writes past slog so LOG_LEVEL cannot hide it. For warnings the user must not miss.
+func printUnsuppressableWarning(message string) {
+	fmt.Fprintf(os.Stderr, "%s%sWARN %s%s\n", ansiYellow, ansiBold, ansiReset, message)
+}
+
 func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	var b strings.Builder
 
@@ -110,7 +115,7 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 		b.WriteString(key)
 		b.WriteString("=")
 		b.WriteString(ansiReset)
-		b.WriteString(a.Value.String())
+		b.WriteString(redactSecretQueryParams(a.Value.String()))
 	}
 
 	for _, a := range h.attrs {

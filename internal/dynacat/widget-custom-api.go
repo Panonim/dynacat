@@ -40,13 +40,16 @@ type CustomAPIRequest struct {
 
 type customAPIWidget struct {
 	widgetBase        `yaml:",inline"`
-	*CustomAPIRequest `yaml:",inline"`             // the primary request
+	*CustomAPIRequest `yaml:",inline"`
 	Subrequests       map[string]*CustomAPIRequest `yaml:"subrequests"`
 	Options           customAPIOptions             `yaml:"options"`
 	Template          string                       `yaml:"template"`
 	Frameless         bool                         `yaml:"frameless"`
-	compiledTemplate  *template.Template           `yaml:"-"`
-	CompiledHTML      template.HTML                `yaml:"-"`
+	// Serialized layout of the visual editor, never read while rendering.
+	Builder          string             `yaml:"builder"`
+	compiledTemplate *template.Template `yaml:"-"`
+	CompiledHTML     template.HTML      `yaml:"-"`
+	APIResponse      json.RawMessage    `yaml:"-"`
 }
 
 func (widget *customAPIWidget) initialize() error {
@@ -73,7 +76,6 @@ func (widget *customAPIWidget) initialize() error {
 
 	widget.compiledTemplate = compiledTemplate
 
-	// Validate update-interval if provided
 	if widget.UpdateInterval == nil {
 		interval := updateIntervalField(10 * time.Second)
 		widget.UpdateInterval = &interval
@@ -88,13 +90,14 @@ func (widget *customAPIWidget) initialize() error {
 
 func (widget *customAPIWidget) update(ctx context.Context) {
 	widget.Hidden = false
-	compiledHTML, hidden, err := fetchAndRenderCustomAPIRequest(
+	compiledHTML, hidden, rawResponse, err := fetchAndRenderCustomAPIRequest(
 		widget.CustomAPIRequest, widget.Subrequests, widget.Options, widget.compiledTemplate,
 	)
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
 	}
 
+	widget.APIResponse = rawResponse
 	widget.Hidden = hidden
 	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers)
 }
@@ -198,6 +201,10 @@ func (req *CustomAPIRequest) initialize() error {
 		req.Method = http.MethodGet
 	}
 
+	if !strings.Contains(req.URL, "://") {
+		req.URL = "https://" + req.URL
+	}
+
 	httpReq, err := http.NewRequest(strings.ToUpper(req.Method), req.URL, req.bodyReader)
 	if err != nil {
 		return err
@@ -245,11 +252,7 @@ func (data *customAPITemplateData) JSONLines() []decoratedGJSONResult {
 func (data *customAPITemplateData) Subrequest(key string) *customAPIResponseData {
 	req, exists := data.subrequests[key]
 	if !exists {
-		// We have to panic here since there's nothing sensible we can return and the
-		// lack of an error would cause requested data to return zero values which
-		// would be confusing from the user's perspective. Go's template module
-		// handles recovering from panics and will return the panic message as an
-		// error during template execution.
+		// Panic - Go's template engine recovers it and surfaces it as a template error.
 		panic(fmt.Sprintf("subrequest with key %q has not been defined", key))
 	}
 
@@ -275,7 +278,7 @@ func fetchCustomAPIResponse(ctx context.Context, req *CustomAPIRequest) (*custom
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -310,18 +313,14 @@ func fetchAndRenderCustomAPIRequest(
 	subReqs map[string]*CustomAPIRequest,
 	options customAPIOptions,
 	tmpl *template.Template,
-) (template.HTML, bool, error) {
+) (template.HTML, bool, json.RawMessage, error) {
 	var primaryData *customAPIResponseData
 	subData := make(map[string]*customAPIResponseData, len(subReqs))
 	var err error
 
 	if len(subReqs) == 0 {
-		// If there are no subrequests, we can fetch the primary request in a much simpler way
 		primaryData, err = fetchCustomAPIResponse(context.Background(), primaryReq)
 	} else {
-		// If there are subrequests, we need to fetch them concurrently
-		// and cancel all requests if any of them fail. There's probably
-		// a more elegant way to do this, but this works for now.
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -365,9 +364,25 @@ func fetchAndRenderCustomAPIRequest(
 	emptyBody := template.HTML("")
 
 	if err != nil {
-		return emptyBody, false, err
+		return emptyBody, false, nil, err
 	}
 
+	// Kept so the widget can expose the upstream payload through the API.
+	var rawResponse json.RawMessage
+	if primaryData != nil && json.Valid([]byte(primaryData.JSON.Raw)) {
+		rawResponse = json.RawMessage(primaryData.JSON.Raw)
+	}
+
+	body, hidden, err := renderCustomAPIData(primaryData, subData, options, tmpl)
+	return body, hidden, rawResponse, err
+}
+
+func renderCustomAPIData(
+	primaryData *customAPIResponseData,
+	subData map[string]*customAPIResponseData,
+	options customAPIOptions,
+	tmpl *template.Template,
+) (template.HTML, bool, error) {
 	data := customAPITemplateData{
 		customAPIResponseData: primaryData,
 		subrequests:           subData,
@@ -375,9 +390,8 @@ func fetchAndRenderCustomAPIRequest(
 	}
 
 	var templateBuffer bytes.Buffer
-	err = tmpl.Execute(&templateBuffer, &data)
-	if err != nil {
-		return emptyBody, false, err
+	if err := tmpl.Execute(&templateBuffer, &data); err != nil {
+		return "", false, err
 	}
 
 	output := templateBuffer.String()
@@ -535,6 +549,28 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 		"toInt": func(a float64) int {
 			return int(a)
 		},
+		"formatBytes": func(v any) string {
+			var b float64
+			switch t := v.(type) {
+			case int:
+				b = float64(t)
+			case int64:
+				b = float64(t)
+			case float64:
+				b = t
+			default:
+				return "?"
+			}
+
+			units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
+			i := 0
+			for b >= 1024 && i < len(units)-1 {
+				b /= 1024
+				i++
+			}
+
+			return strconv.FormatFloat(b, 'f', ternary(i == 0, 0, 1), 64) + " " + units[i]
+		},
 		"add": func(a, b any) any {
 			return doMathOpWithAny(a, b, "add")
 		},
@@ -591,11 +627,7 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 		"endOfDay": func(t time.Time) time.Time {
 			return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location())
 		},
-		// The reason we flip the parameter order is so that you can chain multiple calls together like this:
-		// {{ .JSON.String "foo" | trimPrefix "bar" | doSomethingElse }}
-		// instead of doing this:
-		// {{ trimPrefix (.JSON.String "foo") "bar" | doSomethingElse }}
-		// since the piped value gets passed as the last argument to the function.
+		// Args flipped so the piped value lands last, enabling chaining.
 		"trimPrefix": func(prefix, s string) string {
 			return strings.TrimPrefix(s, prefix)
 		},
@@ -745,17 +777,12 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 		"hide": func() template.HTML {
 			return template.HTML(customAPIHideWidgetSentinel)
 		},
-		// list creates a []any from the given arguments, enabling range iteration
-		// over dynamically constructed slices in templates.
 		"list": func(items ...any) []any {
 			return items
 		},
-		// append adds one or more items to a []any slice and returns the new slice.
 		"append": func(slice []any, items ...any) []any {
 			return append(slice, items...)
 		},
-		// uniq returns a new []any slice with duplicate values removed,
-		// preserving the order of first occurrence for all value types.
 		"uniq": func(slice []any) []any {
 			out := make([]any, 0, len(slice))
 			for _, candidate := range slice {
@@ -775,8 +802,6 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 
 			return out
 		},
-		// sortAlpha sorts a []any slice by each item's string representation
-		// in ascending order while preserving all items.
 		"sortAlpha": func(slice []any) []any {
 			type sortableItem struct {
 				value any
@@ -788,7 +813,6 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 					return asString
 				}
 
-				// Prefer JSON for stable string output of maps/objects when possible.
 				if encoded, err := json.Marshal(value); err == nil {
 					return string(encoded)
 				}

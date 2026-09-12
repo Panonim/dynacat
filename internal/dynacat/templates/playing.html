@@ -4,6 +4,14 @@
 
 {{ define "widget-content" }}
 <style>
+    /* Trim the default widget vertical padding - the session content is
+       short, so the full padding leaves too much dead space top and bottom. */
+    .widget-content:has(.playing-sessions),
+    .widget-content:has(.playing-empty) {
+        padding-top: 7px;
+        padding-bottom: 7px;
+    }
+
     .playing-sessions {
         display: flex;
         flex-direction: column;
@@ -35,16 +43,14 @@
         flex-shrink: 0;
         width: 80px;
         height: 80px;
-        border-radius: 0.25rem;
+        border-radius: 0.3rem;
         overflow: hidden;
         background: var(--color-separator);
         display: inline-block;
     }
 
     .playing-thumbnail.playing-portrait {
-        /* make portrait-oriented covers taller and remove bg color */
         height: 120px;
-        background: transparent;
     }
 
     .playing-thumbnail-img {
@@ -63,7 +69,7 @@
         min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: 0.2rem;
     }
 
     .playing-user {
@@ -157,8 +163,8 @@
     .playing-progress-wrapper {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
-        margin-top: 0.4rem;
+        gap: 0.15rem;
+        margin-top: 0.2rem;
     }
 
     .playing-progress-bar-container {
@@ -248,11 +254,11 @@
                     <div class="playing-host-group">
                         <div class="playing-host-header">{{ $hostKey }}</div>
                         {{ range $session := $sessions }}
-                        <div class="playing-session" data-duration="{{ $session.Duration }}" data-offset="{{ $session.Offset }}" data-playing="{{ $session.IsPlaying }}" data-session-key="{{ $session.ServerURL }}|{{ $session.UserName }}">
+                        <div class="playing-session" data-duration="{{ $session.Duration }}" data-offset="{{ $session.Offset }}" data-playing="{{ $session.IsPlaying }}" data-coarse="{{ $session.Coarse }}" data-title="{{ $session.Title }}" data-session-key="{{ $session.ServerURL }}|{{ $session.UserName }}">
                             {{ if $.ShowThumbnailEnabled }}
                                 {{ if $session.ThumbnailURL }}
                                     <div class="playing-thumbnail">
-                                        <img class="playing-thumbnail-img" src="{{ $session.ThumbnailURL }}" alt="Thumbnail">
+                                        <img class="playing-thumbnail-img" src="{{ $session.ThumbnailURL }}" alt="Thumbnail" loading="lazy">
                                     </div>
                                 {{ else }}
                                     <div class="playing-thumbnail"></div>
@@ -312,11 +318,11 @@
 {{ else }}
     <div class="playing-sessions">
         {{ range $session := .Sessions }}
-        <div class="playing-session" data-duration="{{ $session.Duration }}" data-offset="{{ $session.Offset }}" data-playing="{{ $session.IsPlaying }}" data-session-key="{{ $session.ServerURL }}|{{ $session.UserName }}">
+        <div class="playing-session" data-duration="{{ $session.Duration }}" data-offset="{{ $session.Offset }}" data-playing="{{ $session.IsPlaying }}" data-coarse="{{ $session.Coarse }}" data-title="{{ $session.Title }}" data-session-key="{{ $session.ServerURL }}|{{ $session.UserName }}">
             {{ if $.ShowThumbnailEnabled }}
                 {{ if $session.ThumbnailURL }}
                     <div class="playing-thumbnail">
-                        <img class="playing-thumbnail-img" src="{{ $session.ThumbnailURL }}" alt="Thumbnail">
+                        <img class="playing-thumbnail-img" src="{{ $session.ThumbnailURL }}" alt="Thumbnail" loading="lazy">
                     </div>
                 {{ else }}
                     <div class="playing-thumbnail"></div>
@@ -324,6 +330,7 @@
             {{ end }}
 
             <div class="playing-info">
+                {{ if not $.HideUsername }}
                 <div class="playing-user">
                     {{ if eq $.PlayState "indicator" }}
                         <span class="playing-indicator {{ if $session.IsPlaying }}playing{{ else }}paused{{ end }}"></span>
@@ -332,6 +339,7 @@
                     {{ end }}
                     <span>{{ $session.UserName }}</span>
                 </div>
+                {{ end }}
 
                 <div class="playing-title color-primary">{{ $session.DisplayTitle }}</div>
 
@@ -395,6 +403,11 @@
             const duration = Number.parseInt(session.dataset.duration || '', 10);
             const offset = Number.parseInt(session.dataset.offset || '', 10);
             const sessionKey = session.dataset.sessionKey || '';
+            const title = session.dataset.title || '';
+            // Coarse sources (Navidrome/Subsonic) report a minute-granular
+            // offset that lags the true position, so it must not snap the
+            // smoothly-advancing bar backward on each poll.
+            const coarse = session.dataset.coarse === 'true';
 
             if (!Number.isFinite(duration) || !Number.isFinite(offset) || duration <= 0) {
                 return null;
@@ -402,12 +415,22 @@
 
             let startOffset = offset;
             const previousState = globalState.get(sessionKey);
-            if (previousState && Number.isFinite(previousState.position) && Number.isFinite(previousState.updatedAt)) {
+            const sameTrack = previousState && previousState.title === title;
+            if (sameTrack && Number.isFinite(previousState.position) && Number.isFinite(previousState.updatedAt)) {
                 const projected = Math.min(duration, previousState.position + (nowEpochMs - previousState.updatedAt));
-                const drift = Math.abs(projected - offset);
 
-                if (drift <= 6000) {
-                    startOffset = projected;
+                if (coarse) {
+                    // Keep the monotonic projection unless the server jumped
+                    // ahead (seek) or the projection ran a full minute-bucket
+                    // past the reported offset (drift/track change).
+                    if (projected >= offset && (projected - offset) <= 65000) {
+                        startOffset = projected;
+                    }
+                } else {
+                    const drift = Math.abs(projected - offset);
+                    if (drift <= 6000) {
+                        startOffset = projected;
+                    }
                 }
             }
 
@@ -418,6 +441,7 @@
                 duration,
                 offset: startOffset,
                 sessionKey,
+                title,
                 fill: session.querySelector('.playing-progress-fill'),
                 positionNodes: session.querySelectorAll('.playing-time-pos'),
             };
@@ -471,6 +495,7 @@
                 globalState.set(entry.sessionKey, {
                     position,
                     updatedAt: nowEpochMs + elapsed,
+                    title: entry.title,
                 });
             }
         }

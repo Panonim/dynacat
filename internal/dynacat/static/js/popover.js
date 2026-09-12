@@ -73,11 +73,7 @@ function showPopover() {
     } else if (popoverType === "html") {
         const htmlContent = activeTarget.querySelector(htmlContentSelector);
         if (htmlContent === null) return;
-        /**
-         * The reason for all of the below shenanigans is that I want to preserve
-         * all attached event listeners of the original HTML content. This is so I don't have to
-         * re-setup events for things like lazy images, they'd just work as expected.
-         */
+        // Move the node itself to preserve its attached event listeners.
         const placeholder = document.createComment("");
         htmlContent.replaceWith(placeholder);
         contentElement.replaceChildren(htmlContent);

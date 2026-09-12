@@ -1,11 +1,8 @@
 (function () {
     const base = (typeof pageData !== 'undefined' && pageData.baseURL) || '';
 
-    // activePulls: widgetId -> [{pullId, image, statusText, isError}]
     const activePulls = new Map();
-    // MutationObservers watching widgets for content replacements
     const widgetObservers = new Map();
-    // confirmingItems: "widgetId:type:id" -> {origHTML, origTitle, timeoutId}
     const confirmingItems = new Map();
 
     function escapeHtml(str) {
@@ -16,7 +13,6 @@
             .replace(/"/g, '&quot;');
     }
 
-    // Find the images <ul> list inside a widget (the section that has the pull input)
     function getImagesListForWidget(widgetId) {
         const widget = document.querySelector('.widget[data-widget-id="' + widgetId + '"]');
         if (!widget) return null;
@@ -115,8 +111,6 @@
         updateNoImagesState(widgetId);
     }
 
-    // Watch a widget's direct children for replacements (i.e. widget-content swaps)
-    // and re-inject active pull entries after each swap.
     function watchWidget(widgetId) {
         if (widgetObservers.has(widgetId)) return;
         const widget = document.querySelector('.widget[data-widget-id="' + widgetId + '"]');
@@ -148,8 +142,6 @@
         updateNoImagesState(widgetId);
     }
 
-    // Fetch fresh widget content and replace only the row for the given container ID.
-    // For 'remove' actions, the row is simply deleted from the DOM without a server fetch.
     async function updateContainerRow(widgetId, id, action) {
         const widget = document.querySelector('.widget[data-widget-id="' + widgetId + '"]');
         if (!widget) return;
@@ -203,7 +195,6 @@
             btn.disabled = false;
             return;
         }
-        // Give Docker a moment to apply the state change before fetching fresh state
         await new Promise(function (r) { setTimeout(r, 400); });
         await updateContainerRow(widgetId, id, action);
     };
@@ -246,7 +237,6 @@
         return row ? row.querySelector('.docker-ctrl-icon-btn.remove') : null;
     }
 
-    // After a widget update, re-apply confirming visuals to any buttons that were in confirm state.
     document.addEventListener('dynacat:widget-updated', function (event) {
         const widget = event.detail?.widget;
         const widgetId = event.detail?.widgetId || widget?.dataset?.widgetId;
@@ -263,7 +253,6 @@
         const key = widgetId + ':' + type + ':' + id;
 
         if (confirmingItems.has(key)) {
-            // Second click — perform the removal
             const state = confirmingItems.get(key);
             clearTimeout(state.timeoutId);
             confirmingItems.delete(key);

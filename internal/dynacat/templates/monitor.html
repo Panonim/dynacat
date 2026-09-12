@@ -6,7 +6,7 @@
 {{ if not (and .ShowFailingOnly (not .HasFailing)) }}
 <ul class="dynamic-columns list-gap-20 list-with-separator">
     {{ range .Sites }}
-    {{ if and $.ShowFailingOnly (eq .StatusStyle "ok" ) }} {{ continue }} {{ end }}
+    {{ if and $.ShowFailingOnly (ne .StatusStyle "error" ) }} {{ continue }} {{ end }}
     <div class="monitor-site flex items-center gap-15">
         {{ template "site" . }}
     </div>
@@ -30,14 +30,23 @@
     <a class="size-h3 color-highlight text-truncate block" href="{{ .URL | safeURL }}" {{ if not .SameTab }}target="_blank"{{ end }} rel="noreferrer">{{ .Title }}</a>
     {{- if .Description }}
     <div class="text-truncate">{{ .Description }}</div>
+    {{- else if eq .StatusStyle "disabled" }}
+    <div class="text-truncate color-subdue">{{ .StatusLabel }}</div>
     {{- else }}
     <div class="text-truncate{{ if ne .StatusStyle "ok" }} color-negative{{ end }}">{{ .StatusLabel }} • {{ .Status.ResponseTime.Milliseconds | formatNumber }}ms</div>
     {{- end }}
 </div>
+{{ if .History }}{{ template "monitor-history" . }}{{ end }}
 {{ if eq .StatusStyle "ok" }}
 <div class="monitor-site-status-icon" {{- if .Description }} data-popover-type="text" data-popover-position="above" data-popover-text="{{ if .Status.Error }}{{ .Status.Error }}{{ else }}{{ .StatusLabel }} • {{ .Status.ResponseTime.Milliseconds | formatNumber }}ms{{ end }}" aria-label="{{ .StatusLabel }}"{{ end }}>
     <svg fill="var(--color-positive)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+    </svg>
+</div>
+{{ else if eq .StatusStyle "disabled" }}
+<div class="monitor-site-status-icon" {{- if .Description }} data-popover-type="text" data-popover-position="above" data-popover-text="{{ .StatusLabel }}" aria-label="{{ .StatusLabel }}"{{ end }}>
+    <svg fill="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm5 0a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd" />
     </svg>
 </div>
 {{ else }}
