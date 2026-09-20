@@ -837,7 +837,8 @@ func uniquePageFileName(dir, title string) string {
 	base := titleToSlug(title)
 	base = pageFileNamePattern.ReplaceAllString(base, "")
 	base = strings.Trim(base, "-")
-	if base == "" {
+	// The slug pattern already strips dots and slashes, the check keeps that guarantee explicit at the path sink.
+	if base == "" || strings.Contains(base, "..") || strings.ContainsAny(base, `/\`) {
 		base = "page"
 	}
 
