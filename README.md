@@ -6,7 +6,8 @@
   <a href="https://ko-fi.com/panonim">Sponsor</a> 
 </p>
 <p align="center">
-  <a href="https://github.com/Panonim/dynawidgets">Dynawidgets repo</a> •
+  <a href="https://github.com/Panonim/dynawidgets">Dynawidgets</a> •
+  <a href="https://github.com/Panonim/dynawidgets">Custom-api widgets</a> •
   <a href="https://dynacat.artur.zone/preconfigured-pages">Preconfigured pages</a> •
   <a href="https://dynacat.artur.zone/themes">Themes</a> 
 </p>
@@ -15,7 +16,7 @@
 
 ![](docs/docs/images/readme-main-image.png)
 
-## Features
+## Features List
 ### Various widgets
 * RSS feeds
 * Subreddit posts
@@ -52,6 +53,19 @@ Because you'll want to take it with you on the go.
 Easily create your own theme by tweaking a few numbers or choose from one of the [already available themes](https://dynacat.artur.zone/themes).
 
 ![](docs/docs/images/themes-example.png)
+
+<br>
+
+### Other features worth mentioning
+* **UI editor** - add pages, drag widgets between columns and change their options from the dashboard itself, Dynacat writes it back into your YAML
+* **Widget editor** - a visual builder for `custom-api` widgets, point it at an API and bind blocks to fields instead of writing the template by hand
+* **Dynawidgets** - ready-made widgets from a community repository, fetched and cached from a single slug
+* **JSON API** - read the data your widgets already fetched from scripts or other apps
+* **Dynamic updates** - widgets refresh on their own, no manual reload
+* **OIDC** - log in through your own identity provider
+* **More widgets** - docker controller, currently playing, latest media, torrenting, speedtest, stopwatch and Sonarr/Radarr releases in the calendar
+
+Each of these is covered in [the docs](https://dynacat.artur.zone).
 
 <br>
 
