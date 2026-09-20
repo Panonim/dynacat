@@ -2765,7 +2765,7 @@ Either `duckduckgo` (default), `brave`, or a URL to a custom suggestion endpoint
 | brave | Brave Search autocomplete |
 | a URL containing `{QUERY}` | Your own suggestion endpoint |
 
-A custom URL must return the [OpenSearch suggestions format](https://github.com/dewitt/opensearch/blob/master/opensearch-1-1-draft-6.md#the-json-format) (`["query", ["suggestion 1", "suggestion 2", ...]]`), which is what most self-hosted and public search engines (SearXNG, Wikipedia, etc.) expose. Use `{QUERY}` to indicate where the typed query gets placed. The request is made server-side, so the URL is never sent to the browser. Example:
+A custom URL must return the [OpenSearch suggestions format](https://github.com/dewitt/opensearch/blob/master/opensearch-1-1-draft-6.md#the-json-format) (`["query", ["suggestion 1", "suggestion 2", ...]]`), which is what most self-hosted and public search engines (SearXNG, Wikipedia, etc.) expose. Use `{QUERY}` in the query string to indicate where the typed query gets placed, it is not allowed in the host or path. The request is made server-side, so the URL is never sent to the browser. Example:
 
 ```yaml
 - type: search

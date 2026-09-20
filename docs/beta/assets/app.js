@@ -1976,7 +1976,7 @@ const PAGE_NAMES = new Proxy({}, {
 let SEARCHABLE_PAGE_IDS = [];
 
 function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function highlightMatch(text, query) {
