@@ -91,6 +91,8 @@
   --radius-sm: 4px;
   --radius:    6px;
   --radius-lg: 10px;
+
+  --lightbox-backdrop: rgba(10, 10, 15, 0.82);
 }
 
 [data-theme="light"] {
@@ -138,6 +140,8 @@
 
   --callout-quote-bg:     rgba(100, 116, 139, 0.10);
   --callout-quote-border: rgba(100, 116, 139, 0.30);
+
+  --lightbox-backdrop: rgba(28, 22, 51, 0.62);
 }
 
 /* ─── Scrollbars ─────────────────────────────────────────────────────────── */
@@ -427,6 +431,14 @@ body {
   transition: border-color 0.15s;
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* iOS Safari zooms the page when a focused field renders under 16px, in any orientation. */
+@media (pointer: coarse) {
+  .search-input {
+    font-size: 16px;
+    padding: 8px 10px 8px 32px;
+  }
 }
 
 .search-input::placeholder { color: var(--text-faint); }
@@ -1403,7 +1415,10 @@ body {
 .md-content h1:hover .heading-link,
 .md-content h2:hover .heading-link,
 .md-content h3:hover .heading-link,
-.md-content h4:hover .heading-link { opacity: 1; }
+.md-content h4:hover .heading-link,
+.md-content h5:hover .heading-link,
+.md-content h6:hover .heading-link,
+.md-content .heading-link:focus-visible { opacity: 1; }
 
 .md-content p {
   margin: 0 0 16px;
@@ -1618,6 +1633,120 @@ body {
   border: 1px solid var(--border);
   margin: 8px 0 16px;
   display: block;
+}
+
+.md-content img.zoomable {
+  cursor: zoom-in;
+  transition: border-color 0.15s ease;
+}
+
+.md-content img.zoomable:hover,
+.md-content img.zoomable:focus-visible {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
+/* Image lightbox */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--lightbox-backdrop);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  cursor: zoom-out;
+}
+
+.lightbox[hidden] { display: none; }
+
+.lightbox.open { opacity: 1; }
+
+.lightbox-scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 48px 24px;
+}
+
+/* Auto margins keep the figure centered without the overflow clipping that flex centering causes. */
+.lightbox-figure {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: calc(100vh - 140px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  cursor: default;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform: scale(0.97);
+  transition: transform 0.18s ease;
+}
+
+.lightbox.is-zoomed .lightbox-figure { max-width: none; }
+
+.lightbox-img.zoomed {
+  max-width: none;
+  max-height: none;
+}
+
+@media (pointer: fine) {
+  .lightbox-img { cursor: zoom-in; }
+  .lightbox-img.zoomed { cursor: grab; }
+  .lightbox.is-panning .lightbox-img.zoomed { cursor: grabbing; }
+}
+
+.lightbox.open .lightbox-img { transform: scale(1); }
+
+.lightbox-caption {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 640px;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.lightbox-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.lightbox-close svg { width: 18px; height: 18px; }
+
+@media (max-width: 768px) {
+  .lightbox-scroll { padding: 56px 12px 24px; }
+  .lightbox-img { max-height: calc(100dvh - 160px); }
 }
 
 /* Details / Summary */

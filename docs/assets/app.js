@@ -689,6 +689,172 @@ function fixImagePaths(container) {
   });
 }
 
+let lightboxEl = null;
+let lightboxScrollEl = null;
+let lightboxImgEl = null;
+let lightboxCaptionEl = null;
+let lightboxTrigger = null;
+
+function ensureLightbox() {
+  if (lightboxEl) return;
+
+  lightboxEl = document.createElement('div');
+  lightboxEl.className = 'lightbox';
+  lightboxEl.id = 'lightbox';
+  lightboxEl.setAttribute('role', 'dialog');
+  lightboxEl.setAttribute('aria-modal', 'true');
+  lightboxEl.hidden = true;
+  // The close button sits outside the scrolling layer so panning never carries it off screen.
+  lightboxEl.innerHTML = `
+    <div class="lightbox-scroll">
+      <figure class="lightbox-figure">
+        <img class="lightbox-img" alt="" draggable="false">
+        <figcaption class="lightbox-caption"></figcaption>
+      </figure>
+    </div>
+    <button class="lightbox-close" type="button" aria-label="Close image">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  `;
+
+  lightboxScrollEl = lightboxEl.querySelector('.lightbox-scroll');
+  lightboxImgEl = lightboxEl.querySelector('.lightbox-img');
+  lightboxCaptionEl = lightboxEl.querySelector('.lightbox-caption');
+
+  lightboxEl.addEventListener('click', e => {
+    if (!e.target.closest('.lightbox-img')) {
+      closeLightbox();
+      return;
+    }
+    if (panMovedImage) {
+      panMovedImage = false;
+      return;
+    }
+    toggleLightboxZoom(e);
+  });
+
+  lightboxImgEl.addEventListener('pointerdown', startLightboxPan);
+
+  document.body.appendChild(lightboxEl);
+}
+
+const LIGHTBOX_ZOOM = 2.5;
+const PAN_THRESHOLD = 4;
+
+let panMovedImage = false;
+
+// Touch devices pan the zoomed image by scrolling it, so only the mouse needs a drag handler.
+function startLightboxPan(e) {
+  panMovedImage = false;
+  if (e.pointerType !== 'mouse' || !lightboxImgEl.classList.contains('zoomed')) return;
+
+  e.preventDefault();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startLeft = lightboxScrollEl.scrollLeft;
+  const startTop = lightboxScrollEl.scrollTop;
+
+  const onMove = moveEvent => {
+    const dx = moveEvent.clientX - startX;
+    const dy = moveEvent.clientY - startY;
+
+    if (!panMovedImage) {
+      if (Math.abs(dx) < PAN_THRESHOLD && Math.abs(dy) < PAN_THRESHOLD) return;
+      panMovedImage = true;
+      lightboxEl.classList.add('is-panning');
+    }
+
+    lightboxScrollEl.scrollLeft = startLeft - dx;
+    lightboxScrollEl.scrollTop = startTop - dy;
+  };
+
+  const onUp = () => {
+    document.removeEventListener('pointermove', onMove);
+    lightboxEl.classList.remove('is-panning');
+  };
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp, { once: true });
+}
+
+function resetLightboxZoom() {
+  lightboxEl.classList.remove('is-zoomed');
+  lightboxImgEl.classList.remove('zoomed');
+  lightboxImgEl.style.width = '';
+  lightboxScrollEl.scrollTo(0, 0);
+}
+
+function toggleLightboxZoom(e) {
+  if (lightboxImgEl.classList.contains('zoomed')) {
+    resetLightboxZoom();
+    return;
+  }
+
+  const rect = lightboxImgEl.getBoundingClientRect();
+  const ratioX = (e.clientX - rect.left) / rect.width;
+  const ratioY = (e.clientY - rect.top) / rect.height;
+
+  lightboxEl.classList.add('is-zoomed');
+  lightboxImgEl.classList.add('zoomed');
+  lightboxImgEl.style.width = `${rect.width * LIGHTBOX_ZOOM}px`;
+
+  // Keep the clicked spot under the cursor now that the image is bigger.
+  const zoomedRect = lightboxImgEl.getBoundingClientRect();
+  lightboxScrollEl.scrollLeft += zoomedRect.left + ratioX * zoomedRect.width - e.clientX;
+  lightboxScrollEl.scrollTop += zoomedRect.top + ratioY * zoomedRect.height - e.clientY;
+}
+
+function openLightbox(img) {
+  ensureLightbox();
+  resetLightboxZoom();
+
+  lightboxTrigger = img;
+  lightboxImgEl.src = img.currentSrc || img.src;
+  lightboxImgEl.alt = img.alt || '';
+  lightboxCaptionEl.textContent = img.alt || '';
+  lightboxCaptionEl.hidden = !img.alt;
+
+  lightboxEl.hidden = false;
+  requestAnimationFrame(() => lightboxEl.classList.add('open'));
+  lightboxEl.querySelector('.lightbox-close').focus();
+}
+
+function closeLightbox() {
+  if (!lightboxEl || lightboxEl.hidden) return;
+
+  lightboxEl.classList.remove('open');
+  lightboxEl.hidden = true;
+  resetLightboxZoom();
+  lightboxImgEl.removeAttribute('src');
+
+  if (lightboxTrigger) {
+    lightboxTrigger.focus();
+    lightboxTrigger = null;
+  }
+}
+
+function setupImageZoom(container) {
+  container.querySelectorAll('img').forEach(img => {
+    if (img.closest('a')) return;
+
+    img.classList.add('zoomable');
+    img.tabIndex = 0;
+    img.setAttribute('role', 'button');
+    img.title = 'Click to expand';
+    img.addEventListener('click', () => openLightbox(img));
+    img.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openLightbox(img);
+      }
+    });
+  });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLightbox();
+});
+
 function addHeadingIds(container) {
   const usedIds = new Set();
   container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
@@ -1178,7 +1344,8 @@ function buildFloatingToc(wrapper) {
       };
     })
     .filter(entry => {
-      if (!entry.id || !entry.label) return false;
+      // Headings made only of inline code leave punctuation behind once the code is stripped.
+      if (!entry.id || !/[\p{L}\p{N}]/u.test(entry.label)) return false;
 
       const normalizedLabel = entry.label.toLowerCase();
       // Skip repetitive subheadings that add noise in long config docs.
@@ -1333,12 +1500,14 @@ async function renderDoc(pageId, hash, requestId) {
   wrapper.innerHTML = parseMarkdown(md);
 
   fixImagePaths(wrapper);
+  setupImageZoom(wrapper);
   processCallouts(wrapper);
   addHeadingIds(wrapper);
   highlightCode(wrapper);
   handleContentLinks(wrapper);
 
   clearTimeout(spinnerTimer);
+  closeLightbox();
   destroyToc();
   contentEl.innerHTML = '';
   contentEl.appendChild(wrapper);
