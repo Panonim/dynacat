@@ -29,10 +29,9 @@ func (a *application) handleThemeChangeRequest(w http.ResponseWriter, r *http.Re
 		properties = &a.Config.Theme.themeProperties
 	}
 
-	http.SetCookie(w, &http.Cookie{
+	a.setCookie(w, r, &http.Cookie{
 		Name:     "theme",
 		Value:    themeKey,
-		Path:     a.Config.Server.BaseURL + "/",
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(2 * 365 * 24 * time.Hour),
 	})

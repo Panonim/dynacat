@@ -139,9 +139,11 @@ func (widget *searchWidget) initialize() error {
 
 	if widget.AutocompleteProvider == "" {
 		widget.AutocompleteProvider = "duckduckgo"
-	} else if widget.AutocompleteProvider != "duckduckgo" && widget.AutocompleteProvider != "brave" &&
-		!strings.Contains(widget.AutocompleteProvider, "{QUERY}") {
-		return fmt.Errorf("autocomplete-provider must be \"duckduckgo\", \"brave\", or a custom URL containing {QUERY}")
+	} else if widget.AutocompleteProvider != "duckduckgo" && widget.AutocompleteProvider != "brave" {
+		_, rawQuery, _ := strings.Cut(widget.AutocompleteProvider, "?")
+		if !strings.Contains(rawQuery, "{QUERY}") {
+			return fmt.Errorf("autocomplete-provider must be \"duckduckgo\", \"brave\", or a custom URL with {QUERY} in its query string")
+		}
 	}
 
 	if url, ok := searchEngines[widget.SearchEngine]; ok {

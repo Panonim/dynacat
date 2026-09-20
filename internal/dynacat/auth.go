@@ -417,16 +417,30 @@ func isSafeLocalPath(target string) bool {
 		!strings.HasPrefix(target, "/\\")
 }
 
+// Secure follows the request scheme because browsers drop Secure cookies set over plain HTTP.
+func (a *application) setCookie(w http.ResponseWriter, r *http.Request, cookie *http.Cookie) {
+	cookie.Secure = a.isRequestHTTPS(r)
+	cookie.HttpOnly = true
+	cookie.Path = a.Config.Server.BaseURL + "/"
+	http.SetCookie(w, cookie)
+}
+
+func (a *application) clearCookie(w http.ResponseWriter, r *http.Request, name string) {
+	a.setCookie(w, r, &http.Cookie{
+		Name:     name,
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
 func (a *application) redirectToLoginPage(w http.ResponseWriter, r *http.Request) {
 	if target := r.URL.RequestURI(); isSafeLocalPath(target) {
-		http.SetCookie(w, &http.Cookie{
+		a.setCookie(w, r, &http.Cookie{
 			Name:     AUTH_REDIRECT_COOKIE_NAME,
 			Value:    target,
 			Expires:  time.Now().Add(OIDC_STATE_VALID_PERIOD),
-			Secure:   a.isRequestHTTPS(r),
-			Path:     a.Config.Server.BaseURL + "/",
 			SameSite: http.SameSiteLaxMode,
-			HttpOnly: true,
 		})
 	}
 	http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
@@ -437,13 +451,7 @@ func (a *application) takeLoginRedirect(w http.ResponseWriter, r *http.Request) 
 	if c, err := r.Cookie(AUTH_REDIRECT_COOKIE_NAME); err == nil && isSafeLocalPath(c.Value) {
 		target = c.Value
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     AUTH_REDIRECT_COOKIE_NAME,
-		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     a.Config.Server.BaseURL + "/",
-		HttpOnly: true,
-	})
+	a.clearCookie(w, r, AUTH_REDIRECT_COOKIE_NAME)
 	return target
 }
 
@@ -461,26 +469,17 @@ func (a *application) handleLogoutRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     OIDC_SESSION_COOKIE_NAME,
-		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     a.Config.Server.BaseURL + "/",
-		HttpOnly: true,
-	})
+	a.clearCookie(w, r, OIDC_SESSION_COOKIE_NAME)
 
 	http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
 }
 
 func (a *application) setAuthSessionCookie(w http.ResponseWriter, r *http.Request, token string, expires time.Time) {
-	http.SetCookie(w, &http.Cookie{
+	a.setCookie(w, r, &http.Cookie{
 		Name:     AUTH_SESSION_COOKIE_NAME,
 		Value:    token,
 		Expires:  expires,
-		Secure:   a.isRequestHTTPS(r),
-		Path:     a.Config.Server.BaseURL + "/",
 		SameSite: http.SameSiteStrictMode,
-		HttpOnly: true,
 	})
 }
 

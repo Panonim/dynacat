@@ -1485,12 +1485,24 @@ function iconPreview(input) {
 // Sets src plus the same flat-icon class the widget templates use for auto-invert icons.
 function applyIcon(el, value) {
     const { url, autoInvert } = resolveIcon(value);
+    const src = safeImageURL(url);
     el.classList.toggle("flat-icon", autoInvert);
-    el.onerror = /cdn\.jsdelivr\.net\/gh\/(selfhst\/icons|homarr-labs\/dashboard-icons)\/svg\//.test(url)
-        ? () => { el.onerror = null; el.src = url.replace("/svg/", "/webp/").replace(/\.svg$/, ".webp"); }
+    el.onerror = /cdn\.jsdelivr\.net\/gh\/(selfhst\/icons|homarr-labs\/dashboard-icons)\/svg\//.test(src)
+        ? () => { el.onerror = null; el.src = src.replace("/svg/", "/webp/").replace(/\.svg$/, ".webp"); }
         : null;
-    el.src = url;
-    return url;
+    el.src = src;
+    return src;
+}
+
+// Rebuilds the URL from its parsed form so only http(s) and same-origin paths ever reach an image src.
+function safeImageURL(value) {
+    if (!value) return "";
+    try {
+        const parsed = new URL(value, document.baseURI);
+        return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : "";
+    } catch {
+        return "";
+    }
 }
 
 function resolveIconURL(value) {
