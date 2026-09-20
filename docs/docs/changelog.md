@@ -1,3 +1,7 @@
+# Changes for 3.0.1
+- Updated docs website
+- Fixed a bug where dashless includes would not work in the UI editor
+
 # Changes for 3.0.0
 - Moved the compose template to [Panonim/dynacat-compose-template](https://github.com/Panonim/dynacat-compose-template), the install command is now a single `curl | tar` with no `sed` renaming
 - Added support for `tcp://`/`http://` remote Docker hosts to `sock-path` in the `docker-controller` widget, matching `docker-containers` -> https://github.com/Panonim/dynacat/issues/137

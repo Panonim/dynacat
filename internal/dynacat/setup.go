@@ -254,7 +254,10 @@ func newStarterConfigYAML(pageName string, preset starterPreset) ([]byte, error)
 	addPair(root, "pages", pages)
 	setBlockStyleDeep(root)
 
-	contents := marshalDocument(&yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}})
+	contents, err := marshalDocument(&yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}})
+	if err != nil {
+		return nil, err
+	}
 
 	if _, err := newConfigFromYAML(contents); err != nil {
 		return nil, err
