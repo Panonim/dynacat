@@ -58,6 +58,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &twitchGamesWidget{}
 	case "twitch-channels":
 		w = &twitchChannelsWidget{}
+	case "tennis":
+		w = &tennisWidget{}
 	case "lobsters":
 		w = &lobstersWidget{}
 	case "change-detection":

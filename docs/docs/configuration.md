@@ -3290,6 +3290,31 @@ pages:
 | <kbd>Down Arrow</kbd> | Focus the last task that was added | When the "Add a task" field is focused |
 | <kbd>Escape</kbd> | Focus the "Add a task" field | When a task is focused |
 
+### Tennis
+
+Snapshots of matches currently in play, including set scores, points and the serving player. These are periodic snapshots, not point-by-point updates.
+
+```yaml
+- type: tennis
+  api-key: ${LIVE_TENNIS_API_KEY}
+  limit: 5
+```
+
+Get a free key from [Live Tennis API](https://livetennisapi.com/subscribe/free) and put it in your environment file as `LIVE_TENNIS_API_KEY`. No paid plan is required. The key stays on the server.
+
+| Property | Type | Required | Default |
+| -------- | ---- | -------- | ------- |
+| api-key | string | yes | |
+| limit | integer | no | 5 |
+
+`limit` controls how many matches are displayed (1–200). All tennis widgets using the same key share one snapshot, even when their display limits differ. The widget makes one request to `GET /matches?status=live&limit=200` per refresh. It does not fetch additional pages; a note indicates when only a selection is shown.
+
+Both `cache` and `update-interval` have an enforced minimum of 15 minutes. Errors also count as attempts. At this rate the widget uses at most 96 requests per day, within the free key's 100-request daily allowance. Other applications or separate Dynacat installations using the same key consume that same allowance.
+
+A new cache waits at least 15 minutes before the first request; longer `cache` or `update-interval` settings can delay it further. A private `.tennis-cache` directory beside the main configuration file stores the snapshot and request timing, so restarts and configuration reloads do not reset the request budget. Keep this directory on persistent storage (the standard Docker config mount does this) and allow Dynacat to write to it. Do not share the directory between concurrent Dynacat processes. Recreating it starts another 15-minute wait; an unreadable or invalid cache stops requests until repaired.
+
+Each snapshot shows its fetch time. A failed refresh retains the previous snapshot and displays the error. Unavailable scores are labelled rather than shown as zero, and match tiebreak scores appear in brackets. A provider-marked stale score is labelled separately.
+
 ### Twitch Channels
 Display a list of channels from Twitch.
 

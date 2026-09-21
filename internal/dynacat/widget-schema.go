@@ -58,6 +58,7 @@ var widgetTypeCatalog = []widgetTypeMeta{
 	{"monitor", "Monitor", "mdi:heart-pulse", "configuration/monitor"},
 	{"twitch-top-games", "Twitch Top Games", "mdi:twitch", "configuration/twitch-top-games"},
 	{"twitch-channels", "Twitch Channels", "mdi:twitch", "configuration/twitch-channels"},
+	{"tennis", "Tennis snapshots", "mdi:tennis", "configuration/tennis"},
 	{"lobsters", "Lobsters", "mdi:message-text-outline", "configuration/lobsters"},
 	{"change-detection", "Change Detection", "mdi:eye-outline", "configuration/changedetectionio"},
 	{"repository", "Repository", "mdi:source-repository", "configuration/repository"},
@@ -119,6 +120,7 @@ var requiredFields = map[string][]string{
 	"server-stats":    {"servers.url"},
 	"torrenting":      {"hosts", "hosts.url"},
 	"twitch-channels": {"channels"},
+	"tennis":          {"api-key"},
 	"videos":          {"channels"},
 	"weather":         {"location"},
 }
@@ -193,6 +195,10 @@ var fieldAnnotations = map[string]map[string]fieldAnnotation{
 	},
 	"twitch-channels": {
 		"sort-by": {Options: []string{"viewers", "live"}},
+	},
+	"tennis": {
+		"api-key": {Hint: "Use ${LIVE_TENNIS_API_KEY} for a free Live Tennis API key stored in your environment file."},
+		"limit":   {Hint: "Number of matches to display (1–200). Widgets using the same key share one snapshot."},
 	},
 	"twitch-top-games": {
 		"exclude": {Hint: "Category slugs, found in the category page URL on Twitch."},

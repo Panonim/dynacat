@@ -1,0 +1,22 @@
+{{ template "widget-base.html" . }}
+
+{{ define "widget-content" }}
+{{ if .Message }}<p class="margin-bottom-10 color-subdue">{{ .Message }}</p>{{ end }}
+{{ if .FetchedAt }}
+<p class="size-h6 color-subdue margin-bottom-10">Snapshot: {{ .FetchedAt }} · Refreshes no faster than every 15 minutes</p>
+<ul class="list list-gap-14">
+    {{ range .Matches }}
+    <li>
+        <p class="size-h6 color-subdue">{{ .Tournament }}</p>
+        <p class="color-highlight">{{ .Players.P1.Name }} — {{ .Players.P2.Name }}</p>
+        <p>{{ .ScoreText }}</p>
+        {{ if .Serving }}<p class="size-h6 color-subdue">Serving: {{ .Serving }}</p>{{ end }}
+        {{ if .Score }}{{ if .Score.Stale }}<p class="size-h6 color-subdue">Score marked stale by provider</p>{{ end }}{{ end }}
+    </li>
+    {{ else }}
+    <li class="color-subdue">No live matches in this snapshot.</li>
+    {{ end }}
+</ul>
+{{ if .HasMore }}<p class="size-h6 color-subdue margin-top-10">Showing a limited selection of matches.</p>{{ end }}
+{{ end }}
+{{ end }}

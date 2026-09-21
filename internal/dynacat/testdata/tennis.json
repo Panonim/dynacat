@@ -1,0 +1,30 @@
+{
+  "data": [
+    {
+      "tournament": "<Final>",
+      "status": "live",
+      "players": {"p1": {"name": "A. One"}, "p2": {"name": "B. Two"}},
+      "score": {"games": [[6, 3], [4, 4]], "points": ["15", "30"], "server": 2, "is_tiebreak": false}
+    },
+    {
+      "tournament": "Doubles final",
+      "status": "live",
+      "players": {"p1": {"name": "Team One"}, "p2": {"name": "Team Two"}},
+      "score": {"games": [[6, 4, 10], [4, 6, 5]], "points": ["10", "5"], "server": 1, "is_tiebreak": true}
+    },
+    {
+      "tournament": "Qualifying",
+      "status": "live",
+      "players": {"p1": {"name": "C. Three"}, "p2": {"name": "D. Four"}},
+      "score": null
+    },
+    {
+      "tournament": "Qualifying",
+      "status": "live",
+      "players": {"p1": {"name": "E. Five"}, "p2": {"name": "F. Six"}},
+      "score": {"games": null, "points": [null, null], "server": null, "stale": true}
+    },
+    {"status": "completed", "score": {"games": [], "points": [null, null]}}
+  ],
+  "meta": {"has_more": true}
+}
