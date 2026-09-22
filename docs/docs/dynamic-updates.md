@@ -72,6 +72,8 @@ To save resources, Dynacat intelligently manages updates using two primary mecha
 ### Server-Side Updates (SSE)
 Most widgets use **Server-Sent Events (SSE)**. The server keeps a persistent connection with your browser and "pushes" updates only when the server-side update loop detects a change. This is highly efficient as it avoids constant HTTP requests from your browser.
 
+Widgets opted into server-side prewarming with `prewarm: true` (per widget, per container, or per page) are refreshed in the background, each one whenever its own `cache` duration expires - regardless of whether a browser is connected. This means their data is always ready to serve the moment a client opens the dashboard, and SSE pushes update the browser as cache entries are refreshed. Widgets without `prewarm` are fetched on demand and cached for their `cache` duration.
+
 ### Client-Side Polling
 Certain widgets, specifically the **Custom API** widget (when an `update-interval` is set), use **Client-Side Polling**.
 

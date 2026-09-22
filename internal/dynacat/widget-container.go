@@ -41,6 +41,22 @@ func (widget *containerWidgetBase) _update(ctx context.Context) {
 	wg.Wait()
 }
 
+func (widget *containerWidgetBase) _serverPrewarm(ctx context.Context, prewarmAll bool) {
+	var wg sync.WaitGroup
+
+	for w := range widget.Widgets {
+		widget := widget.Widgets[w]
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			serverPrewarm(ctx, widget, prewarmAll)
+		}()
+	}
+
+	wg.Wait()
+}
+
 func (widget *containerWidgetBase) _setProviders(providers *widgetProviders) {
 	for i := range widget.Widgets {
 		widget.Widgets[i].setProviders(providers)

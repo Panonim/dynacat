@@ -92,7 +92,7 @@ type fieldAnnotation struct {
 var alwaysAdvancedFields = map[string]bool{
 	"title": true, "title-icon": true, "title-url": true, "hide-header": true,
 	"css-class": true, "cache": true, "update-interval": true, "lazy-load": true,
-	"frameless": true, "api-id": true,
+	"prewarm": true, "frameless": true, "api-id": true,
 }
 
 // Fields the user must fill in for the widget to work. Fields of a list entry are addressed

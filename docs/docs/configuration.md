@@ -536,6 +536,7 @@ pages:
 | name-icon | string | no | |
 | slug | string | no | |
 | dynamic-updates | boolean | no | true |
+| prewarm | boolean | no | false |
 | width | string | no | |
 | desktop-navigation-width | string | no | |
 | center-vertically | boolean | no | false |
@@ -579,6 +580,9 @@ pages:
       - size: full
         widgets: ...
 ```
+
+#### `prewarm`
+When set to `true`, every widget on the page is prewarmed on the server in the background, on each widget's own `cache` schedule - even when no browser has the dashboard open. Widgets can also enable prewarming individually with `prewarm: true` (see [Shared Widget Options](shared-widget-options.md#prewarm)). Widgets without prewarming are fetched on demand and cached for their `cache` duration.
 
 #### `width`
 The maximum width of the page on desktop. Possible values are `default`, `slim` and `wide`.

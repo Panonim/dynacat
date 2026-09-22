@@ -124,6 +124,7 @@ type page struct {
 	HideDesktopNavigation  bool            `yaml:"hide-desktop-navigation"`
 	CenterVertically       bool            `yaml:"center-vertically"`
 	HideFromNavigation     bool            `yaml:"hide-from-navigation"`
+	Prewarm                bool            `yaml:"prewarm"`
 	KeyBind                string          `yaml:"key-bind"`
 	HeadWidgets            widgets         `yaml:"head-widgets"`
 	Columns                []struct {

@@ -149,6 +149,8 @@ type widget interface {
 
 	initialize() error
 	requiresUpdate(*time.Time) bool
+	PrewarmEnabled() bool
+	hasNeverFetched() bool
 	getCacheDuration() time.Duration
 	setProviders(*widgetProviders)
 	update(context.Context)
@@ -179,6 +181,7 @@ type widgetBase struct {
 	CustomCacheDuration durationField        `yaml:"cache"`
 	UpdateInterval      *updateIntervalField `yaml:"update-interval"`
 	ContentAvailable    bool                 `yaml:"-"`
+	Prewarm             bool                 `yaml:"prewarm"`
 	LazyLoad            bool                 `yaml:"lazy-load"`
 	WIP                 bool                 `yaml:"-"`
 	Error               error                `yaml:"-"`
@@ -256,6 +259,38 @@ func (w *widgetBase) IsLazyLoad() bool {
 
 func (w *widgetBase) update(ctx context.Context) {
 
+}
+
+func (w *widgetBase) PrewarmEnabled() bool {
+	return w.Prewarm
+}
+
+func (w *widgetBase) hasNeverFetched() bool {
+	return w.nextUpdate.IsZero()
+}
+
+// serverPrewarm refreshes a widget's cache in the background. It only affects
+// widgets that opted in with `prewarm: true` (or an ancestor page/container), so
+// widgets without the flag are fetched on demand instead. The type switch keeps
+// dispatch dynamic: widgetBase has no virtual update() for its embedded types.
+func serverPrewarm(ctx context.Context, w widget, prewarmAll bool) {
+	if !prewarmAll && !w.PrewarmEnabled() {
+		return
+	}
+
+	switch v := w.(type) {
+	case *groupWidget:
+		v.containerWidgetBase._serverPrewarm(ctx, prewarmAll || v.Prewarm)
+	case *splitColumnWidget:
+		v.containerWidgetBase._serverPrewarm(ctx, prewarmAll || v.Prewarm)
+	default:
+		now := time.Now()
+		if !w.requiresUpdate(&now) && !(w.hasNeverFetched() && w.IsLazyLoad()) {
+			return
+		}
+
+		w.update(withSharedFetchMaxAge(ctx, w.getCacheDuration()))
+	}
 }
 
 func (w *widgetBase) getCacheDuration() time.Duration {

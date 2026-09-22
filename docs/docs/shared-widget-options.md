@@ -4,18 +4,19 @@ All widgets share a common set of configuration options that control their appea
 
 ## Overview
 
-| Name | Type | Required | Default |
-| ---- | ---- | -------- | ------- |
-| title | string | no | |
-| hide-header | boolean | no | false |
-| title-icon | icon | no | |
-| title-url | string | no | |
-| css-class | string | no | |
-| cache | string | no | widget-specific |
-| update-interval | string | no | widget-specific |
-| frameless | boolean | no | false |
-| lazy-load | boolean | no | false |
-| api-id | string | no | |
+| Name            | Type    | Required | Default         |
+| --------------- | ------- | -------- | --------------- |
+| title           | string  | no       |                 |
+| hide-header     | boolean | no       | false           |
+| title-icon      | icon    | no       |                 |
+| title-url       | string  | no       |                 |
+| css-class       | string  | no       |                 |
+| cache           | string  | no       | widget-specific |
+| update-interval | string  | no       | widget-specific |
+| prewarm         | boolean | no       | false           |
+| frameless       | boolean | no       | false           |
+| lazy-load       | boolean | no       | false           |
+| api-id          | string  | no       |                 |
 
 ## Properties
 
@@ -99,8 +100,8 @@ Then in your custom CSS file:
 
 ```css
 .widget-type-rss.custom-feed {
-    border-color: var(--color-highlight);
-    background-color: rgba(255, 255, 0, 0.1);
+  border-color: var(--color-highlight);
+  background-color: rgba(255, 255, 0, 0.1);
 }
 ```
 
@@ -111,6 +112,7 @@ See the [Theme](configuration.md#theme) section for more information on custom C
 Overrides the widget's default cache duration. Cached content is stored and reused for the specified duration to reduce API requests and improve performance.
 
 **Format:** A number followed by a unit. Supported units are:
+
 - `s` for seconds (e.g., `30s`)
 - `m` for minutes (e.g., `5m`)
 - `h` for hours (e.g., `2h`)
@@ -137,11 +139,34 @@ Example:
   cache: 1d
 ```
 
+### `prewarm`
+
+When set to `true`, the widget is refreshed on the server in the background, on its own schedule based on the `cache` (or `update-interval`) duration - even when no browser has the dashboard open. This keeps the widget's data ready to serve the instant a client opens the dashboard, so every browser sees identical, up-to-date content without triggering its own request.
+
+Widgets without `prewarm` (the default) are fetched only when a browser needs them, on demand.
+
+On a page, the same `prewarm: true` option applies to every widget on that page. Setting it on a `group` or `split-column` widget applies to all of that container's widgets.
+
+Example:
+
+```yaml
+- type: markets
+  cache: 1h
+  prewarm: true
+```
+
+```yaml
+- type: server-stats
+  cache: 5s
+  prewarm: true
+```
+
 ### `update-interval`
 
 Controls how frequently the widget content is refreshed. This is independent of caching and controls the polling interval for dynamic updates.
 
 **Format:** A number followed by a unit. Supported units are:
+
 - `s` for seconds (e.g., `15s`)
 - `m` for minutes (e.g., `30m`)
 - `h` for hours (e.g., `1h`)
@@ -197,16 +222,16 @@ Example:
 
 ### `lazy-load`
 
-When set to `true`, the widget skips its initial update on page load and shows a loading placeholder until it actually needs its content (for example, once it scrolls into view). Useful for pages with many widgets where you want to avoid firing every widget's update on first load.
+When set to `true`, the widget skips its initial update on page load and shows a loading placeholder until its content is fetched. Use this for widgets whose data is expensive to fetch or rarely used. When combined with `prewarm: true`, the widget is still built on the server ahead of time, so the loading placeholder is never shown to clients.
 
 Example:
 
-```yaml
+````yaml
 ```yaml
 - type: custom-api
   title: Minimal Widget
   lazy-load: true
-```
+````
 
 ### `api-id`
 

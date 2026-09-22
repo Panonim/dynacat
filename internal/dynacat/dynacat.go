@@ -508,6 +508,35 @@ func (p *page) updateOutdatedWidgets() {
 	wg.Wait()
 }
 
+func (p *page) updatePrewarmedWidgets() {
+	var wg sync.WaitGroup
+	ctx := context.Background()
+
+	for w := range p.HeadWidgets {
+		widget := p.HeadWidgets[w]
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			serverPrewarm(ctx, widget, p.Prewarm)
+		}()
+	}
+
+	for c := range p.Columns {
+		for w := range p.Columns[c].Widgets {
+			widget := p.Columns[c].Widgets[w]
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				serverPrewarm(ctx, widget, p.Prewarm)
+			}()
+		}
+	}
+
+	wg.Wait()
+}
+
 func (p *page) GetMinUpdateInterval() int64 {
 	if !p.DynamicUpdatesEnabled() {
 		return 0
@@ -784,7 +813,10 @@ func (a *application) handleWidgetContentRequest(w http.ResponseWriter, r *http.
 	page.mu.Lock()
 	defer page.mu.Unlock()
 
-	widget.update(context.Background())
+	now := time.Now()
+	if widget.requiresUpdate(&now) || widget.IsLazyLoad() {
+		widget.update(withSharedFetchMaxAge(context.Background(), widget.getCacheDuration()))
+	}
 
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1112,6 +1144,7 @@ func (a *application) server() (func() error, func() error) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	go a.sseUpdateLoop(ctx)
 	go a.prewarmWidgets()
+	go a.serverRefreshLoop(ctx)
 	if a.oidcSessions != nil {
 		go a.oidcSessions.runSweeper(ctx, 15*time.Minute, OIDC_SESSION_VALID_PERIOD)
 	}
@@ -1133,8 +1166,33 @@ func (a *application) prewarmWidgets() {
 			defer wg.Done()
 			page.mu.Lock()
 			defer page.mu.Unlock()
-			page.updateOutdatedWidgets()
+			page.updatePrewarmedWidgets()
 		}()
 	}
 	wg.Wait()
+}
+
+func (a *application) serverRefreshLoop(ctx context.Context) {
+	ticker := time.NewTicker(400 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			var wg sync.WaitGroup
+			for p := range a.Config.Pages {
+				page := &a.Config.Pages[p]
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					page.mu.Lock()
+					defer page.mu.Unlock()
+					page.updatePrewarmedWidgets()
+				}()
+			}
+			wg.Wait()
+		}
+	}
 }
