@@ -226,12 +226,11 @@ When set to `true`, the widget skips its initial update on page load and shows a
 
 Example:
 
-````yaml
 ```yaml
 - type: custom-api
   title: Minimal Widget
   lazy-load: true
-````
+```
 
 ### `api-id`
 

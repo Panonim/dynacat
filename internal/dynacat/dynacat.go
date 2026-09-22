@@ -482,11 +482,9 @@ func (p *page) updateOutdatedWidgets() {
 			continue
 		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			widget.update(withSharedFetchMaxAge(ctx, widget.getCacheDuration()))
-		}()
+		})
 	}
 
 	for c := range p.Columns {
@@ -497,11 +495,9 @@ func (p *page) updateOutdatedWidgets() {
 				continue
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				widget.update(withSharedFetchMaxAge(ctx, widget.getCacheDuration()))
-			}()
+			})
 		}
 	}
 
@@ -515,22 +511,18 @@ func (p *page) updatePrewarmedWidgets() {
 	for w := range p.HeadWidgets {
 		widget := p.HeadWidgets[w]
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			serverPrewarm(ctx, widget, p.Prewarm)
-		}()
+		})
 	}
 
 	for c := range p.Columns {
 		for w := range p.Columns[c].Widgets {
 			widget := p.Columns[c].Widgets[w]
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				serverPrewarm(ctx, widget, p.Prewarm)
-			}()
+			})
 		}
 	}
 
@@ -1157,21 +1149,26 @@ func (a *application) server() (func() error, func() error) {
 	return start, stop
 }
 
+// prewarmWidgets fetches every widget that has never been fetched, once, at
+// server start. This matches the original server-side prewarming behavior: the
+// first page load benefits from a warm cache regardless of prewarm flags.
 func (a *application) prewarmWidgets() {
 	var wg sync.WaitGroup
 	for p := range a.Config.Pages {
 		page := &a.Config.Pages[p]
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			page.mu.Lock()
 			defer page.mu.Unlock()
-			page.updatePrewarmedWidgets()
-		}()
+			page.updateOutdatedWidgets()
+		})
 	}
 	wg.Wait()
 }
 
+// serverRefreshLoop keeps only prewarm-opted widgets (prewarm: true on the
+// widget, a containing group/split-column, or the page) refreshed in the
+// background. Widgets without the flag are refreshed on demand when a browser
+// requests them.
 func (a *application) serverRefreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(400 * time.Millisecond)
 	defer ticker.Stop()
@@ -1184,13 +1181,11 @@ func (a *application) serverRefreshLoop(ctx context.Context) {
 			var wg sync.WaitGroup
 			for p := range a.Config.Pages {
 				page := &a.Config.Pages[p]
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					page.mu.Lock()
 					defer page.mu.Unlock()
 					page.updatePrewarmedWidgets()
-				}()
+				})
 			}
 			wg.Wait()
 		}

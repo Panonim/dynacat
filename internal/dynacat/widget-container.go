@@ -47,11 +47,9 @@ func (widget *containerWidgetBase) _serverPrewarm(ctx context.Context, prewarmAl
 	for w := range widget.Widgets {
 		widget := widget.Widgets[w]
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			serverPrewarm(ctx, widget, prewarmAll)
-		}()
+		})
 	}
 
 	wg.Wait()
