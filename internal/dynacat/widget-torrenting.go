@@ -225,11 +225,13 @@ func (widget *torrentingWidget) qbLogin(ctx context.Context, host *TorrentingHos
 		return err
 	}
 
-	if strings.TrimSpace(string(body)) != "Ok." {
-		return fmt.Errorf("login failed: %s", strings.TrimSpace(string(body)))
+	// qBittorrent 5.2+ returns 204 with an empty body, older versions return 200 "Ok.".
+	if resp.StatusCode == http.StatusNoContent ||
+		(resp.StatusCode == http.StatusOK && strings.TrimSpace(string(body)) == "Ok.") {
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("login failed: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(body)))
 }
 
 func (widget *torrentingWidget) fetchFromHost(ctx context.Context, host *TorrentingHostConfig) ([]torrentInfo, error) {
