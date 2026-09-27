@@ -793,6 +793,10 @@ Preview:
 | Name | Type | Required |
 | ---- | ---- | -------- |
 | groups | array | yes |
+| style | string | no |
+
+##### `style`
+Set to `grid` to show the links as a grid of icon tiles with the title and description underneath, which works best when each link has an `icon`. Leave it empty for the default list.
 
 ##### `groups`
 An array of groups which can optionally have a title and a custom color.
