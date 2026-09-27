@@ -921,7 +921,7 @@ Which kinds of release to show. Each release is shown as its own entry on the da
 
 A **Radarr** movie can have a cinema, a physical and a digital release date, so it may appear on up to three days. This option controls both Radarr and Sonarr - for example dropping `episode` hides Sonarr episodes entirely.
 
-By default all types are shown. Restrict it by listing only the ones you want.
+By default all types are shown. Restrict it by listing only the ones you want. 
 
 ```yaml
 - type: calendar
@@ -1509,7 +1509,7 @@ Whether to display the relative time in the graph in `12h` or `24h` format.
 
 Blocky needs its Prometheus metrics enabled and scraped before the widget has anything to read:
 
-`dynacat.yml` (Blocky)
+`config.yml` (Blocky)
 ```yaml
 prometheus:
   enable: true
