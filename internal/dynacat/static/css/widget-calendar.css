@@ -99,6 +99,10 @@
     background: var(--color-upcoming);
 }
 
+.calendar-spillover-date .calendar-release-indicator {
+    filter: brightness(0.55);
+}
+
 .calendar-release-card {
     text-decoration: none;
     text-align: left;
