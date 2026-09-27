@@ -1168,6 +1168,24 @@ function zoneDiffText(diffInMinutes) {
     return { text: `${sign}${hours}h~`, title: `${hours} hour${hourSuffix} and ${minutes} minutes ${signText}` };
 }
 
+const clockUpdaters = new Map();
+let clockTimerStarted = false;
+
+function tickClocks() {
+    const now = new Date();
+
+    for (const [clock, updateClock] of clockUpdaters) {
+        if (!clock.isConnected) {
+            clockUpdaters.delete(clock);
+            continue;
+        }
+
+        updateClock(now);
+    }
+
+    setTimeout(tickClocks, (60 - now.getSeconds()) * 1000);
+}
+
 function setupClocks() {
     const clocks = document.getElementsByClassName('clock');
 
@@ -1175,10 +1193,14 @@ function setupClocks() {
         return;
     }
 
-    const updateCallbacks = [];
-
     for (var i = 0; i < clocks.length; i++) {
         const clock = clocks[i];
+
+        if (clock.dataset.clockReady !== undefined) {
+            continue;
+        }
+
+        const updateCallbacks = [];
         const hourFormat = clock.dataset.hourFormat;
         const localTimeContainer = clock.querySelector('[data-local-time]');
         const localDateElement = localTimeContainer.querySelector('[data-date]');
@@ -1215,18 +1237,21 @@ function setupClocks() {
                 diffElement.title = title;
             });
         }
+
+        const updateClock = (now) => {
+            for (var c = 0; c < updateCallbacks.length; c++)
+                updateCallbacks[c](now);
+        };
+
+        clockUpdaters.set(clock, updateClock);
+        updateClock(new Date());
+        clock.dataset.clockReady = '';
     }
 
-    const updateClocks = () => {
-        const now = new Date();
-
-        for (var i = 0; i < updateCallbacks.length; i++)
-            updateCallbacks[i](now);
-
-        setTimeout(updateClocks, (60 - now.getSeconds()) * 1000);
-    };
-
-    updateClocks();
+    if (!clockTimerStarted) {
+        clockTimerStarted = true;
+        setTimeout(tickClocks, (60 - new Date().getSeconds()) * 1000);
+    }
 }
 
 async function setupCalendars() {
@@ -1579,6 +1604,7 @@ async function updateWidget(widgetElement) {
 
             const callbacksIndexBefore = contentReadyCallbacks.length;
 
+            setupClocks();
             setupPopovers();
             setupCarousels();
             setupCollapsibleLists();
@@ -2045,6 +2071,7 @@ async function applyContentUpdate() {
             restoreGroupTabStates(widget, states);
         }
 
+        setupClocks();
         setupPopovers();
         setupCarousels();
         setupCollapsibleLists();
@@ -2217,6 +2244,7 @@ function _applyWidgetUpdate(widgetId, html) {
 }
 
 function _runPostSettleSetup() {
+    setupClocks();
     setupPopovers();
     setupCarousels();
     setupGroups();
