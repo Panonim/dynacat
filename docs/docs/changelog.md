@@ -8,6 +8,7 @@
 - Fixed `clock` widget blanking after widget updates -> https://github.com/Panonim/dynacat/pull/160
 - Calendar now shows releases on the previous and next month days visible in the grid -> https://github.com/Panonim/dynacat/issues/156
 - Calendar now properly shows upcoming shows -> https://github.com/Panonim/dynacat/issues/156
+- Added a `grid` style to the `bookmarks` widget -> https://github.com/Panonim/dynacat/issues/162
 
 # Changes for 3.0.0
 - Moved the compose template to [Panonim/dynacat-compose-template](https://github.com/Panonim/dynacat-compose-template), the install command is now a single `curl | tar` with no `sed` renaming
