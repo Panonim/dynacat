@@ -76,9 +76,18 @@ type MountpointInfo struct {
 	UsedPercent uint8  `json:"used_percent"`
 }
 
+func (mp MountpointInfo) displayName() string {
+	if mp.Name != "" {
+		return mp.Name
+	}
+
+	return mp.Path
+}
+
 type SystemInfoRequest struct {
 	CPUTempSensor            string                       `yaml:"cpu-temp-sensor"`
 	HideMountpointsByDefault bool                         `yaml:"hide-mountpoints-by-default"`
+	MountpointOrder          string                       `yaml:"mountpoint-order"`
 	Mountpoints              map[string]MointpointRequest `yaml:"mountpoints"`
 }
 
@@ -314,7 +323,16 @@ func Collect(req *SystemInfoRequest) (*SystemInfo, []error) {
 	}
 
 	sort.Slice(info.Mountpoints, func(a, b int) bool {
-		return info.Mountpoints[a].UsedPercent > info.Mountpoints[b].UsedPercent
+		mpA, mpB := info.Mountpoints[a], info.Mountpoints[b]
+
+		switch req.MountpointOrder {
+		case "name":
+			return mpA.displayName() < mpB.displayName()
+		case "path":
+			return mpA.Path < mpB.Path
+		default:
+			return mpA.UsedPercent > mpB.UsedPercent
+		}
 	})
 
 	return info, errs

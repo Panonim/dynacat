@@ -134,7 +134,7 @@
                     {{- if .Info.Mountpoints }}
                     <div class="progress-value{{ if ge .DiskUsedPercent 85 }} progress-value-notice{{ end }}" style="--percent: {{ .DiskUsedPercent }}"></div>
                     {{- if ge (len .Info.Mountpoints) 2 }}
-                    <div class="progress-value{{ if ge ((index .Info.Mountpoints 1).UsedPercent) 85 }} progress-value-notice{{ end }}" style="--percent: {{ (index .Info.Mountpoints 1).UsedPercent }}"></div>
+                    <div class="progress-value{{ if ge .SecondFullestDiskPercent 85 }} progress-value-notice{{ end }}" style="--percent: {{ .SecondFullestDiskPercent }}"></div>
                     {{- end }}
                     {{- end }}
                 </div>
