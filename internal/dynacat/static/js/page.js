@@ -631,7 +631,7 @@ function setupDynamicRelativeTime() {
     });
 }
 
-const _initializedGroupHeaders = new WeakSet();
+const _groupTabSetters = new WeakMap();
 
 function setupGroups() {
     const groups = document.getElementsByClassName("widget-type-group");
@@ -644,18 +644,24 @@ function setupGroups() {
         const group = groups[g];
 
         const headerEl = group.getElementsByClassName("widget-header")[0];
-        if (!headerEl || _initializedGroupHeaders.has(headerEl)) continue;
-        _initializedGroupHeaders.add(headerEl);
+        if (!headerEl) continue;
 
         const titles = headerEl.children;
-        const tabs = group.getElementsByClassName("widget-group-contents")[0].children;
         let current = parseInt(group.dataset.currentTab ?? "0", 10);
 
         if (Number.isNaN(current) || current < 0 || current >= titles.length) {
             current = 0;
         }
 
+        if (_groupTabSetters.has(headerEl)) {
+            _groupTabSetters.get(headerEl)(current);
+            continue;
+        }
+
+        const tabs = group.getElementsByClassName("widget-group-contents")[0].children;
+
         const setCurrentTab = (nextCurrent) => {
+            current = nextCurrent;
             group.dataset.currentTab = String(nextCurrent);
 
             for (let i = 0; i < titles.length; i++) {
@@ -715,12 +721,11 @@ function setupGroups() {
                     tabs[t].dataset.direction = "left";
                 }
 
-                current = t;
-
                 setCurrentTab(t);
             });
         }
 
+        _groupTabSetters.set(headerEl, setCurrentTab);
         setCurrentTab(current);
     }
 }
