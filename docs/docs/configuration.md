@@ -2927,6 +2927,7 @@ Whether to hide the swap usage.
 | ---- | ---- | -------- | ------- |
 | cpu-temp-sensor | string | no |  |
 | hide-mountpoints-by-default | boolean | no | false |
+| mountpoint-order | string | no | usage |
 | mountpoints | map\[string\]object | no |  |
 
 ###### `cpu-temp-sensor`
@@ -2962,6 +2963,9 @@ If set to `true` you'll have to manually make each mountpoint visible by adding 
 ```
 
 This is useful if you're running Dynacat inside of a container which usually mounts a lot of irrelevant filesystems.
+
+###### `mountpoint-order`
+The order in which mountpoints are displayed. Possible values are `usage` (most full first), `name` (alphabetically by name, falling back to the path) and `path` (alphabetically by path). 
 
 ###### `mountpoints`
 A map of mountpoints to display disk usage for. The key is the path to the mountpoint and the value is an object with optional properties. Example:

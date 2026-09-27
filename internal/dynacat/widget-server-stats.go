@@ -2,6 +2,7 @@ package dynacat
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"math"
@@ -40,6 +41,14 @@ func (widget *serverStatsWidget) initialize() error {
 
 		if widget.Servers[i].Timeout == 0 {
 			widget.Servers[i].Timeout = durationField(3 * time.Second)
+		}
+
+		if req := widget.Servers[i].SystemInfoRequest; req != nil {
+			switch req.MountpointOrder {
+			case "", "usage", "name", "path":
+			default:
+				return fmt.Errorf("invalid mountpoint-order %q, must be one of: usage, name, path", req.MountpointOrder)
+			}
 		}
 	}
 
@@ -123,6 +132,21 @@ func (s *serverStatsRequest) DiskUsedPercent() uint8 {
 
 	usedPercent := (float64(usedMB) / float64(totalMB)) * 100
 	return uint8(math.Min(usedPercent, 100))
+}
+
+func (s *serverStatsRequest) SecondFullestDiskPercent() uint8 {
+	var first, second uint8
+
+	for i := range s.Info.Mountpoints {
+		p := s.Info.Mountpoints[i].UsedPercent
+		if p > first {
+			first, second = p, first
+		} else if p > second {
+			second = p
+		}
+	}
+
+	return second
 }
 
 func fetchRemoteServerInfo(infoReq *serverStatsRequest) (*sysinfo.SystemInfo, error) {
