@@ -7,7 +7,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/Panonim/dynawidgets">Dynawidgets</a> •
-  <a href="https://github.com/Panonim/dynawidgets">Custom-api widgets</a> •
+  <a href="https://github.com/glanceapp/community-widgets">Custom-api widgets</a> •
   <a href="https://dynacat.artur.zone/preconfigured-pages">Preconfigured pages</a> •
   <a href="https://dynacat.artur.zone/themes">Themes</a> 
 </p>
@@ -65,8 +65,6 @@ Easily create your own theme by tweaking a few numbers or choose from one of the
 * **OIDC** - log in through your own identity provider
 * **More widgets** - docker controller, currently playing, latest media, torrenting, speedtest, stopwatch and Sonarr/Radarr releases in the calendar
 
-Each of these is covered in [the docs](https://dynacat.artur.zone).
-
 <br>
 
 ## Installation
@@ -102,8 +100,6 @@ services:
     env_file: .env
 ```
 </details>
-
-If you'd like a more detailed instructions they can be found in [the docs](https://dynacat.artur.zone/#installation).
 
 ## Configuration
 There are two ways to configure Dynacat, and they work on the same files:
