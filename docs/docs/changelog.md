@@ -11,6 +11,7 @@
 - Added a `grid` style to the `bookmarks` widget -> https://github.com/Panonim/dynacat/issues/162
 - Allowed non-root users to use the folders easily -> https://github.com/Panonim/dynacat/issues/165
 - Added .exe support for the releases
+- Full text finding for bookmarks in `search` widget
 
 # Changes for 3.0.0
 - Moved the compose template to [Panonim/dynacat-compose-template](https://github.com/Panonim/dynacat-compose-template), the install command is now a single `curl | tar` with no `sed` renaming
