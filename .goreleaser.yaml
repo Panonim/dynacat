@@ -40,6 +40,8 @@ dockers:
     goarch: amd64
     use: buildx
     dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - docker/entrypoint.sh
 
   - image_templates:
       - &arm64v8_image "{{ .ProjectName }}:{{ .Tag }}-arm64"
@@ -48,6 +50,8 @@ dockers:
     goarch: arm64
     use: buildx
     dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - docker/entrypoint.sh
 
   - image_templates:
       - &armv7_image "{{ .ProjectName }}:{{ .Tag }}-armv7"
@@ -57,6 +61,8 @@ dockers:
     goarm: 7
     use: buildx
     dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - docker/entrypoint.sh
 
 docker_manifests:
   - name_template: "{{ .ProjectName }}:{{ .Tag }}"

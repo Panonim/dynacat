@@ -131,6 +131,9 @@ func serveApp(configPath string) error {
 	hadValidConfigOnStartup := false
 	var stopServer func() error
 
+	warnIfDirNotWritable(filepath.Dir(configPath))
+	warnIfDirNotWritable(filepath.Dir(dynawidgetsAssetsDir))
+
 	onChange := func(newContents []byte) {
 		if stopServer != nil {
 			slog.Info("Config file changed, reloading")

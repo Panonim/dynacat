@@ -70,7 +70,25 @@ services:
 ### Running as a non-root user
 
 The image runs as root by default. Nothing in Dynacat needs it, and dropping to your own UID
-and GID is recommended, especially if you mount the docker socket:
+and GID is recommended, especially if you mount the docker socket. The easiest way is to set
+`PUID` and `PGID`:
+
+```yaml
+services:
+  dynacat:
+    environment:
+      - PUID=1000
+      - PGID=1000
+```
+
+On startup the container hands `config`, `assets` and its image cache over to that UID and GID,
+then runs Dynacat as that user. Only the owner is changed, the permission bits of your files are
+left as they are and symlinks are never followed. If the docker socket is mounted, the user is
+added to the group that owns it. `PGID` defaults to `PUID` when left out.
+
+#### Using `user` instead
+
+If you would rather the container never start as root, use `user` instead of `PUID`/`PGID`:
 
 ```yaml
 services:
@@ -78,7 +96,7 @@ services:
     user: "1000:1000"
 ```
 
-Two things have to line up for this to work:
+The container cannot fix ownership in this mode, so two things have to line up yourself:
 
 - `config` and `assets` have to be readable and writable by that user, otherwise the UI editor
   cannot save and the dynawidgets cache cannot be written: `chown -R 1000:1000 config assets`.
@@ -91,7 +109,8 @@ server:
 ```
 
 If you mount the docker socket for the docker widgets, the user also has to be in the group
-that owns it, which is normally `docker`.
+that owns it, which is normally `docker`. When a folder is not writable, Dynacat logs a warning
+on startup with the exact `chown` command to run.
 
 Then, create a new directories called `config` & `assets` and download the example starting [`dynacat.yml`](https://github.com/Panonim/dynacat/blob/main/docs/docs/dynacat.yml) file into it by running:
 
