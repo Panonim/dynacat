@@ -518,6 +518,15 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		slot.seq.Content = removeNode(slot.seq.Content, slot.index)
 		pruneEmptyInclude(slot)
 		return nil
+	case "setColumnSize":
+		if !validIndex(colSlots, m.Column) {
+			return fmt.Errorf("column %d out of range", m.Column)
+		}
+		if m.Size != "small" && m.Size != "full" {
+			return fmt.Errorf("invalid column size %q", m.Size)
+		}
+		setMappingKey(colSlots[m.Column].node, "size", scalarNode(m.Size))
+		return nil
 	}
 
 	widgets, owner, err := resolveWidgets(colSlots, m.Path, docs)
