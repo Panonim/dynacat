@@ -121,10 +121,17 @@ type editorMutation struct {
 	PresetKey  string            `json:"presetKey"`
 }
 
-type editorPermissionError struct{ path string }
+type editorPermissionError struct {
+	path string
+	err  error
+}
 
 func (e *editorPermissionError) Error() string {
-	return fmt.Sprintf("cannot write %s: the config directory is read only or lacks write permission", filepath.Base(e.path))
+	msg := fmt.Sprintf("cannot write %s: the config directory is read only or lacks write permission", filepath.Base(e.path))
+	if hint := ownershipHint(e.err); hint != "" {
+		msg += ", " + hint
+	}
+	return msg
 }
 
 type editorDisabledError struct{}
@@ -196,6 +203,28 @@ func (a *application) userCanEditAnything(user *authenticatedUser) bool {
 
 func isWriteBlockedError(err error) bool {
 	return os.IsPermission(err) || errors.Is(err, syscall.EROFS)
+}
+
+// ownershipHint explains how to fix a permission error caused by file ownership, empty when chown would not help.
+func ownershipHint(err error) string {
+	uid, gid := os.Getuid(), os.Getgid()
+	if !os.IsPermission(err) || uid <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("dynacat runs as %d:%d, run chown -R %d:%d on the mounted config and assets folders or set PUID/PGID instead of user", uid, gid, uid, gid)
+}
+
+// warnIfDirNotWritable logs at startup when dir exists but cannot be written to.
+func warnIfDirNotWritable(dir string) {
+	f, err := os.CreateTemp(dir, ".write-check-*")
+	if err != nil {
+		if isWriteBlockedError(err) {
+			slog.Warn("Directory is not writable, the UI editor and caches cannot save to it", "dir", dir, "hint", ownershipHint(err))
+		}
+		return
+	}
+	f.Close()
+	os.Remove(f.Name())
 }
 
 type editorValidationError struct {
@@ -489,6 +518,15 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		slot.seq.Content = removeNode(slot.seq.Content, slot.index)
 		pruneEmptyInclude(slot)
 		return nil
+	case "setColumnSize":
+		if !validIndex(colSlots, m.Column) {
+			return fmt.Errorf("column %d out of range", m.Column)
+		}
+		if m.Size != "small" && m.Size != "full" {
+			return fmt.Errorf("invalid column size %q", m.Size)
+		}
+		setMappingKey(colSlots[m.Column].node, "size", scalarNode(m.Size))
+		return nil
 	}
 
 	widgets, owner, err := resolveWidgets(colSlots, m.Path, docs)
@@ -765,7 +803,7 @@ func (a *application) addPageFile(mainDoc *yaml.Node, mainPath string, m editorM
 	}
 	if err := os.WriteFile(pagePath, pageContents, 0o644); err != nil {
 		if isWriteBlockedError(err) {
-			return &editorPermissionError{pagePath}
+			return &editorPermissionError{pagePath, err}
 		}
 		return err
 	}
@@ -896,7 +934,7 @@ func (a *application) writeConfigCandidates(candidates map[string][]byte) error 
 		if err := os.WriteFile(path, candidate, perms[path]); err != nil {
 			rollback()
 			if isWriteBlockedError(err) {
-				return &editorPermissionError{path}
+				return &editorPermissionError{path, err}
 			}
 			return err
 		}

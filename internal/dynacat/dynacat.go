@@ -223,6 +223,9 @@ func newApplication(c *config) (*application, error) {
 		cacheDir = absCacheDir
 	}
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		if hint := ownershipHint(err); hint != "" {
+			return nil, fmt.Errorf("creating cache-dir: %v, %s", err, hint)
+		}
 		return nil, fmt.Errorf("creating cache-dir: %v", err)
 	}
 	config.Server.CacheDir = cacheDir

@@ -362,10 +362,12 @@ function setupSearchBoxes() {
             const autocompleteEnabled = widget.dataset.autocomplete === "true";
             const targetsEnabled = widget.dataset.targetsEnabled === "true";
             const autocompleteEl = widget.querySelector(".search-autocomplete");
+            const toWords = (text) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
             const targets = Array.from(widget.querySelectorAll(".search-targets > input")).map((el) => ({
                 type: "target",
                 kind: el.dataset.kind || "bookmark",
                 title: el.dataset.title,
+                titleWords: toWords(el.dataset.title || ""),
                 url: el.dataset.url,
                 target: el.dataset.target || "",
                 icon: el.dataset.icon || "",
@@ -449,14 +451,15 @@ function setupSearchBoxes() {
             const TARGET_MATCH_LIMIT = 3;
             const TARGET_FALLBACK_GLYPHS = { bookmark: "↗", docker: "▣", monitor: "◉" };
 
-            // Each kind gets its own limit so bookmarks can't crowd out containers or sites.
+            // Every query word must prefix some title word and each kind gets its own limit so bookmarks can't crowd out containers or sites.
             const matchTargets = (query) => {
                 if (!targetsEnabled || !query) return [];
-                const lowerQuery = query.toLowerCase();
+                const queryWords = toWords(query);
+                if (queryWords.length === 0) return [];
                 const countPerKind = {};
 
                 return targets.filter((t) => {
-                    if (!t.title || !t.title.toLowerCase().startsWith(lowerQuery)) return false;
+                    if (!queryWords.every((q) => t.titleWords.some((w) => w.startsWith(q)))) return false;
                     countPerKind[t.kind] = (countPerKind[t.kind] || 0) + 1;
                     return countPerKind[t.kind] <= TARGET_MATCH_LIMIT;
                 });

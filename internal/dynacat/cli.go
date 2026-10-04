@@ -84,6 +84,10 @@ func parseCliOptions() (*cliOptions, error) {
 			intent = cliIntentDiagnose
 		case "secret:make":
 			intent = cliIntentSecretMake
+		case "password:hash":
+			return nil, fmt.Errorf("missing password, usage: dynacat password:hash <password>")
+		case "mountpoint:info":
+			return nil, fmt.Errorf("missing path, usage: dynacat mountpoint:info <path>")
 		default:
 			return nil, unknownCommandErr
 		}
