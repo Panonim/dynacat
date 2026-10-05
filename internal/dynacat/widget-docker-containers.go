@@ -21,6 +21,7 @@ type dockerContainersWidget struct {
 	Frameless            bool                         `yaml:"frameless"`
 	HideByDefault        bool                         `yaml:"hide-by-default"`
 	RunningOnly          bool                         `yaml:"running-only"`
+	ShowMissing          bool                         `yaml:"show-missing"`
 	Category             string                       `yaml:"category"`
 	SockPath             string                       `yaml:"sock-path"`
 	FormatContainerNames bool                         `yaml:"format-container-names"`
@@ -55,6 +56,7 @@ func (widget *dockerContainersWidget) update(ctx context.Context) {
 		widget.RunningOnly,
 		widget.FormatContainerNames,
 		widget.LabelOverrides,
+		widget.ShowMissing,
 	)
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
@@ -194,8 +196,9 @@ func fetchDockerContainers(
 	runningOnly bool,
 	formatNames bool,
 	labelOverrides map[string]map[string]string,
+	showMissing bool,
 ) (dockerContainerList, error) {
-	containers, err := fetchDockerContainersFromSource(socketPath, category, runningOnly, labelOverrides)
+	containers, err := fetchDockerContainersFromSource(socketPath, category, runningOnly, labelOverrides, showMissing)
 	if err != nil {
 		return nil, fmt.Errorf("fetching containers: %w", err)
 	}
@@ -320,6 +323,7 @@ func fetchDockerContainersFromSource(
 	category string,
 	runningOnly bool,
 	labelOverrides map[string]map[string]string,
+	showMissing bool,
 ) ([]dockerContainerJsonResponse, error) {
 	var hostname string
 
@@ -394,6 +398,8 @@ func fetchDockerContainersFromSource(
 		}
 	}
 
+	containers = appendMissingDockerContainers(containers, labelOverrides, runningOnly, showMissing)
+
 	// Filter here rather than via Docker's filters param since category may come from a config override.
 	if category != "" {
 		filtered := make([]dockerContainerJsonResponse, 0, len(containers))
@@ -410,4 +416,45 @@ func fetchDockerContainersFromSource(
 	}
 
 	return containers, nil
+}
+
+// appendMissingDockerContainers adds a synthetic entry for every container declared under the
+// widget's "containers" property that the engine doesn't report. Podman quadlets remove their
+// container on stop, so a stopped quadlet is not returned in the socket response.
+func appendMissingDockerContainers(
+	containers []dockerContainerJsonResponse,
+	labelOverrides map[string]map[string]string,
+	runningOnly bool,
+	showMissing bool,
+) []dockerContainerJsonResponse {
+	if !showMissing || runningOnly {
+		return containers
+	}
+
+	present := make(map[string]bool, len(containers))
+	for i := range containers {
+		for _, n := range containers[i].Names {
+			present[strings.TrimLeft(n, "/")] = true
+		}
+	}
+
+	for name := range labelOverrides {
+		if present[name] {
+			continue
+		}
+
+		labels := make(dockerContainerLabels, len(labelOverrides[name]))
+		for label, value := range labelOverrides[name] {
+			labels["dynacat."+label] = value
+		}
+
+		containers = append(containers, dockerContainerJsonResponse{
+			Names:  []string{name},
+			State:  "missing",
+			Status: "missing",
+			Labels: labels,
+		})
+	}
+
+	return containers
 }

@@ -134,6 +134,9 @@ var itemAdvancedFields = map[string]bool{
 const maxListDepth = 2
 
 var fieldAnnotations = map[string]map[string]fieldAnnotation{
+	"bookmarks": {
+		"style": {Options: []string{"grid"}},
+	},
 	"calendar": {
 		"first-day-of-week": {Options: []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}},
 		"hosts.url":         {Hint: "Prefix with the service, e.g. sonarr:https://... or radarr:https://..."},
@@ -247,7 +250,8 @@ var fieldAnnotations = map[string]map[string]fieldAnnotation{
 		"widget":         {Hint: "Widget from the dynawidgets repository."},
 	},
 	"docker-containers": {
-		"sock-path": {Advanced: true, Hint: "Defaults to /var/run/docker.sock; can also be a tcp://host:port or http://host:port address."},
+		"sock-path":    {Advanced: true, Hint: "Defaults to /var/run/docker.sock; can also be a tcp://host:port or http://host:port address."},
+		"show-missing": {Hint: "Containers declared under \"containers\" that the engine no longer reports are shown in a missing state. Useful for podman quadlets, which remove the container on stop."},
 	},
 	"docker-controller": {
 		"show":      {Options: []string{"both", "containers", "images"}},

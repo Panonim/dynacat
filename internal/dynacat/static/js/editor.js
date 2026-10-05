@@ -272,20 +272,38 @@ function renderCanvas() {
         const colEl = div(`page-column page-column-${col.size}`);
         setupDropTarget(colEl, [colIndex]);
         (col.widgets || []).forEach((w, i) => colEl.append(buildWidgetCard(w, [colIndex, i])));
-        colEl.append(buildColumnTools(colIndex));
+        colEl.append(buildColumnTools(colIndex, col.size));
         container.append(colEl);
     });
     if (canAddColumn) container.append(addColumnLine(page.columns.length));
     container.dataset.editorCanvas = "1";
 }
 
-function buildColumnTools(colIndex) {
-    const tools = div("editor-ui editor-column-tools");
-    const btn = button("Remove column", "editor-column-remove");
-    btn.prepend(iconSpan(iconTrash));
-    btn.addEventListener("click", () => removeColumn(colIndex));
-    tools.append(btn);
+function buildColumnTools(colIndex, size) {
+    const small = pageToolButton("editor-column-size", iconColumnSmall, "Small", "Make this a small column (fixed 300px width)", () => setColumnSize(colIndex, "small"));
+    const full = pageToolButton("editor-column-size", iconColumnFull, "Full", "Make this a full column (takes the remaining width)", () => setColumnSize(colIndex, "full"));
+    (size === "full" ? full : small).classList.add("active");
+
+    const remove = pageToolButton("editor-column-remove", iconTrash, "Remove", "Remove this column and its widgets", () => removeColumn(colIndex));
+
+    const tools = div("editor-ui editor-page-tools editor-column-tools");
+    tools.append(small, div("editor-page-tools-divider"), full, div("editor-page-tools-divider"), remove);
     return tools;
+}
+
+function setColumnSize(colIndex, size) {
+    const columns = state.config.pages[state.pageIndex].columns;
+    if (columns[colIndex].size === size) return;
+    const fullCount = columns.filter((c, i) => (i === colIndex ? size : c.size) === "full").length;
+    if (fullCount === 0) {
+        toast("This is the only full column. Make another column full first.", "negative");
+        return;
+    }
+    if (fullCount > 2) {
+        toast("Only 2 columns can be full. Make another column small first.", "negative");
+        return;
+    }
+    save({ op: "setColumnSize", page: state.pageIndex, column: colIndex, size });
 }
 
 function iconSpan(svg) {
@@ -1485,12 +1503,24 @@ function iconPreview(input) {
 // Sets src plus the same flat-icon class the widget templates use for auto-invert icons.
 function applyIcon(el, value) {
     const { url, autoInvert } = resolveIcon(value);
+    const src = safeImageURL(url);
     el.classList.toggle("flat-icon", autoInvert);
-    el.onerror = /cdn\.jsdelivr\.net\/gh\/(selfhst\/icons|homarr-labs\/dashboard-icons)\/svg\//.test(url)
-        ? () => { el.onerror = null; el.src = url.replace("/svg/", "/webp/").replace(/\.svg$/, ".webp"); }
+    el.onerror = /cdn\.jsdelivr\.net\/gh\/(selfhst\/icons|homarr-labs\/dashboard-icons)\/svg\//.test(src)
+        ? () => { el.onerror = null; el.src = src.replace("/svg/", "/webp/").replace(/\.svg$/, ".webp"); }
         : null;
-    el.src = url;
-    return url;
+    el.src = src;
+    return src;
+}
+
+// Rebuilds the URL from its parsed form so only http(s) and same-origin paths ever reach an image src.
+function safeImageURL(value) {
+    if (!value) return "";
+    try {
+        const parsed = new URL(value, document.baseURI);
+        return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : "";
+    } catch {
+        return "";
+    }
 }
 
 function resolveIconURL(value) {
@@ -2242,4 +2272,6 @@ const iconChevron = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const iconPaste = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184"/></svg>`;
 const iconCopy = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"/></svg>`;
 const iconTrash = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`;
+const iconColumnSmall = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"/><rect x="9.75" y="4.5" width="4.5" height="15" fill="currentColor" stroke="none"/></svg>`;
+const iconColumnFull = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"/><rect x="6.75" y="4.5" width="10.5" height="15" fill="currentColor" stroke="none"/></svg>`;
 const iconMedal = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4V4L9.81 8.36C6.14 9.57 4.14 13.53 5.35 17.2C6.56 20.87 10.5 22.87 14.19 21.66C17.86 20.45 19.86 16.5 18.65 12.82C17.95 10.71 16.3 9.05 14.19 8.36L20 4V2M14.94 19.5L12 17.78L9.06 19.5L9.84 16.17L7.25 13.94L10.66 13.64L12 10.5L13.34 13.63L16.75 13.93L14.16 16.16L14.94 19.5Z"/></svg>`;

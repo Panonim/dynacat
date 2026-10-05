@@ -1,3 +1,19 @@
+# Changes for 3.0.1
+- Updated docs website
+- Fixed a bug where dashless includes would not work in the UI editor
+- Fixed `releases` widget ignoring the `gitlab:`, `codeberg:` and `dockerhub:`
+- Added a `mountpoint-order` option to server-stats -> https://github.com/Panonim/dynacat/issues/159
+- Group widget refresh resets the active tab and causes subsequent clicks to open its title URL -> https://github.com/Panonim/dynacat/issues/157
+- Fixed a bug where qBittorrent wasn't logging in correctly -> https://github.com/Panonim/dynacat/issues/155
+- Fixed `clock` widget blanking after widget updates -> https://github.com/Panonim/dynacat/pull/160
+- Calendar now shows releases on the previous and next month days visible in the grid -> https://github.com/Panonim/dynacat/issues/156
+- Calendar now properly shows upcoming shows -> https://github.com/Panonim/dynacat/issues/156
+- Added a `grid` style to the `bookmarks` widget -> https://github.com/Panonim/dynacat/issues/162
+- Allowed non-root users to use the folders easily -> https://github.com/Panonim/dynacat/issues/165
+- Added .exe support for the releases
+- Full text finding for bookmarks in `search` widget -> https://github.com/Panonim/dynacat/issues/167
+- Added Small/Full column size controls to the page editor
+
 # Changes for 3.0.0
 - Moved the compose template to [Panonim/dynacat-compose-template](https://github.com/Panonim/dynacat-compose-template), the install command is now a single `curl | tar` with no `sed` renaming
 - Added support for `tcp://`/`http://` remote Docker hosts to `sock-path` in the `docker-controller` widget, matching `docker-containers` -> https://github.com/Panonim/dynacat/issues/137

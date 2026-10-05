@@ -103,6 +103,18 @@ volumes:
   - /etc:/host-etc:ro
 ```
 
+### PUID / PGID
+
+Runs Dynacat as this UID and GID instead of root. On startup the container changes the owner of `config`, `assets` and its image cache to match, so the UI editor can save without a manual `chown`. Permission bits are left untouched. `PGID` defaults to `PUID`.
+
+```yaml
+environment:
+  - PUID=1000
+  - PGID=1000
+```
+
+See [Running as a non-root user](installation.md#running-as-a-non-root-user) for details and the `user` alternative.
+
 ## Dynamic Refreshing
 
 Dynamic refreshing allows widgets to automatically update their data at specified intervals. This behavior can be controlled through two mechanisms:

@@ -149,25 +149,26 @@ func (r *releaseRequest) UnmarshalYAML(node *yaml.Node) error {
 		}
 	}
 
-	parts := strings.SplitN(repository, ":", 2)
+	parts := strings.SplitN(r.Repository, ":", 2)
 	if len(parts) == 1 {
 		r.source = releaseSourceGithub
-	} else if len(parts) == 2 {
-		r.Repository = parts[1]
-
-		switch parts[0] {
-		case string(releaseSourceGithub):
-			r.source = releaseSourceGithub
-		case string(releaseSourceGitlab):
-			r.source = releaseSourceGitlab
-		case string(releaseSourceDockerHub):
-			r.source = releaseSourceDockerHub
-		case string(releaseSourceCodeberg):
-			r.source = releaseSourceCodeberg
-		default:
-			return errors.New("invalid source")
-		}
+		return nil
 	}
+
+	switch parts[0] {
+	case string(releaseSourceGithub):
+		r.source = releaseSourceGithub
+	case string(releaseSourceGitlab):
+		r.source = releaseSourceGitlab
+	case string(releaseSourceDockerHub):
+		r.source = releaseSourceDockerHub
+	case string(releaseSourceCodeberg):
+		r.source = releaseSourceCodeberg
+	default:
+		return fmt.Errorf("invalid source %q", parts[0])
+	}
+
+	r.Repository = parts[1]
 
 	return nil
 }

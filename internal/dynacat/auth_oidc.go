@@ -55,26 +55,18 @@ func (a *application) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 
 	pkceVerifier := oauth2.GenerateVerifier()
 
-	secure := a.isRequestHTTPS(r)
-
-	http.SetCookie(w, &http.Cookie{
+	a.setCookie(w, r, &http.Cookie{
 		Name:     OIDC_STATE_COOKIE_NAME,
 		Value:    state,
 		Expires:  time.Now().Add(OIDC_STATE_VALID_PERIOD),
-		Secure:   secure,
-		Path:     a.Config.Server.BaseURL + "/",
 		SameSite: http.SameSiteLaxMode,
-		HttpOnly: true,
 	})
 
-	http.SetCookie(w, &http.Cookie{
+	a.setCookie(w, r, &http.Cookie{
 		Name:     OIDC_PKCE_COOKIE_NAME,
 		Value:    pkceVerifier,
 		Expires:  time.Now().Add(OIDC_STATE_VALID_PERIOD),
-		Secure:   secure,
-		Path:     a.Config.Server.BaseURL + "/",
 		SameSite: http.SameSiteLaxMode,
-		HttpOnly: true,
 	})
 
 	url := a.oauth2Config.AuthCodeURL(state, oauth2.S256ChallengeOption(pkceVerifier))
@@ -101,20 +93,8 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     OIDC_STATE_COOKIE_NAME,
-		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     baseURL + "/",
-		HttpOnly: true,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     OIDC_PKCE_COOKIE_NAME,
-		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     baseURL + "/",
-		HttpOnly: true,
-	})
+	a.clearCookie(w, r, OIDC_STATE_COOKIE_NAME)
+	a.clearCookie(w, r, OIDC_PKCE_COOKIE_NAME)
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -216,14 +196,11 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 	})
 
 	// Strict would not survive the redirect back from the provider.
-	http.SetCookie(w, &http.Cookie{
+	a.setCookie(w, r, &http.Cookie{
 		Name:     OIDC_SESSION_COOKIE_NAME,
 		Value:    sessionID,
 		Expires:  time.Now().Add(OIDC_SESSION_VALID_PERIOD),
-		Secure:   a.isRequestHTTPS(r),
-		Path:     baseURL + "/",
 		SameSite: http.SameSiteLaxMode,
-		HttpOnly: true,
 	})
 
 	slog.Info("OIDC user logged in", "username", username)

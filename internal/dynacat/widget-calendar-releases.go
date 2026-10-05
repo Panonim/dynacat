@@ -105,7 +105,7 @@ func (widget *calendarWidget) getReleasesForMonth(ctx context.Context, year int,
 	monthStart := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
 	monthEnd := monthStart.AddDate(0, 1, -1)
 	start := monthStart.AddDate(0, 0, -7)
-	end := monthEnd.AddDate(0, 0, 7)
+	end := monthEnd.AddDate(0, 0, 14)
 
 	data := make(map[string][]calendarReleaseItem)
 	seen := make(map[string]struct{})

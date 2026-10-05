@@ -223,6 +223,9 @@ func newApplication(c *config) (*application, error) {
 		cacheDir = absCacheDir
 	}
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		if hint := ownershipHint(err); hint != "" {
+			return nil, fmt.Errorf("creating cache-dir: %v, %s", err, hint)
+		}
 		return nil, fmt.Errorf("creating cache-dir: %v", err)
 	}
 	config.Server.CacheDir = cacheDir
@@ -961,16 +964,9 @@ func originHost(origin string) string {
 }
 
 func (a *application) isRequestHTTPS(r *http.Request) bool {
-	if a.Config.Server.HTTPS {
-		return true
-	}
-	if r.TLS != nil {
-		return true
-	}
-	if a.Config.Server.Proxied && a.requestCameThroughTrustedProxy(r) {
-		return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-	}
-	return false
+	return a.Config.Server.HTTPS || r.TLS != nil ||
+		(a.Config.Server.Proxied && a.requestCameThroughTrustedProxy(r) &&
+			strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"))
 }
 
 func (a *application) server() (func() error, func() error) {

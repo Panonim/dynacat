@@ -1,7 +1,10 @@
 FROM alpine:3.21
 
+RUN apk add --no-cache su-exec
+
 WORKDIR /app
 COPY dynacat .
+COPY --chmod=755 docker/entrypoint.sh /app/entrypoint.sh
 
 EXPOSE 8080/tcp
-ENTRYPOINT ["/app/dynacat", "--config", "/app/config/dynacat.yml"]
+ENTRYPOINT ["/app/entrypoint.sh", "--config", "/app/config/dynacat.yml"]

@@ -46,7 +46,7 @@ func (a *application) handleEditorConfigLoad(w http.ResponseWriter, r *http.Requ
 		slog.Error("Editor config load failed", "error", err)
 		writeEditorError(w, http.StatusInternalServerError, "editor_config_unreadable",
 			"the config could not be read into the editor",
-			"The config file is missing a pages list or failed to parse. The server log holds the parser error.")
+			"The config file has no pages, or failed to parse. Pages may be a list or a block of $include directives. The server log holds the parser error.")
 		return
 	}
 	writeJSON(w, http.StatusOK, view)
