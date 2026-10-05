@@ -362,10 +362,12 @@ function setupSearchBoxes() {
             const autocompleteEnabled = widget.dataset.autocomplete === "true";
             const targetsEnabled = widget.dataset.targetsEnabled === "true";
             const autocompleteEl = widget.querySelector(".search-autocomplete");
+            const toWords = (text) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
             const targets = Array.from(widget.querySelectorAll(".search-targets > input")).map((el) => ({
                 type: "target",
                 kind: el.dataset.kind || "bookmark",
                 title: el.dataset.title,
+                titleWords: toWords(el.dataset.title || ""),
                 url: el.dataset.url,
                 target: el.dataset.target || "",
                 icon: el.dataset.icon || "",
@@ -449,14 +451,15 @@ function setupSearchBoxes() {
             const TARGET_MATCH_LIMIT = 3;
             const TARGET_FALLBACK_GLYPHS = { bookmark: "↗", docker: "▣", monitor: "◉" };
 
-            // Each kind gets its own limit so bookmarks can't crowd out containers or sites.
+            // Every query word must prefix some title word and each kind gets its own limit so bookmarks can't crowd out containers or sites.
             const matchTargets = (query) => {
                 if (!targetsEnabled || !query) return [];
-                const lowerQuery = query.toLowerCase();
+                const queryWords = toWords(query);
+                if (queryWords.length === 0) return [];
                 const countPerKind = {};
 
                 return targets.filter((t) => {
-                    if (!t.title || !t.title.toLowerCase().startsWith(lowerQuery)) return false;
+                    if (!queryWords.every((q) => t.titleWords.some((w) => w.startsWith(q)))) return false;
                     countPerKind[t.kind] = (countPerKind[t.kind] || 0) + 1;
                     return countPerKind[t.kind] <= TARGET_MATCH_LIMIT;
                 });
@@ -631,7 +634,7 @@ function setupDynamicRelativeTime() {
     });
 }
 
-const _initializedGroupHeaders = new WeakSet();
+const _groupTabSetters = new WeakMap();
 
 function setupGroups() {
     const groups = document.getElementsByClassName("widget-type-group");
@@ -644,18 +647,24 @@ function setupGroups() {
         const group = groups[g];
 
         const headerEl = group.getElementsByClassName("widget-header")[0];
-        if (!headerEl || _initializedGroupHeaders.has(headerEl)) continue;
-        _initializedGroupHeaders.add(headerEl);
+        if (!headerEl) continue;
 
         const titles = headerEl.children;
-        const tabs = group.getElementsByClassName("widget-group-contents")[0].children;
         let current = parseInt(group.dataset.currentTab ?? "0", 10);
 
         if (Number.isNaN(current) || current < 0 || current >= titles.length) {
             current = 0;
         }
 
+        if (_groupTabSetters.has(headerEl)) {
+            _groupTabSetters.get(headerEl)(current);
+            continue;
+        }
+
+        const tabs = group.getElementsByClassName("widget-group-contents")[0].children;
+
         const setCurrentTab = (nextCurrent) => {
+            current = nextCurrent;
             group.dataset.currentTab = String(nextCurrent);
 
             for (let i = 0; i < titles.length; i++) {
@@ -715,12 +724,11 @@ function setupGroups() {
                     tabs[t].dataset.direction = "left";
                 }
 
-                current = t;
-
                 setCurrentTab(t);
             });
         }
 
+        _groupTabSetters.set(headerEl, setCurrentTab);
         setCurrentTab(current);
     }
 }
@@ -1168,6 +1176,24 @@ function zoneDiffText(diffInMinutes) {
     return { text: `${sign}${hours}h~`, title: `${hours} hour${hourSuffix} and ${minutes} minutes ${signText}` };
 }
 
+const clockUpdaters = new Map();
+let clockTimerStarted = false;
+
+function tickClocks() {
+    const now = new Date();
+
+    for (const [clock, updateClock] of clockUpdaters) {
+        if (!clock.isConnected) {
+            clockUpdaters.delete(clock);
+            continue;
+        }
+
+        updateClock(now);
+    }
+
+    setTimeout(tickClocks, (60 - now.getSeconds()) * 1000);
+}
+
 function setupClocks() {
     const clocks = document.getElementsByClassName('clock');
 
@@ -1175,10 +1201,14 @@ function setupClocks() {
         return;
     }
 
-    const updateCallbacks = [];
-
     for (var i = 0; i < clocks.length; i++) {
         const clock = clocks[i];
+
+        if (clock.dataset.clockReady !== undefined) {
+            continue;
+        }
+
+        const updateCallbacks = [];
         const hourFormat = clock.dataset.hourFormat;
         const localTimeContainer = clock.querySelector('[data-local-time]');
         const localDateElement = localTimeContainer.querySelector('[data-date]');
@@ -1215,18 +1245,21 @@ function setupClocks() {
                 diffElement.title = title;
             });
         }
+
+        const updateClock = (now) => {
+            for (var c = 0; c < updateCallbacks.length; c++)
+                updateCallbacks[c](now);
+        };
+
+        clockUpdaters.set(clock, updateClock);
+        updateClock(new Date());
+        clock.dataset.clockReady = '';
     }
 
-    const updateClocks = () => {
-        const now = new Date();
-
-        for (var i = 0; i < updateCallbacks.length; i++)
-            updateCallbacks[i](now);
-
-        setTimeout(updateClocks, (60 - now.getSeconds()) * 1000);
-    };
-
-    updateClocks();
+    if (!clockTimerStarted) {
+        clockTimerStarted = true;
+        setTimeout(tickClocks, (60 - new Date().getSeconds()) * 1000);
+    }
 }
 
 async function setupCalendars() {
@@ -1579,6 +1612,7 @@ async function updateWidget(widgetElement) {
 
             const callbacksIndexBefore = contentReadyCallbacks.length;
 
+            setupClocks();
             setupPopovers();
             setupCarousels();
             setupCollapsibleLists();
@@ -2045,6 +2079,7 @@ async function applyContentUpdate() {
             restoreGroupTabStates(widget, states);
         }
 
+        setupClocks();
         setupPopovers();
         setupCarousels();
         setupCollapsibleLists();
@@ -2217,6 +2252,7 @@ function _applyWidgetUpdate(widgetId, html) {
 }
 
 function _runPostSettleSetup() {
+    setupClocks();
     setupPopovers();
     setupCarousels();
     setupGroups();

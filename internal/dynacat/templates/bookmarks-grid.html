@@ -1,0 +1,32 @@
+{{ template "widget-base.html" . }}
+
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
+{{ define "widget-content" }}
+<div class="list list-gap-24 list-with-separator">
+    {{- range .Groups }}
+    <div class="bookmarks-group"{{ if .Color }} style="--bookmarks-group-color: {{ .Color.String | safeCSS }}"{{ end }}>
+        {{- if ne .Title "" }}
+        <div class="bookmarks-group-title size-h3 margin-bottom-10">{{ .Title }}</div>
+        {{- end }}
+        <ul class="bookmarks-grid">
+        {{- range .Links }}
+        <li class="text-center">
+            <a href="{{ .URL | safeURL }}" class="bookmarks-grid-link block" {{ if .Target }}target="{{ .Target }}"{{ end }} rel="noreferrer">
+                {{- if ne "" .Icon.URL }}
+                <div class="bookmarks-grid-icon-container">
+                    <img class="bookmarks-grid-icon{{ if .Icon.AutoInvert }} flat-icon{{ end }}" src="{{ .Icon.URL }}" alt="" loading="lazy">
+                </div>
+                {{- end }}
+                <p class="bookmarks-grid-title margin-top-7 text-truncate color-highlight size-h4">{{ .Title }}</p>
+            </a>
+            {{- if .Description }}
+            <div class="margin-top-5 text-truncate-2-lines text-compact">{{ .Description }}</div>
+            {{- end }}
+        </li>
+        {{- end }}
+        </ul>
+    </div>
+    {{- end }}
+</div>
+{{ end }}

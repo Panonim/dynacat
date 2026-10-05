@@ -156,16 +156,17 @@ body.editing .page-column {
     background: var(--color-widget-background);
 }
 
-body.editing .page-column:not(:has(> .widget)) {
-    align-items: center;
-    justify-content: center;
-}
-
 body.editing .page-column:not(:has(> .widget))::after {
     content: "Drop widgets here";
+    order: -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    border: 1px dashed var(--color-separator);
+    border-radius: var(--border-radius);
     color: var(--color-text-subdue);
     font-size: 1.2rem;
-    opacity: 0.5;
     pointer-events: none;
 }
 
@@ -288,24 +289,15 @@ body.editing .page-column:not(:has(> .widget))::after {
 }
 
 .editor-column-tools {
-    display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    padding-top: 8px;
+    padding: 6px 0 2px;
+    font-size: 1.3rem;
 }
 
-.editor-column-remove {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    border: none;
-    border-radius: var(--border-radius);
-    background: transparent;
-    color: var(--color-text-subdue);
-    font: inherit;
-    font-size: 1.1rem;
-    cursor: pointer;
-    transition: color 0.15s;
+.editor-column-size.active {
+    color: var(--color-primary);
+    cursor: default;
 }
 
 .editor-column-remove:hover {

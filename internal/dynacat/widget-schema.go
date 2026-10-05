@@ -134,6 +134,9 @@ var itemAdvancedFields = map[string]bool{
 const maxListDepth = 2
 
 var fieldAnnotations = map[string]map[string]fieldAnnotation{
+	"bookmarks": {
+		"style": {Options: []string{"grid"}},
+	},
 	"calendar": {
 		"first-day-of-week": {Options: []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}},
 		"hosts.url":         {Hint: "Prefix with the service, e.g. sonarr:https://... or radarr:https://..."},

@@ -33,3 +33,43 @@
     height: 20px;
     opacity: 0.8;
 }
+
+.bookmarks-grid {
+    display: grid;
+    gap: 2rem 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+
+.bookmarks-grid-icon-container {
+    width: max-content;
+    margin-inline: auto;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    background-color: var(--color-widget-background-highlight);
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.bookmarks-grid-icon {
+    display: block;
+    width: 4rem;
+    height: 4rem;
+    object-fit: contain;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.bookmarks-grid-link:hover .bookmarks-grid-icon-container,
+.bookmarks-grid-link:focus-visible .bookmarks-grid-icon-container {
+    background-color: color-mix(in srgb, var(--bookmarks-group-color) 18%, var(--color-widget-background-highlight));
+    transform: translateY(-2px);
+}
+
+.bookmarks-grid-link:hover .bookmarks-grid-icon,
+.bookmarks-grid-link:focus-visible .bookmarks-grid-icon {
+    opacity: 1;
+}
+
+.bookmarks-grid-link:hover .bookmarks-grid-title,
+.bookmarks-grid-link:focus-visible .bookmarks-grid-title {
+    color: var(--bookmarks-group-color);
+}

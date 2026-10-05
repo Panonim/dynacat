@@ -5,11 +5,13 @@ import (
 )
 
 var bookmarksWidgetTemplate = mustParseTemplate("bookmarks.html", "widget-base.html")
+var bookmarksGridWidgetTemplate = mustParseTemplate("bookmarks-grid.html", "widget-base.html")
 
 type bookmarksWidget struct {
 	widgetBase `yaml:",inline"`
 	cachedHTML template.HTML `yaml:"-"`
 	Frameless  bool          `yaml:"frameless"`
+	Style      string        `yaml:"style"`
 	Groups     []struct {
 		Title     string         `yaml:"title"`
 		Color     *hslColorField `yaml:"color"`
@@ -65,15 +67,23 @@ func (widget *bookmarksWidget) initialize() error {
 func (widget *bookmarksWidget) setProviders(providers *widgetProviders) {
 	widget.widgetBase.setProviders(providers)
 	widget.cacheIcons()
-	widget.cachedHTML = widget.renderTemplate(widget, bookmarksWidgetTemplate)
+	widget.cachedHTML = widget.render()
 }
 
 func (widget *bookmarksWidget) Render() template.HTML {
 	if widget.cachedHTML == "" {
-		widget.cachedHTML = widget.renderTemplate(widget, bookmarksWidgetTemplate)
+		widget.cachedHTML = widget.render()
 	}
 
 	return widget.cachedHTML
+}
+
+func (widget *bookmarksWidget) render() template.HTML {
+	if widget.Style == "grid" {
+		return widget.renderTemplate(widget, bookmarksGridWidgetTemplate)
+	}
+
+	return widget.renderTemplate(widget, bookmarksWidgetTemplate)
 }
 
 func (widget *bookmarksWidget) cacheIcons() {

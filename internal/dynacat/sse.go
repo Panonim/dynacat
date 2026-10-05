@@ -139,12 +139,14 @@ func (a *application) handleImageProxyRequest(w http.ResponseWriter, r *http.Req
 	io.Copy(w, io.LimitReader(resp.Body, maxResponseBytes))
 }
 
-func (a *application) respondWithOpenSearchSuggestions(w http.ResponseWriter, r *http.Request, requestURL string, client *http.Client) {
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, requestURL, nil)
+// The typed query is applied to RawQuery only, so it can never alter the host or path being fetched.
+func (a *application) respondWithOpenSearchSuggestions(w http.ResponseWriter, r *http.Request, baseURL string, rawQuery string, client *http.Client) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, baseURL, nil)
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
 	}
+	req.URL.RawQuery = rawQuery
 	setBrowserUserAgentHeader(req)
 
 	resp, err := client.Do(req)
@@ -196,8 +198,8 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 	w.Header().Set("Content-Type", "application/json")
 
 	if provider == "brave" {
-		braveURL := "https://search.brave.com/api/suggest?" + url.Values{"q": {query}, "rich": {"false"}}.Encode()
-		a.respondWithOpenSearchSuggestions(w, r, braveURL, publicOnlyHTTPClient)
+		braveQuery := url.Values{"q": {query}, "rich": {"false"}}.Encode()
+		a.respondWithOpenSearchSuggestions(w, r, "https://search.brave.com/api/suggest", braveQuery, publicOnlyHTTPClient)
 		return
 	}
 
@@ -216,12 +218,13 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 			return
 		}
 
-		customURL := strings.ReplaceAll(source.URL, "{QUERY}", url.QueryEscape(query))
+		baseURL, rawQuery, _ := strings.Cut(source.URL, "?")
+		rawQuery = strings.ReplaceAll(rawQuery, "{QUERY}", url.QueryEscape(query))
 		// Self-hosted instances named in the config are allowed to sit on a private
 		// address, unlike URLs that could otherwise be probed through this endpoint.
 		client := defaultHTTPClient
 		if !source.AllowPrivate {
-			if err := validatePublicFetchURL(customURL); err != nil {
+			if err := validatePublicFetchURL(baseURL); err != nil {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte("[]"))
 				return
@@ -229,7 +232,7 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 			client = publicOnlyHTTPClient
 		}
 
-		a.respondWithOpenSearchSuggestions(w, r, customURL, client)
+		a.respondWithOpenSearchSuggestions(w, r, baseURL, rawQuery, client)
 		return
 	}
 

@@ -241,10 +241,6 @@ function Dates(firstDay, releases, showReleaseState) {
             if (existing) existing.remove();
 
             const cellDate = new Date(firstCellDate.getFullYear(), firstCellDate.getMonth(), firstCellDate.getDate() + i);
-            if (cellDate.getMonth() !== newDate.getMonth() || cellDate.getFullYear() !== newDate.getFullYear()) {
-                continue;
-            }
-
             const items = data[isoDate(cellDate)];
             if (items && items.length) {
                 cell.append(releaseMarker(items, showReleaseState));

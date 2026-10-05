@@ -793,6 +793,10 @@ Preview:
 | Name | Type | Required |
 | ---- | ---- | -------- |
 | groups | array | yes |
+| style | string | no |
+
+##### `style`
+Set to `grid` to show the links as a grid of icon tiles with the title and description underneath, which works best when each link has an `icon`. Leave it empty for the default list.
 
 ##### `groups`
 An array of groups which can optionally have a title and a custom color.
@@ -2765,7 +2769,7 @@ Either `duckduckgo` (default), `brave`, or a URL to a custom suggestion endpoint
 | brave | Brave Search autocomplete |
 | a URL containing `{QUERY}` | Your own suggestion endpoint |
 
-A custom URL must return the [OpenSearch suggestions format](https://github.com/dewitt/opensearch/blob/master/opensearch-1-1-draft-6.md#the-json-format) (`["query", ["suggestion 1", "suggestion 2", ...]]`), which is what most self-hosted and public search engines (SearXNG, Wikipedia, etc.) expose. Use `{QUERY}` to indicate where the typed query gets placed. The request is made server-side, so the URL is never sent to the browser. Example:
+A custom URL must return the [OpenSearch suggestions format](https://github.com/dewitt/opensearch/blob/master/opensearch-1-1-draft-6.md#the-json-format) (`["query", ["suggestion 1", "suggestion 2", ...]]`), which is what most self-hosted and public search engines (SearXNG, Wikipedia, etc.) expose. Use `{QUERY}` in the query string to indicate where the typed query gets placed, it is not allowed in the host or path. The request is made server-side, so the URL is never sent to the browser. Example:
 
 ```yaml
 - type: search
@@ -2927,6 +2931,7 @@ Whether to hide the swap usage.
 | ---- | ---- | -------- | ------- |
 | cpu-temp-sensor | string | no |  |
 | hide-mountpoints-by-default | boolean | no | false |
+| mountpoint-order | string | no | usage |
 | mountpoints | map\[string\]object | no |  |
 
 ###### `cpu-temp-sensor`
@@ -2962,6 +2967,9 @@ If set to `true` you'll have to manually make each mountpoint visible by adding 
 ```
 
 This is useful if you're running Dynacat inside of a container which usually mounts a lot of irrelevant filesystems.
+
+###### `mountpoint-order`
+The order in which mountpoints are displayed. Possible values are `usage` (most full first), `name` (alphabetically by name, falling back to the path) and `path` (alphabetically by path). 
 
 ###### `mountpoints`
 A map of mountpoints to display disk usage for. The key is the path to the mountpoint and the value is an object with optional properties. Example:

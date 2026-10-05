@@ -20,11 +20,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.21
 
-RUN apk add --no-cache zfs
+RUN apk add --no-cache zfs su-exec
 
 WORKDIR /app
 COPY --from=builder /app/dynacat .
+COPY --chmod=755 docker/entrypoint.sh /app/entrypoint.sh
 RUN mkdir -p /app/config
 
 EXPOSE 8080/tcp
-ENTRYPOINT ["/app/dynacat", "--config", "/app/config/dynacat.yml"]
+ENTRYPOINT ["/app/entrypoint.sh", "--config", "/app/config/dynacat.yml"]
