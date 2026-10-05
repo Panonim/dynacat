@@ -7,7 +7,6 @@
 - Fixed a bug where qBittorrent wasn't logging in correctly -> https://github.com/Panonim/dynacat/issues/155
 - Fixed `clock` widget blanking after widget updates -> https://github.com/Panonim/dynacat/pull/160
 - Calendar now shows releases on the previous and next month days visible in the grid -> https://github.com/Panonim/dynacat/issues/156
-- Calendar now properly shows upcoming shows -> https://github.com/Panonim/dynacat/issues/156
 - Added a `grid` style to the `bookmarks` widget -> https://github.com/Panonim/dynacat/issues/162
 - Allowed non-root users to use the folders easily -> https://github.com/Panonim/dynacat/issues/165
 - Added .exe support for the releases
