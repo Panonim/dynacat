@@ -157,7 +157,9 @@ Make sure to rename your `glance.yml` file into `dynacat.yml`.
 
 Download `dynacat-windows-amd64-setup.exe` (or `dynacat-windows-arm64-setup.exe` for ARM devices) from the [latest release](https://github.com/Panonim/dynacat/releases/latest) and run it. 
 
-The default installation path is located at `%LOCALAPPDATA%\Dynacat`. 
+The default installation path is located at `%LOCALAPPDATA%\Dynacat`. No administrator rights are needed, except for the optional firewall rule and Event Viewer logging.
+
+By default Dynacat only listens on this computer (`host: 127.0.0.1`). To reach it from other devices, pick the firewall option during install and remove the `host` line from the config.
 
 In background mode there is no window and logs go to Event Viewer under `Windows Logs > Application` with the source `Dynacat`. Use the `Stop Dynacat` shortcut from the Start menu to stop it. Start at login can be turned off any time in `Settings > Apps > Startup`.
 

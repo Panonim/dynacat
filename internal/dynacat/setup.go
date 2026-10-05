@@ -114,7 +114,8 @@ func configNeedsFirstRunSetup(path string) bool {
 		return true
 	}
 
-	contents, err := os.ReadFile(path)
+	// Pages can live in an included file, so check the merged config.
+	contents, _, err := parseYAMLIncludes(path)
 	if err != nil {
 		return false
 	}

@@ -18,8 +18,8 @@ AppPublisher=Panonim
 AppPublisherURL=https://github.com/Panonim/dynacat
 DefaultDirName={localappdata}\Dynacat
 DisableProgramGroupPage=yes
-PrivilegesRequired=admin
-UsedUserAreasWarning=no
+; Installs per user without UAC, only the firewall rule and event log source ask for admin rights.
+PrivilegesRequired=lowest
 ArchitecturesAllowed={#InnoArch}
 ArchitecturesInstallIn64BitMode={#InnoArch}
 OutputDir=output
@@ -34,7 +34,7 @@ UninstallDisplayIcon={app}\dynacat.exe
 Name: desktopicon; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts"; Flags: unchecked
 Name: background; Description: "Run in the background without a window (logs go to Event Viewer)"; GroupDescription: "Startup"; Flags: unchecked
 Name: autostart; Description: "Start Dynacat in the background when I log in"; GroupDescription: "Startup"; Flags: unchecked
-Name: firewall; Description: "Allow access from other devices on the network (Windows Firewall rule)"; GroupDescription: "Network"; Flags: unchecked
+Name: firewall; Description: "Allow access from other devices on private networks (Windows Firewall rule)"; GroupDescription: "Network"; Flags: unchecked
 
 [Files]
 Source: "dynacat.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -49,13 +49,9 @@ Name: "{userdesktop}\Dynacat"; Filename: "{app}\dynacat.exe"; Parameters: "{code
 Name: "{userstartup}\Dynacat"; Filename: "{app}\dynacat.exe"; Parameters: "{code:GetRunParams|background}"; WorkingDir: "{app}"; Flags: runminimized; Tasks: autostart
 
 [Registry]
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\EventLog\Application\Dynacat"; ValueType: expandsz; ValueName: "EventMessageFile"; ValueData: "%SystemRoot%\System32\EventCreate.exe"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\EventLog\Application\Dynacat"; ValueType: dword; ValueName: "TypesSupported"; ValueData: "7"
 Root: HKCU; Subkey: "Software\Dynacat"; ValueType: string; ValueName: "EnvFile"; ValueData: "{code:GetEnvFile}"; Flags: uninsdeletekey
 
 [Run]
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Dynacat"""; Flags: runhidden
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Dynacat"" dir=in action=allow protocol=TCP localport={code:GetPort}"; Flags: runhidden; Tasks: firewall
 Filename: "{app}\dynacat.exe"; Parameters: "{code:GetRunParams|console}"; WorkingDir: "{app}"; Description: "Launch Dynacat"; Flags: postinstall nowait skipifsilent; Tasks: not background
 Filename: "{app}\dynacat.exe"; Parameters: "{code:GetRunParams|background}"; WorkingDir: "{app}"; Description: "Launch Dynacat"; Flags: postinstall nowait skipifsilent runhidden; Tasks: background
 Filename: "http://localhost:{code:GetPort}"; Description: "Open Dynacat in the browser"; Flags: postinstall shellexec nowait skipifsilent
@@ -64,7 +60,6 @@ Filename: "{app}\dynacat.exe"; Parameters: "{code:GetRunParams|background}"; Wor
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM dynacat.exe"; Flags: runhidden; RunOnceId: "StopDynacat"
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Dynacat"""; Flags: runhidden; RunOnceId: "DeleteFirewallRule"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\.cache"
@@ -73,6 +68,8 @@ Type: filesandordirs; Name: "{app}\assets\dynawidgets"
 [Code]
 const
   DefaultPort = '8080';
+  DynacatKey = 'Software\Dynacat';
+  EventLogKey = 'SYSTEM\CurrentControlSet\Services\EventLog\Application\Dynacat';
 
 var
   EnvCheck: TNewCheckBox;
@@ -333,12 +330,67 @@ begin
 end;
 
 // The config has no pages, so Dynacat opens its first run setup page to create them.
+procedure AddCommand(var Commands: String; Command: String);
+begin
+  if Commands <> '' then
+    Commands := Commands + ' & ';
+  Commands := Commands + Command;
+end;
+
+// Runs everything in one elevated cmd so there is at most a single UAC prompt.
+function RunElevated(Commands: String): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := True;
+  if Commands <> '' then
+    Result := ShellExec('runas', ExpandConstant('{cmd}'), '/c ' + Commands, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+function GetFirewallPort(): String;
+begin
+  Result := '';
+  if WizardIsTaskSelected('firewall') then
+    Result := GetPort('');
+end;
+
+// The firewall rule and event log source are machine wide, so only these steps ask for admin rights.
+procedure RunElevatedSetup();
+var
+  Commands, PrevFirewallPort, FirewallPort: String;
+begin
+  Commands := '';
+
+  if (WizardIsTaskSelected('background') or WizardIsTaskSelected('autostart')) and not RegKeyExists(HKLM, EventLogKey) then
+  begin
+    AddCommand(Commands, Format('reg add "HKLM\%s" /v EventMessageFile /t REG_EXPAND_SZ /d "%s" /f', [EventLogKey, ExpandConstant('{sys}\EventCreate.exe')]));
+    AddCommand(Commands, Format('reg add "HKLM\%s" /v TypesSupported /t REG_DWORD /d 7 /f', [EventLogKey]));
+  end;
+
+  if not RegQueryStringValue(HKCU, DynacatKey, 'FirewallPort', PrevFirewallPort) then
+    PrevFirewallPort := '';
+  FirewallPort := GetFirewallPort();
+  if FirewallPort <> PrevFirewallPort then
+  begin
+    AddCommand(Commands, 'netsh advfirewall firewall delete rule name="Dynacat"');
+    if FirewallPort <> '' then
+      AddCommand(Commands, Format('netsh advfirewall firewall add rule name="Dynacat" dir=in action=allow protocol=TCP localport=%s profile=private,domain', [FirewallPort]));
+  end;
+
+  if RunElevated(Commands) then
+    RegWriteStringValue(HKCU, DynacatKey, 'FirewallPort', FirewallPort)
+  else if not WizardSilent then
+    MsgBox('Administrator rights were declined, so the firewall rule and Event Viewer logging were not set up. Run the installer again to retry.', mbInformation, MB_OK);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  AssetsPath: String;
+  AssetsPath, Host: String;
 begin
   if CurStep <> ssPostInstall then
     Exit;
+
+  RunElevatedSetup();
 
   AssetsPath := ExpandConstant('{app}\assets');
   ForceDirectories(AssetsPath);
@@ -350,9 +402,16 @@ begin
 
   if not FileExists(ConfigPath()) then
   begin
+    // Without the firewall option only this computer needs access, which also keeps the first run setup page private.
+    Host := '';
+    if not WizardIsTaskSelected('firewall') then
+      Host := '  # Remove this line to allow other devices to connect' + #13#10 +
+        '  host: 127.0.0.1' + #13#10;
+
     StringChangeEx(AssetsPath, '''', '''''', True);
     SaveStringToFile(ConfigPath(),
       'server:' + #13#10 +
+      Host +
       '  port: ' + GetPort('') + #13#10 +
       '  assets-path: ''' + AssetsPath + '''' + #13#10 + #13#10 +
       'theme:' + #13#10 +
@@ -437,6 +496,21 @@ begin
   end;
 end;
 
+// Undoes RunElevatedSetup, asking for admin rights only when there is something to remove.
+procedure RunElevatedCleanup();
+var
+  Commands, FirewallPort: String;
+begin
+  Commands := '';
+  if RegKeyExists(HKLM, EventLogKey) then
+    AddCommand(Commands, Format('reg delete "HKLM\%s" /f', [EventLogKey]));
+  if RegQueryStringValue(HKCU, DynacatKey, 'FirewallPort', FirewallPort) and (FirewallPort <> '') then
+    AddCommand(Commands, 'netsh advfirewall firewall delete rule name="Dynacat"');
+
+  if not RunElevated(Commands) then
+    Log('Skipped removing the firewall rule and event log source, administrator rights were declined');
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   EnvFile: String;
@@ -444,7 +518,8 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     // Read before uninstall deletes the registry key.
-    if RemoveUserData and RegQueryStringValue(HKCU, 'Software\Dynacat', 'EnvFile', EnvFile) then
+    RunElevatedCleanup();
+    if RemoveUserData and RegQueryStringValue(HKCU, DynacatKey, 'EnvFile', EnvFile) then
       DeleteFile(EnvFile);
   end;
 

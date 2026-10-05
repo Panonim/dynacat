@@ -25,13 +25,13 @@ func enableConsoleColors() bool {
 }
 
 func newBackgroundLogHandler(level slog.Level) slog.Handler {
-	// Detaching closes the console window the shortcut opened.
-	windows.NewLazySystemDLL("kernel32.dll").NewProc("FreeConsole").Call()
-
 	log, err := eventlog.Open(eventLogSource)
 	if err != nil {
 		return nil
 	}
+
+	// Detaching closes the console window the shortcut opened, so only do it once logs have somewhere to go.
+	windows.NewLazySystemDLL("kernel32.dll").NewProc("FreeConsole").Call()
 
 	return &eventLogHandler{prettyHandler: newPrettyHandler(nil, level, false), log: log}
 }

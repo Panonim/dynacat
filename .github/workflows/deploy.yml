@@ -178,6 +178,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" build/windows/*/dynacat-windows-*-setup.exe --clobber
 
+  checksums:
+    needs: [release-binaries, windows-installer]
+    # Still runs when windows-installer is skipped for prerelease tags.
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-slim
+    steps:
+      - name: Generate checksums.txt for every release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "${GITHUB_REF_NAME}" --pattern '*' --skip-existing
+          rm -f checksums.txt
+          # dynacat update refuses installers that are not listed here.
+          sha256sum -- * > ../checksums.txt
+          gh release upload "${GITHUB_REF_NAME}" ../checksums.txt --clobber
+
   notify-discord:
     needs: [deploy, release-binaries, windows-installer]
     # Still runs when windows-installer is skipped for prerelease tags.

@@ -57,8 +57,9 @@ func dynawidgetsAssetPath(slug string, repo string, suffix string) (string, erro
 		return "", fmt.Errorf("invalid repo %q", repo)
 	}
 
-	path := filepath.Join(dynawidgetsAssetsDir, dynawidgetsCacheKey(slug, repo)+suffix)
-	absAssets, err := filepath.Abs(dynawidgetsAssetsDir)
+	assetsDir := dynawidgetsAssetsDir()
+	path := filepath.Join(assetsDir, dynawidgetsCacheKey(slug, repo)+suffix)
+	absAssets, err := filepath.Abs(assetsDir)
 	if err != nil {
 		return path, nil
 	}
@@ -86,7 +87,7 @@ func dynawidgetsTemplateModTime(slug string, repo string) time.Time {
 
 // Metadata for every cached template, keyed by slug and branch.
 func dynawidgetsMetaPath() string {
-	return filepath.Join(dynawidgetsAssetsDir, "templates.meta.json")
+	return filepath.Join(dynawidgetsAssetsDir(), "templates.meta.json")
 }
 
 var dynawidgetsMetaMu sync.Mutex
@@ -130,7 +131,7 @@ func dynawidgetsWriteMeta(slug string, repo string, meta *dynawidgetsTemplateMet
 		return
 	}
 
-	if err := os.MkdirAll(dynawidgetsAssetsDir, 0755); err != nil {
+	if err := os.MkdirAll(dynawidgetsAssetsDir(), 0755); err != nil {
 		slog.Error("Failed to create dynawidgets assets directory", "error", err)
 		return
 	}

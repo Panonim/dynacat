@@ -176,7 +176,7 @@ func newConfigFromYAML(contents []byte) (*config, error) {
 	}
 
 	// Widgets resolve cached templates during initialization, so the directory must be set first.
-	dynawidgetsAssetsDir = filepath.Join(config.assetsPath(), "dynawidgets")
+	setDynawidgetsAssetsDir(filepath.Join(config.assetsPath(), "dynawidgets"))
 
 	for p := range config.Pages {
 		for w := range config.Pages[p].HeadWidgets {
