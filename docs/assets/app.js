@@ -677,7 +677,29 @@ function parseMarkdown(md) {
   // Preprocess: fix dynacat.yml link
   md = md.replace(/\(dynacat\.yml\)/g, '(docs/dynacat.yml)');
 
+  md = separateHtmlBlocks(md);
+
   return marked.parse(md);
+}
+
+// Marked treats text directly under an HTML line as raw HTML, so it skips markdown and <p> wrapping.
+function separateHtmlBlocks(md) {
+  const lines = md.split('\n');
+  const out = [];
+  let inFence = false;
+
+  lines.forEach((line, i) => {
+    out.push(line);
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (inFence) return;
+
+    const next = lines[i + 1];
+    if (/^\s*(<br\s*\/?>|.*<\/summary>)\s*$/i.test(line) && next !== undefined && next.trim() !== '') {
+      out.push('');
+    }
+  });
+
+  return out.join('\n');
 }
 
 function fixImagePaths(container) {
