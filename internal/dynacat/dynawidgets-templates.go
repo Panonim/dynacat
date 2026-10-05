@@ -85,19 +85,21 @@ func dynawidgetsTemplateModTime(slug string, repo string) time.Time {
 }
 
 // Metadata for every cached template, keyed by slug and branch.
-var dynawidgetsMetaPath = filepath.Join(dynawidgetsAssetsDir, "templates.meta.json")
+func dynawidgetsMetaPath() string {
+	return filepath.Join(dynawidgetsAssetsDir, "templates.meta.json")
+}
 
 var dynawidgetsMetaMu sync.Mutex
 
 func dynawidgetsReadAllMeta() map[string]dynawidgetsTemplateMeta {
-	data, err := os.ReadFile(dynawidgetsMetaPath)
+	data, err := os.ReadFile(dynawidgetsMetaPath())
 	if err != nil {
 		return map[string]dynawidgetsTemplateMeta{}
 	}
 
 	entries := map[string]dynawidgetsTemplateMeta{}
 	if err := json.Unmarshal(data, &entries); err != nil {
-		slog.Warn("Ignoring unreadable dynawidgets metadata", "error", err, "path", dynawidgetsMetaPath)
+		slog.Warn("Ignoring unreadable dynawidgets metadata", "error", err, "path", dynawidgetsMetaPath())
 		return map[string]dynawidgetsTemplateMeta{}
 	}
 
@@ -133,8 +135,8 @@ func dynawidgetsWriteMeta(slug string, repo string, meta *dynawidgetsTemplateMet
 		return
 	}
 
-	if err := os.WriteFile(dynawidgetsMetaPath, data, 0600); err != nil {
-		slog.Error("Failed to write dynawidgets metadata", "error", err, "path", dynawidgetsMetaPath)
+	if err := os.WriteFile(dynawidgetsMetaPath(), data, 0600); err != nil {
+		slog.Error("Failed to write dynawidgets metadata", "error", err, "path", dynawidgetsMetaPath())
 	}
 }
 

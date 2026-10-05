@@ -22,12 +22,14 @@ const (
 	cliIntentMountpointInfo
 	cliIntentSecretMake
 	cliIntentPasswordHash
+	cliIntentUpdate
 )
 
 type cliOptions struct {
 	intent     cliIntent
 	configPath string
 	envFile    string
+	background bool
 	args       []string
 }
 
@@ -56,10 +58,12 @@ func parseCliOptions() (*cliOptions, error) {
 		fmt.Println("  sensors:print         List all sensors")
 		fmt.Println("  mountpoint:info       Print information about a given mountpoint path")
 		fmt.Println("  diagnose              Run diagnostic checks")
+		fmt.Println("  update                Update to the latest release (Windows installer only)")
 	}
 
 	configPath := flags.String("config", "dynacat.yml", "Set config path")
 	envFile := flags.String("env-file", "", "Path to an env file to load environment variables from")
+	background := flags.Bool("background", false, "Run without a console window, logging to the Windows Event Log (Windows only)")
 	err := flags.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -84,6 +88,8 @@ func parseCliOptions() (*cliOptions, error) {
 			intent = cliIntentDiagnose
 		case "secret:make":
 			intent = cliIntentSecretMake
+		case "update":
+			intent = cliIntentUpdate
 		case "password:hash":
 			return nil, fmt.Errorf("missing password, usage: dynacat password:hash <password>")
 		case "mountpoint:info":
@@ -108,6 +114,7 @@ func parseCliOptions() (*cliOptions, error) {
 		intent:     intent,
 		configPath: *configPath,
 		envFile:    *envFile,
+		background: *background,
 		args:       args,
 	}, nil
 }

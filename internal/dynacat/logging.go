@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -20,9 +21,17 @@ const (
 	ansiGray   = "\033[90m"
 )
 
-func configureLogging() {
+func configureLogging(background bool) {
 	level := parseLogLevel(os.Getenv("LOG_LEVEL"))
-	slog.SetDefault(slog.New(newPrettyHandler(os.Stderr, level)))
+
+	if background {
+		if handler := newBackgroundLogHandler(level); handler != nil {
+			slog.SetDefault(slog.New(handler))
+			return
+		}
+	}
+
+	slog.SetDefault(slog.New(newPrettyHandler(os.Stderr, level, enableConsoleColors())))
 }
 
 func parseLogLevel(value string) slog.Level {
@@ -42,12 +51,13 @@ type prettyHandler struct {
 	mu    *sync.Mutex
 	out   io.Writer
 	level slog.Level
+	color bool
 	attrs []slog.Attr
 	group string
 }
 
-func newPrettyHandler(out io.Writer, level slog.Level) *prettyHandler {
-	return &prettyHandler{mu: &sync.Mutex{}, out: out, level: level}
+func newPrettyHandler(out io.Writer, level slog.Level, color bool) *prettyHandler {
+	return &prettyHandler{mu: &sync.Mutex{}, out: out, level: level, color: color}
 }
 
 func (h *prettyHandler) Enabled(_ context.Context, level slog.Level) bool {
@@ -83,24 +93,29 @@ func levelColor(level slog.Level) string {
 	}
 }
 
-// Writes past slog so LOG_LEVEL cannot hide it. For warnings the user must not miss.
+func ansi(enabled bool, code string) string {
+	if enabled {
+		return code
+	}
+	return ""
+}
+
+// Calls the handler directly so LOG_LEVEL cannot hide it. For warnings the user must not miss.
 func printUnsuppressableWarning(message string) {
-	fmt.Fprintf(os.Stderr, "%s%sWARN %s%s\n", ansiYellow, ansiBold, ansiReset, message)
+	slog.Default().Handler().Handle(context.Background(), slog.NewRecord(time.Now(), slog.LevelWarn, message, 0))
 }
 
 func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	var b strings.Builder
 
-	b.WriteString(ansiDim)
+	b.WriteString(ansi(h.color, ansiDim))
 	b.WriteString(r.Time.Format("15:04:05"))
-	b.WriteString(ansiReset)
+	b.WriteString(ansi(h.color, ansiReset))
 	b.WriteByte(' ')
 
-	color := levelColor(r.Level)
-	b.WriteString(color)
-	b.WriteString(ansiBold)
+	b.WriteString(ansi(h.color, levelColor(r.Level)+ansiBold))
 	fmt.Fprintf(&b, "%-5s", r.Level.String())
-	b.WriteString(ansiReset)
+	b.WriteString(ansi(h.color, ansiReset))
 	b.WriteByte(' ')
 
 	b.WriteString(r.Message)
@@ -111,10 +126,10 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 			key = h.group + "." + key
 		}
 		b.WriteByte(' ')
-		b.WriteString(ansiGray)
+		b.WriteString(ansi(h.color, ansiGray))
 		b.WriteString(key)
 		b.WriteString("=")
-		b.WriteString(ansiReset)
+		b.WriteString(ansi(h.color, ansiReset))
 		b.WriteString(redactSecretQueryParams(a.Value.String()))
 	}
 

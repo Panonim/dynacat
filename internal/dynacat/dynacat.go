@@ -452,7 +452,7 @@ func newApplication(c *config) (*application, error) {
 	if needsTodoDB {
 		dbPath := config.Server.DBPath
 		if dbPath == "" {
-			dbPath = "/app/assets/dynacat.db"
+			dbPath = filepath.Join(config.assetsPath(), "dynacat.db")
 		}
 		app.todoStorage = newTodoStorage(dbPath)
 	}
@@ -1077,10 +1077,7 @@ func (a *application) server() (func() error, func() error) {
 		w.Write(a.parsedManifest)
 	})
 
-	assetsPath := a.Config.Server.AssetsPath
-	if assetsPath == "" {
-		assetsPath = "/app/assets"
-	}
+	assetsPath := a.Config.assetsPath()
 
 	absAssetsPath, _ := filepath.Abs(assetsPath)
 	assetsFS := fileServerWithCache(http.Dir(assetsPath), 2*time.Hour)

@@ -14,17 +14,17 @@ import (
 var buildVersion = "dev"
 
 func Main() int {
-	configureLogging()
-
 	options, err := parseCliOptions()
 	if err != nil {
 		fmt.Println(err)
 		return 1
 	}
 
+	configureLogging(options.background)
+
 	if options.envFile != "" {
 		if err := loadEnvFile(options.envFile); err != nil {
-			fmt.Printf("Failed to load env file: %v\n", err)
+			slog.Error("Failed to load env file", "error", err)
 			return 1
 		}
 	}
@@ -41,12 +41,12 @@ func Main() int {
 		}
 
 		if err := serveFirstRunSetupIfNoConfig(options.configPath); err != nil {
-			fmt.Println(err)
+			slog.Error("First run setup failed", "error", err)
 			return 1
 		}
 
 		if err := serveApp(options.configPath); err != nil {
-			fmt.Println(err)
+			slog.Error("Failed to serve app", "error", err)
 			return 1
 		}
 	case cliIntentConfigValidate:
@@ -74,6 +74,8 @@ func Main() int {
 		return cliMountpointInfo(options.args[1])
 	case cliIntentDiagnose:
 		runDiagnostic()
+	case cliIntentUpdate:
+		return cliUpdate()
 	case cliIntentSecretMake:
 		key, err := makeAuthSecretKey(AUTH_SECRET_KEY_LENGTH)
 		if err != nil {
@@ -132,7 +134,6 @@ func serveApp(configPath string) error {
 	var stopServer func() error
 
 	warnIfDirNotWritable(filepath.Dir(configPath))
-	warnIfDirNotWritable(filepath.Dir(dynawidgetsAssetsDir))
 
 	onChange := func(newContents []byte) {
 		if stopServer != nil {
@@ -164,6 +165,7 @@ func serveApp(configPath string) error {
 
 		if !hadValidConfigOnStartup {
 			hadValidConfigOnStartup = true
+			warnIfDirNotWritable(config.assetsPath())
 		}
 
 		if stopServer != nil {

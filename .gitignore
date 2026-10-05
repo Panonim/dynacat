@@ -10,3 +10,4 @@ Makefile
 .cache/
 docs/scripts/
 sections.yml
+*.exe

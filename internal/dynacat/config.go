@@ -149,6 +149,13 @@ func (p *page) normalizeKeyBind() {
 	}
 }
 
+func (c *config) assetsPath() string {
+	if c.Server.AssetsPath == "" {
+		return "/app/assets"
+	}
+	return c.Server.AssetsPath
+}
+
 func newConfigFromYAML(contents []byte) (*config, error) {
 	contents, err := parseConfigVariables(contents)
 	if err != nil {
@@ -167,6 +174,9 @@ func newConfigFromYAML(contents []byte) (*config, error) {
 	if err = isConfigStateValid(config); err != nil {
 		return nil, err
 	}
+
+	// Widgets resolve cached templates during initialization, so the directory must be set first.
+	dynawidgetsAssetsDir = filepath.Join(config.assetsPath(), "dynawidgets")
 
 	for p := range config.Pages {
 		for w := range config.Pages[p].HeadWidgets {

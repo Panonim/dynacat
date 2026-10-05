@@ -159,9 +159,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" "${ASSET}" --clobber
 
+  windows-installer:
+    # Prerelease tags like v0.6.0-beta.1 are skipped.
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the target Git reference
+        uses: actions/checkout@v6
+
+      - name: Build Windows installers
+        run: |
+          for ARCH in amd64 arm64; do
+            docker build -f windows/Dockerfile --build-arg APP_VERSION="${GITHUB_REF_NAME}" --build-arg ARCH="${ARCH}" --output "build/windows/${ARCH}" .
+          done
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" build/windows/*/dynacat-windows-*-setup.exe --clobber
+
   notify-discord:
-    needs: [deploy, release-binaries]
-    if: startsWith(github.ref, 'refs/tags/') && needs.deploy.outputs.is_latest == 'true'
+    needs: [deploy, release-binaries, windows-installer]
+    # Still runs when windows-installer is skipped for prerelease tags.
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') && needs.deploy.outputs.is_latest == 'true' }}
     runs-on: ubuntu-slim
     permissions: {}
     steps:

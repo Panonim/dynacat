@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	firstRunSetupAddr          = ":8080"
+	firstRunDefaultPort        = 8080
 	firstRunSetupMaxBodyBytes  = 4 << 10
 	firstRunMaxPageNameLength  = 40
 	firstRunPresetEmpty        = "empty"
@@ -108,6 +108,46 @@ func configIsMissingOrEmpty(path string) bool {
 	return !stat.IsDir() && stat.Size() == 0
 }
 
+// Installer written configs hold only server settings, so a config without pages still needs setup.
+func configNeedsFirstRunSetup(path string) bool {
+	if configIsMissingOrEmpty(path) {
+		return true
+	}
+
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	var cfg struct {
+		Pages yaml.Node `yaml:"pages"`
+	}
+	if err := yaml.Unmarshal(contents, &cfg); err != nil {
+		return false
+	}
+
+	return cfg.Pages.Kind == 0
+}
+
+// Serves setup where the app will listen, so the page can wait for it on the same address.
+func firstRunSetupAddr(path string) string {
+	var cfg struct {
+		Server struct {
+			Host string `yaml:"host"`
+			Port uint16 `yaml:"port"`
+		} `yaml:"server"`
+	}
+	cfg.Server.Port = firstRunDefaultPort
+
+	if contents, err := os.ReadFile(path); err == nil {
+		if contents, err = parseConfigVariables(contents); err == nil {
+			yaml.Unmarshal(contents, &cfg)
+		}
+	}
+
+	return fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+}
+
 type firstRunSetup struct {
 	configPath string
 	mu         sync.Mutex
@@ -124,17 +164,17 @@ func (s *firstRunSetup) isDone() bool {
 
 // serveFirstRunSetupIfNoConfig blocks on a temporary server that writes the initial config.
 func serveFirstRunSetupIfNoConfig(configPath string) error {
-	if !configIsMissingOrEmpty(configPath) {
+	if !configNeedsFirstRunSetup(configPath) {
 		return nil
 	}
 
 	slog.Warn(
-		"No config file found, serving the first run setup page - anyone who can reach this server can create the initial config",
+		"No pages configured, serving the first run setup page - anyone who can reach this server can create the initial config",
 		"path", configPath,
 	)
 
 	mux := http.NewServeMux()
-	server := &http.Server{Addr: firstRunSetupAddr, Handler: mux}
+	server := &http.Server{Addr: firstRunSetupAddr(configPath), Handler: mux}
 
 	setup := &firstRunSetup{
 		configPath: configPath,
@@ -209,7 +249,8 @@ func (s *firstRunSetup) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contents, err := newStarterConfigYAML(name, preset)
+	existing, _ := os.ReadFile(s.configPath)
+	contents, err := newStarterConfigYAML(existing, name, preset)
 	if err != nil {
 		writeJSONError(w, http.StatusUnprocessableEntity, fmt.Sprintf("Could not create a valid config: %v", err))
 		return
@@ -223,7 +264,7 @@ func (s *firstRunSetup) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !configIsMissingOrEmpty(s.configPath) {
+	if !configNeedsFirstRunSetup(s.configPath) {
 		writeJSONError(w, http.StatusConflict, "A config file already exists, restart the container to load it")
 		return
 	}
@@ -239,7 +280,8 @@ func (s *firstRunSetup) handleCreate(w http.ResponseWriter, r *http.Request) {
 	s.onDone()
 }
 
-func newStarterConfigYAML(pageName string, preset starterPreset) ([]byte, error) {
+// Appends pages to the existing config so settings written before setup are kept.
+func newStarterConfigYAML(existing []byte, pageName string, preset starterPreset) ([]byte, error) {
 	page, err := starterPageNode(preset)
 	if err != nil {
 		return nil, err
@@ -249,12 +291,16 @@ func newStarterConfigYAML(pageName string, preset starterPreset) ([]byte, error)
 
 	pages := sequenceNode()
 	pages.Content = append(pages.Content, page)
+	setBlockStyleDeep(pages)
 
-	root := newMappingNode()
-	addPair(root, "pages", pages)
-	setBlockStyleDeep(root)
+	doc := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{newMappingNode()}}
+	var parsed yaml.Node
+	if yaml.Unmarshal(existing, &parsed) == nil && len(parsed.Content) > 0 && parsed.Content[0].Kind == yaml.MappingNode {
+		doc = &parsed
+	}
+	addPair(doc.Content[0], "pages", pages)
 
-	contents, err := marshalDocument(&yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}})
+	contents, err := marshalDocument(doc)
 	if err != nil {
 		return nil, err
 	}

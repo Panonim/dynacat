@@ -10,3 +10,4 @@
 !/go.sum
 !main.go
 !/docker/entrypoint.sh
+!/windows/dynacat.iss

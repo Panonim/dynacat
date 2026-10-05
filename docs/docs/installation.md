@@ -153,6 +153,17 @@ Make sure to rename your `glance.yml` file into `dynacat.yml`.
 | -------- | ------- | ----------- |
 | `ENABLE_DYNAMIC_UPDATE` | `true` | Set to `false`, `0`, or `f` to disable automatic widget refresh. Useful for static views or default glance behaviour. |
 
+## Windows installer
+
+Download `dynacat-windows-amd64-setup.exe` (or `dynacat-windows-arm64-setup.exe` for ARM devices) from the [latest release](https://github.com/Panonim/dynacat/releases/latest) and run it. 
+
+The default installation path is located at `%LOCALAPPDATA%\Dynacat`. 
+
+In background mode there is no window and logs go to Event Viewer under `Windows Logs > Application` with the source `Dynacat`. Use the `Stop Dynacat` shortcut from the Start menu to stop it. Start at login can be turned off any time in `Settings > Apps > Startup`.
+
+To update, run the `Update Dynacat` shortcut from the Start menu (or `dynacat.exe update`). It downloads the latest release, installs it in the background and starts Dynacat again. Running a newer installer by hand works too.
+
+Upgrading keeps your existing config, `.env` and assets. Uninstalling always removes the cache and asks whether to also remove your pages and settings.
 
 ## Build binary with Go
 

@@ -17,7 +17,7 @@ import (
 )
 
 const dynawidgetsDefaultRepo = "main"
-const dynawidgetsAssetsDir = "/app/assets/dynawidgets"
+var dynawidgetsAssetsDir = "/app/assets/dynawidgets"
 
 var dynawidgetsSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 var dynawidgetsRepoPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
