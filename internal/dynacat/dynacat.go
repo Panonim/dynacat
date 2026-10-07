@@ -167,7 +167,7 @@ func newApplication(c *config) (*application, error) {
 		app.oidcProvider = provider
 		app.oidcVerifier = verifier
 		app.oauth2Config = oauth2Cfg
-		app.oidcSessions = newSessionStore()
+		app.oidcSessions = sharedOIDCSessions
 		app.OIDCEnabled = true
 	}
 

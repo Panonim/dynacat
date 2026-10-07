@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -154,31 +155,10 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 	}
 	groups := extractGroupsClaim(claims, groupsClaim)
 
-	oidcCfg := a.Config.Auth.OIDC
-	if len(oidcCfg.AllowedUsers) > 0 || len(oidcCfg.AllowedGroups) > 0 {
-		allowed := false
-		for _, u := range oidcCfg.AllowedUsers {
-			if u == username {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-		outer:
-			for _, g := range oidcCfg.AllowedGroups {
-				for _, ug := range groups {
-					if g == ug {
-						allowed = true
-						break outer
-					}
-				}
-			}
-		}
-		if !allowed {
-			slog.Warn("OIDC user not in allowed users/groups", "username", username)
-			http.Redirect(w, r, baseURL+"/login?error=not_allowed", http.StatusSeeOther)
-			return
-		}
+	if !oidcUserAllowed(a.Config.Auth.OIDC, username, groups) {
+		slog.Warn("OIDC user not in allowed users/groups", "username", username)
+		http.Redirect(w, r, baseURL+"/login?error=not_allowed", http.StatusSeeOther)
+		return
 	}
 
 	sessionID, err := makeAuthSecretKey(32)
@@ -205,6 +185,24 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 
 	slog.Info("OIDC user logged in", "username", username)
 	http.Redirect(w, r, a.takeLoginRedirect(w, r), http.StatusSeeOther)
+}
+
+func oidcUserAllowed(cfg *oidcConfig, username string, groups []string) bool {
+	if len(cfg.AllowedUsers) == 0 && len(cfg.AllowedGroups) == 0 {
+		return true
+	}
+
+	if slices.Contains(cfg.AllowedUsers, username) {
+		return true
+	}
+
+	for _, g := range cfg.AllowedGroups {
+		if slices.Contains(groups, g) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func extractGroupsClaim(claims map[string]interface{}, claimName string) []string {
