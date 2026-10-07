@@ -1662,6 +1662,7 @@ If any of the child containers are down, their status will propagate up to the p
 | sock-path | string | no | /var/run/docker.sock |
 | category | string | no | |
 | running-only | boolean | no | false |
+| show-missing | boolean | no | false |
 | update-interval | string | no | 2m |
 
 ##### `hide-by-default`
@@ -1724,6 +1725,9 @@ Then you can use the `category` property to filter the containers:
 
 ##### `running-only`
 Whether to only show running containers. If set to `true` only containers that are currently running will be displayed. If set to `false` all containers will be displayed regardless of their state.
+
+##### `show-missing`
+When set to `true`, containers declared under the `containers` property that the engine no longer reports are still displayed with a "missing" state.
 
 #### Labels
 | Name | Description |

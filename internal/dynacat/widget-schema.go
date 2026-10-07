@@ -250,7 +250,8 @@ var fieldAnnotations = map[string]map[string]fieldAnnotation{
 		"widget":         {Hint: "Widget from the dynawidgets repository."},
 	},
 	"docker-containers": {
-		"sock-path": {Advanced: true, Hint: "Defaults to /var/run/docker.sock; can also be a tcp://host:port or http://host:port address."},
+		"sock-path":    {Advanced: true, Hint: "Defaults to /var/run/docker.sock; can also be a tcp://host:port or http://host:port address."},
+		"show-missing": {Hint: "Containers declared under \"containers\" that the engine no longer reports are shown in a missing state. Useful for podman quadlets, which remove the container on stop."},
 	},
 	"docker-controller": {
 		"show":      {Options: []string{"both", "containers", "images"}},

@@ -12,7 +12,7 @@
     opacity: 0.7;
 }
 
-.docker-container:hover .docker-container-icon {
+.docker-container:hover:not(.docker-container-missing) .docker-container-icon {
     opacity: 1;
 }
 
@@ -23,4 +23,9 @@
 .docker-container-status-icon {
     width: 2rem;
     height: 2rem;
+}
+
+.docker-container-missing .docker-container-icon {
+    opacity: 0.5;
+    filter: grayscale(1);
 }
