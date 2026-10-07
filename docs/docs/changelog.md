@@ -1,3 +1,6 @@
+# Changes for 3.0.2
+- Fixed a bug where users were randomly logged out after a config reload -> https://github.com/Panonim/dynacat/issues/174
+
 # Changes for 3.0.1
 - Updated docs website
 - Fixed a bug where dashless includes would not work in the UI editor

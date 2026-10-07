@@ -22,6 +22,9 @@ type sessionStore struct {
 	sessions sync.Map
 }
 
+// Shared across config reloads so a reload does not log OIDC users out.
+var sharedOIDCSessions = newSessionStore()
+
 func newSessionStore() *sessionStore {
 	return &sessionStore{}
 }
