@@ -69,7 +69,7 @@ func (widget *customAPIWidget) initialize() error {
 		return errors.New("template is required")
 	}
 
-	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(nil)).Parse(widget.Template)
+	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(nil, nil)).Parse(widget.Template)
 	if err != nil {
 		return fmt.Errorf("parsing template: %w", err)
 	}
@@ -108,7 +108,7 @@ func (widget *customAPIWidget) setProviders(providers *widgetProviders) {
 		return
 	}
 
-	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(providers)).Parse(widget.Template)
+	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(providers, widget.getCacheDuration)).Parse(widget.Template)
 	if err != nil {
 		slog.Error("Failed to recompile custom API template", "error", err)
 		return
@@ -482,7 +482,7 @@ func customAPIDoMathOp[T int | float64](a, b T, op string) T {
 	return 0
 }
 
-func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
+func customAPITemplateFuncs(providers *widgetProviders, imageMaxAge func() time.Duration) template.FuncMap {
 	var regexpCacheMu sync.Mutex
 	var regexpCache = make(map[string]*regexp.Regexp)
 
@@ -528,18 +528,25 @@ func customAPITemplateFuncs(providers *widgetProviders) template.FuncMap {
 		}
 	}
 
+	maxAge := func() time.Duration {
+		if imageMaxAge == nil {
+			return 0
+		}
+		return imageMaxAge()
+	}
+
 	secureImageURL := func(rawURL string) string {
 		if providers == nil {
 			return rawURL
 		}
-		return providers.SecureImageURL(context.Background(), rawURL, false)
+		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, false, maxAge())
 	}
 
 	secureImageURLAllowInsecure := func(rawURL string) string {
 		if providers == nil {
 			return rawURL
 		}
-		return providers.SecureImageURL(context.Background(), rawURL, true)
+		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, true, maxAge())
 	}
 
 	funcs := template.FuncMap{

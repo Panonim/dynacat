@@ -339,7 +339,7 @@ func (a *application) handleEditorCustomAPIPreview(w http.ResponseWriter, r *htt
 			app:           a,
 		}
 
-		tmpl, err := template.New("").Funcs(customAPITemplateFuncs(providers)).Parse(req.Template)
+		tmpl, err := template.New("").Funcs(customAPITemplateFuncs(providers, nil)).Parse(req.Template)
 		if err != nil {
 			fail("template-parse", "", err)
 			return

@@ -113,7 +113,7 @@ func (widget *dynawidgetsWidget) initialize() error {
 		}
 	}
 
-	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(nil)).Parse(templateContent)
+	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(nil, nil)).Parse(templateContent)
 	if err != nil {
 		return fmt.Errorf("parsing template: %w", err)
 	}
@@ -185,7 +185,7 @@ func (widget *dynawidgetsWidget) refreshTemplate() {
 		return
 	}
 
-	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(widget.Providers)).Parse(templateContent)
+	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(widget.Providers, nil)).Parse(templateContent)
 	if err != nil {
 		slog.Error("Failed to parse updated dynawidget template", "slug", widget.slug, "error", err)
 		return
@@ -215,7 +215,7 @@ func (widget *dynawidgetsWidget) setProviders(providers *widgetProviders) {
 		return
 	}
 
-	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(providers)).Parse(widget.templateContent)
+	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs(providers, nil)).Parse(widget.templateContent)
 	if err != nil {
 		slog.Error("Failed to recompile dynawidget template", "error", err)
 		return

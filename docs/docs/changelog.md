@@ -1,5 +1,6 @@
 # Changes for 3.0.2
 - Fixed a bug where users were randomly logged out after a config reload -> https://github.com/Panonim/dynacat/issues/174
+- Fixed `secureImageURL` in `custom-api` never refreshing cached images, they are now re-downloaded after the widget `cache` duration -> https://github.com/Panonim/dynacat/issues/176
 
 # Changes for 3.0.1
 - Updated docs website

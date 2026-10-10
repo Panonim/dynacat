@@ -10,8 +10,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type imageCache struct {
@@ -62,10 +64,11 @@ func newImageCache(baseURL string, dir string) *imageCache {
 }
 
 func (c *imageCache) CacheURL(ctx context.Context, rawURL string) (string, error) {
-	return c.CacheURLWithClient(ctx, rawURL, false)
+	return c.CacheURLWithClient(ctx, rawURL, false, 0)
 }
 
-func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allowInsecure bool) (string, error) {
+// A maxAge of 0 keeps cached files forever.
+func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allowInsecure bool, maxAge time.Duration) (string, error) {
 	if c == nil || rawURL == "" {
 		return "", nil
 	}
@@ -80,7 +83,8 @@ func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allo
 	}
 
 	hashHex := hashString(rawURL)
-	if existing, ok := c.findExistingFile(hashHex, parsed.Path); ok {
+	existing, found := c.findExistingFile(hashHex, parsed.Path)
+	if found && (maxAge <= 0 || !c.isStale(existing, maxAge)) {
 		return c.publicURL(existing), nil
 	}
 
@@ -96,6 +100,9 @@ func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allo
 	c.mu.Unlock()
 
 	entry.url, entry.err = c.downloadAndCacheWithClient(ctx, rawURL, hashHex, parsed.Path, allowInsecure)
+	if entry.err != nil && found {
+		entry.url, entry.err = c.publicURL(existing), nil
+	}
 
 	c.mu.Lock()
 	delete(c.inFlight, rawURL)
@@ -173,11 +180,6 @@ func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL stri
 
 	filename := hashHex + ext
 	finalPath := filepath.Join(c.dir, filename)
-	if fileExists(finalPath) {
-		_ = os.Remove(tmpPath)
-		return c.publicURL(filename), nil
-	}
-
 	if err := os.Rename(tmpPath, finalPath); err != nil {
 		_ = os.Remove(tmpPath)
 		return "", err
@@ -186,12 +188,19 @@ func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL stri
 	return c.publicURL(filename), nil
 }
 
+func (c *imageCache) isStale(filename string, maxAge time.Duration) bool {
+	info, err := os.Stat(filepath.Join(c.dir, filename))
+	return err != nil || time.Since(info.ModTime()) > maxAge
+}
+
+// The mtime query param makes browsers refetch when the file is replaced.
 func (c *imageCache) publicURL(filename string) string {
-	if c.baseURL == "" {
-		return "/.cache/" + filename
+	path := "/.cache/" + filename
+	if info, err := os.Stat(filepath.Join(c.dir, filename)); err == nil {
+		path += "?v=" + strconv.FormatInt(info.ModTime().Unix(), 10)
 	}
 
-	return c.baseURL + "/.cache/" + filename
+	return c.baseURL + path
 }
 
 func (c *imageCache) IsBuildingCache() bool {
