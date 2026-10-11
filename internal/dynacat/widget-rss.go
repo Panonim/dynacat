@@ -57,12 +57,16 @@ type rssWidget struct {
 	CollapseAfter    int              `yaml:"collapse-after"`
 	SingleLineTitles bool             `yaml:"single-line-titles"`
 	PreserveOrder    bool             `yaml:"preserve-order"`
+	Sort             string           `yaml:"sort"`
+	RarityBase       float64          `yaml:"rarity-base"`
+	RarityExponent   float64          `yaml:"rarity-exponent"`
 
 	Items          rssFeedItemList `yaml:"-"`
 	NoItemsMessage string          `yaml:"-"`
 
 	cachedFeedsMutex sync.Mutex
 	cachedFeeds      map[string]*cachedRSSFeed `yaml:"-"`
+	feedTiers        map[string]int            `yaml:"-"`
 }
 
 func (widget *rssWidget) initialize() error {
@@ -94,8 +98,19 @@ func (widget *rssWidget) initialize() error {
 		}
 	}
 
+	if err := validateRSSSort(widget.Sort, widget.RarityBase, widget.RarityExponent); err != nil {
+		return err
+	}
+
 	widget.NoItemsMessage = "No items were returned from the feeds."
 	widget.cachedFeeds = make(map[string]*cachedRSSFeed)
+
+	widget.feedTiers = make(map[string]int)
+	for _, feed := range widget.FeedRequests {
+		if feed.Tier != nil {
+			widget.feedTiers[feed.URL] = *feed.Tier
+		}
+	}
 
 	return nil
 }
@@ -108,7 +123,14 @@ func (widget *rssWidget) update(ctx context.Context) {
 	}
 
 	if !widget.PreserveOrder {
-		items.sortByNewest()
+		switch widget.Sort {
+		case rssSortRarity:
+			items.sortByRarity(time.Now(), widget.RarityBase, widget.RarityExponent)
+		case rssSortTier:
+			items.sortByTier(widget.feedTiers)
+		default:
+			items.sortByNewest()
+		}
 	}
 
 	if len(items) > widget.Limit {
@@ -152,6 +174,7 @@ type cachedRSSFeed struct {
 type rssFeedItem struct {
 	ChannelName string
 	ChannelURL  string
+	feedURL     string // configured feed URL, unlike ChannelURL which comes from the feed itself
 	Title       string
 	Link        string
 	ImageURL    string
@@ -168,6 +191,7 @@ type rssFeedRequest struct {
 	Limit           int               `yaml:"limit"`
 	ItemLinkPrefix  string            `yaml:"item-link-prefix"`
 	Headers         map[string]string `yaml:"headers"`
+	Tier            *int              `yaml:"tier"`
 	IsDetailed      bool              `yaml:"-"`
 }
 
@@ -285,6 +309,7 @@ func (widget *rssWidget) fetchItemsFromFeedTask(request rssFeedRequest) ([]rssFe
 
 		rssItem := rssFeedItem{
 			ChannelURL: feed.Link,
+			feedURL:    request.URL,
 		}
 
 		if request.ItemLinkPrefix != "" {
