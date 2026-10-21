@@ -218,24 +218,23 @@ func parseEnvVariablesOnly(contents []byte) ([]byte, error) {
 	return expandConfigVariables(contents, false)
 }
 
-var yamlBlockScalarPattern = regexp.MustCompile(`(^|[:-])\s*[|>][-+0-9]*\s*$`)
+var yamlBlockScalarPattern = regexp.MustCompile(`(^\s*|[:-]\s+)([&!]\S*\s+)*[|>][-+0-9]*\s*$`)
 
-func yamlCommentIndex(line []byte) int {
-	var quote byte
-	var escaped bool
-	for i, c := range line {
+// Carries an unclosed quoted scalar over to the next line through quote.
+func yamlCommentIndex(line []byte, quote *byte) int {
+	for i := 0; i < len(line); i++ {
+		c := line[i]
 		switch {
-		case quote == '"' && c == '\\':
-			escaped = !escaped
-		case quote != 0:
-			if c == quote && !escaped {
-				quote = 0
+		case *quote == '"' && c == '\\', *quote == '\'' && c == '\'' && i+1 < len(line) && line[i+1] == '\'':
+			i++
+		case *quote != 0:
+			if c == *quote {
+				*quote = 0
 			}
-			escaped = false
-		case c == '"' || c == '\'':
-			quote = c
 		case c == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t'):
 			return i
+		case (c == '"' || c == '\'') && (i == 0 || strings.IndexByte(" \t[{,", line[i-1]) >= 0):
+			*quote = c
 		}
 	}
 	return len(line)
@@ -285,6 +284,7 @@ func expandConfigVariables(contents []byte, allowTypedVariables bool) ([]byte, e
 	var replaced bytes.Buffer
 	// Indent of the line opening a block scalar, whose deeper lines are content even when they start with #.
 	blockIndent := -1
+	var quote byte
 	for _, line := range bytes.SplitAfter(contents, []byte("\n")) {
 		indent := len(line) - len(bytes.TrimLeft(line, " "))
 		if blockIndent >= 0 && (len(bytes.TrimSpace(line)) == 0 || indent > blockIndent) {
@@ -292,10 +292,10 @@ func expandConfigVariables(contents []byte, allowTypedVariables bool) ([]byte, e
 			continue
 		}
 
-		commentStart := yamlCommentIndex(line)
+		commentStart := yamlCommentIndex(line, &quote)
 		replaced.Write(configVariablePattern.ReplaceAllFunc(line[:commentStart], replace))
 		replaced.Write(line[commentStart:])
-		blockIndent = ternary(yamlBlockScalarPattern.Match(line[:commentStart]), indent, -1)
+		blockIndent = ternary(quote == 0 && yamlBlockScalarPattern.Match(line[:commentStart]), indent, -1)
 	}
 
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 )
 
 var envInlineCommentPattern = regexp.MustCompile(`\s+#.*$`)
+var envEscapeReplacer = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
 
 func parseEnvValue(value string) string {
 	if value != "" && (value[0] == '"' || value[0] == '\'') {
@@ -16,7 +17,7 @@ func parseEnvValue(value string) string {
 			if value[0] == '"' && value[i] == '\\' {
 				i++
 			} else if value[i] == value[0] {
-				return strings.ReplaceAll(value[1:i], `\"`, `"`)
+				return envEscapeReplacer.Replace(value[1:i])
 			}
 		}
 	}
