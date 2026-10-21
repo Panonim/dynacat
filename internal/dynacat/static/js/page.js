@@ -383,10 +383,15 @@ function setupSearchBoxes() {
                             if (known.has(targetKey(t))) continue;
                             targets.push({ type: "target", ...t, titleWords: toWords(t.title || "") });
                         }
+                        const query = inputElement.value.trim();
+                        if (query && query === acQuery) {
+                            renderAC([...matchTargets(query), ...acItems.filter((item) => item.type === "phrase")]);
+                        }
                     })
                     .catch(() => {});
             }
             let acItems = [];
+            let acQuery = "";
             let acIndex = -1;
             let acDebounce = null;
             let acVisible = false;
@@ -538,6 +543,7 @@ function setupSearchBoxes() {
 
             const updateSuggestions = (query, phraseItems) => {
                 if (inputElement.value.trim() !== query) return;
+                acQuery = query;
                 renderAC([...matchTargets(query), ...phraseItems]);
             };
 
