@@ -12,8 +12,12 @@ var envInlineCommentPattern = regexp.MustCompile(`\s+#.*$`)
 
 func parseEnvValue(value string) string {
 	if value != "" && (value[0] == '"' || value[0] == '\'') {
-		if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
-			return value[1 : end+1]
+		for i := 1; i < len(value); i++ {
+			if value[0] == '"' && value[i] == '\\' {
+				i++
+			} else if value[i] == value[0] {
+				return strings.ReplaceAll(value[1:i], `\"`, `"`)
+			}
 		}
 	}
 

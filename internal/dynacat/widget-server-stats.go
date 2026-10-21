@@ -173,6 +173,9 @@ func fetchRemoteServerInfo(infoReq *serverStatsRequest) (*sysinfo.SystemInfo, er
 	if err != nil {
 		return nil, err
 	}
+	if info == nil {
+		return nil, fmt.Errorf("empty system-info response from %s", infoReq.URL)
+	}
 
 	info.ApplyMountpointRequest(infoReq.SystemInfoRequest)
 

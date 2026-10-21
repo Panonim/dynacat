@@ -218,14 +218,20 @@ func parseEnvVariablesOnly(contents []byte) ([]byte, error) {
 	return expandConfigVariables(contents, false)
 }
 
+var yamlBlockScalarPattern = regexp.MustCompile(`(^|[:-])\s*[|>][-+0-9]*\s*$`)
+
 func yamlCommentIndex(line []byte) int {
 	var quote byte
+	var escaped bool
 	for i, c := range line {
 		switch {
+		case quote == '"' && c == '\\':
+			escaped = !escaped
 		case quote != 0:
-			if c == quote {
+			if c == quote && !escaped {
 				quote = 0
 			}
+			escaped = false
 		case c == '"' || c == '\'':
 			quote = c
 		case c == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t'):
@@ -277,10 +283,19 @@ func expandConfigVariables(contents []byte, allowTypedVariables bool) ([]byte, e
 	}
 
 	var replaced bytes.Buffer
+	// Indent of the line opening a block scalar, whose deeper lines are content even when they start with #.
+	blockIndent := -1
 	for _, line := range bytes.SplitAfter(contents, []byte("\n")) {
+		indent := len(line) - len(bytes.TrimLeft(line, " "))
+		if blockIndent >= 0 && (len(bytes.TrimSpace(line)) == 0 || indent > blockIndent) {
+			replaced.Write(configVariablePattern.ReplaceAllFunc(line, replace))
+			continue
+		}
+
 		commentStart := yamlCommentIndex(line)
 		replaced.Write(configVariablePattern.ReplaceAllFunc(line[:commentStart], replace))
 		replaced.Write(line[commentStart:])
+		blockIndent = ternary(yamlBlockScalarPattern.Match(line[:commentStart]), indent, -1)
 	}
 
 	if err != nil {

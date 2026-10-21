@@ -563,7 +563,7 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		}
 		if builder, _ := m.Fields["builder"].(string); separateWidgetFilesEnabled() && m.WidgetType == "custom-api" && builder != "" {
 			title, _ := m.Fields["title"].(string)
-			node = docs.splitWidgetFile(node, orDefault(title, "custom-api"))
+			node = docs.splitWidgetFile(docs.ownerOf(seq), node, orDefault(title, "custom-api"))
 		}
 		seq.Content = insertNode(seq.Content, at, node)
 	case "editWidget":
@@ -777,9 +777,9 @@ func separateWidgetFilesEnabled() bool {
 	return false
 }
 
-// Moves a new widget into its own file next to the page and returns the include entry pointing at it.
-func (d *editorDocs) splitWidgetFile(node *yaml.Node, title string) *yaml.Node {
-	dir := filepath.Dir(d.pagePath)
+// Moves a new widget into its own file next to the owning file and returns the include entry pointing at it.
+func (d *editorDocs) splitWidgetFile(ownerPath string, node *yaml.Node, title string) *yaml.Node {
+	dir := filepath.Dir(ownerPath)
 	file := uniquePageFileName(dir, title)
 	d.track(filepath.Join(dir, file), &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{
 		{Kind: yaml.SequenceNode, Content: []*yaml.Node{node}},
@@ -979,6 +979,9 @@ func (a *application) writeConfigCandidates(candidates map[string][]byte) error 
 
 	for path, candidate := range candidates {
 		if err := os.WriteFile(path, candidate, perms[path]); err != nil {
+			if created[path] {
+				os.Remove(path)
+			}
 			rollback()
 			if isWriteBlockedError(err) {
 				return &editorPermissionError{path, err}
@@ -1082,6 +1085,28 @@ func (d *editorDocs) track(path string, doc *yaml.Node) {
 	if b, err := os.ReadFile(path); err == nil {
 		d.original[path] = b
 	}
+}
+
+// Finds the loaded file whose tree holds the node, since an insertion point can sit in any included file.
+func (d *editorDocs) ownerOf(n *yaml.Node) string {
+	for path, doc := range d.docs {
+		if containsNode(doc, n) {
+			return path
+		}
+	}
+	return d.pagePath
+}
+
+func containsNode(root, n *yaml.Node) bool {
+	if root == n {
+		return true
+	}
+	for _, c := range root.Content {
+		if containsNode(c, n) {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *editorDocs) load(ownerPath, file string) (string, *yaml.Node, error) {
