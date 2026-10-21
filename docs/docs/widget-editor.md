@@ -151,6 +151,8 @@ The **Preview** toggle renders the template on the server using the real API dat
 
 Any template error is shown in the status line and the editor stays open, so nothing is lost.
 
+New widgets are written inline into the page by default. Set [`EDITOR_SEPARATE_WIDGET_FILES`](docker-options.md#editor_separate_widget_files) to save each one to its own file next to the page instead.
+
 ## The builder key
 
 Saving also writes a `builder:` key on the widget, a compact JSON snapshot of your layout so that reopening the editor restores your blocks. It is ignored when the widget renders.

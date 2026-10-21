@@ -10,6 +10,12 @@
 - Added a `home-assistant` widget showing entity states with toggles for lights, switches, fans and input booleans, using the same default icons as Home Assistant
 - Added a `node-exporter` server type to `server-stats` so hosts running Prometheus node_exporter can be shown without the agent -> https://github.com/Panonim/dynacat/issues/172
 - Added `page-background` and `global-background` page options to set a background image on one page or on every page
+- Added a Windows installer
+- Fixed a crash in the `monitor` widget when a site has no `url`, it now shows a site-specific error instead -> https://github.com/Panonim/dynacat/issues/192
+- Fixed the database not being created properly on start, which broke the `todo` widget -> https://github.com/Panonim/dynacat/issues/196
+- `mountpoints` and `mountpoint-order` now also apply to `remote` servers in `server-stats`
+- Variables in commented out sections of the config and inline comments in env files are now ignored
+- Widgets created by `widget editor` can now be split into seperate files 
 
 # Changes for 3.0.1
 - Updated docs website

@@ -90,6 +90,15 @@ environment:
 >
 > This only affects pages created after the change. Existing pages, whether inline or included, keep their current location.
 
+### EDITOR_SEPARATE_WIDGET_FILES
+
+Controls where the [Widget Editor](widget-editor.md) stores a new `custom-api` widget. By default it is written inline into the page. Set it to `true`, `1`, or `t` to write each new widget to its own file (e.g. `my-widget.yml`) in the same folder as its page and link it in with a `$include` line:
+
+```yaml
+environment:
+  - EDITOR_SEPARATE_WIDGET_FILES=true
+```
+
 ### HOST_ETC
 
 Points the `server-stats` widget at a bind-mounted copy of the host's `/etc` directory so it reports the host's OS instead of the container image's (usually `alpine`). Dynacat reads `$HOST_ETC/os-release`.
@@ -158,6 +167,7 @@ The global page update interval can be disabled by:
 | -------- | ------- | ----------- |
 | `ENABLE_DYNAMIC_UPDATE` | `true` | Set to `false`, `0`, or `f` to disable automatic widget refresh. Useful for static views or default glance behaviour. |
 | `EDITOR_SEPARATE_PAGE_FILES` | `true` | Set to `false`, `0`, or `f` to write new pages inline into the main config instead of a separate `$include` file. |
+| `EDITOR_SEPARATE_WIDGET_FILES` | `false` | Set to `true`, `1`, or `t` to write new Widget Editor widgets to their own `$include` file next to the page. |
 | `ENABLE_EDITOR` | `true` | Set to `false`, `0`, `f`, `no`, or `off` to disable the page editor everywhere. Editor config keys are ignored with a startup warning. |
 
 ## ZFS Mountpoint Support
