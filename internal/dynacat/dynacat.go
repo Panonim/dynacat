@@ -432,36 +432,16 @@ func newApplication(c *config) (*application, error) {
 	}
 	app.parsedManifest = []byte(manifest)
 
-	needsTodoDB := false
-	for p := range config.Pages {
-		for _, w := range config.Pages[p].HeadWidgets {
-			if tw, ok := w.(*todoWidget); ok && tw.Storage == "server" {
-				needsTodoDB = true
-				break
-			}
-		}
-		if needsTodoDB {
-			break
-		}
-		for c := range config.Pages[p].Columns {
-			for _, w := range config.Pages[p].Columns[c].Widgets {
-				if tw, ok := w.(*todoWidget); ok && tw.Storage == "server" {
-					needsTodoDB = true
-					break
-				}
-			}
-			if needsTodoDB {
-				break
-			}
-		}
-	}
-
-	if needsTodoDB {
+	if len(app.todoListIDToPage) > 0 {
 		dbPath := config.Server.DBPath
 		if dbPath == "" {
 			dbPath = filepath.Join(config.assetsPath(), "dynacat.db")
 		}
 		app.todoStorage = newTodoStorage(dbPath)
+
+		if err := app.todoStorage.init(); err != nil {
+			slog.Error("Could not initialize todo database", "path", dbPath, "error", err)
+		}
 	}
 
 	return app, nil

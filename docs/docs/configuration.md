@@ -2951,7 +2951,7 @@ Whether to use a compact layout that hides system info, swap usage and the CPU 1
 ###### `hide-swap`
 Whether to hide the swap usage.
 
-##### Properties for `local` and `node-exporter` servers
+##### Properties for `local`, `remote` and `node-exporter` servers
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | cpu-temp-sensor | string | no |  |
@@ -2960,7 +2960,7 @@ Whether to hide the swap usage.
 | mountpoints | map\[string\]object | no |  |
 
 ###### `cpu-temp-sensor`
-The name of the sensor to use for the CPU temperature. When not provided the widget will attempt to find the correct one, if it fails to do so the temperature will not be displayed. To view the available sensors you can use the `sensors` command.
+The name of the sensor to use for the CPU temperature. When not provided the widget will attempt to find the correct one, if it fails to do so the temperature will not be displayed. To view the available sensors you can use the `sensors` command. For `remote` servers it is set on the agent instead, using `system.cpu-temp-sensor` in `agent.yml` or the `TEMP_SENSOR` environment variable.
 
 Both the chip name and the `chip/Label` form printed by `sensors` are accepted, as is a bare label. For a chip listed as:
 

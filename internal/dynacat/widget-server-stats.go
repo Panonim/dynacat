@@ -174,6 +174,8 @@ func fetchRemoteServerInfo(infoReq *serverStatsRequest) (*sysinfo.SystemInfo, er
 		return nil, err
 	}
 
+	info.ApplyMountpointRequest(infoReq.SystemInfoRequest)
+
 	return info, nil
 }
 

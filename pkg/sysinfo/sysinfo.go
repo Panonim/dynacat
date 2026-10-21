@@ -320,6 +320,29 @@ func (req *SystemInfoRequest) isMountpointHidden(mpReq MointpointRequest) bool {
 	return req.HideMountpointsByDefault
 }
 
+func (info *SystemInfo) ApplyMountpointRequest(req *SystemInfoRequest) {
+	if req == nil {
+		return
+	}
+
+	visible := info.Mountpoints[:0]
+	for _, mp := range info.Mountpoints {
+		mpReq := req.Mountpoints[mp.Path]
+		if req.isMountpointHidden(mpReq) {
+			continue
+		}
+
+		if mpReq.Name != "" {
+			mp.Name = mpReq.Name
+		}
+
+		visible = append(visible, mp)
+	}
+
+	info.Mountpoints = visible
+	info.sortMountpoints(req.MountpointOrder)
+}
+
 func (info *SystemInfo) sortMountpoints(order string) {
 	sort.Slice(info.Mountpoints, func(a, b int) bool {
 		mpA, mpB := info.Mountpoints[a], info.Mountpoints[b]
