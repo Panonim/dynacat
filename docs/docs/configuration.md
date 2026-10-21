@@ -2944,7 +2944,7 @@ Whether to display statistics for the local server or a remote server. Possible 
 The name of the server which will be displayed on the widget. If not provided it will default to the server's hostname.
 
 ###### `compact`
-Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average.
+Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average. A single line above the stats still shows a status dot in the theme's positive or negative color (with `unreachable` when the server is down), plus the server's name when the widget has more than one server.
 
 ![](images/server-stats-compact-preview.webp)
 

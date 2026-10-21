@@ -16,6 +16,7 @@
 - `mountpoints` and `mountpoint-order` now also apply to `remote` servers in `server-stats`
 - Variables in commented out sections of the config and inline comments in env files are now ignored
 - Widgets created by `widget editor` can now be split into seperate files 
+- `compact` servers in `server-stats` now show the server name when the widget has more than one server
 
 # Changes for 3.0.1
 - Updated docs website

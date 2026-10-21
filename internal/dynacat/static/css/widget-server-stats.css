@@ -56,6 +56,26 @@
     height: 1.5rem;
 }
 
+.server-compact-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.server-compact-status {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.server-status-dot {
+    flex-shrink: 0;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    background: currentColor;
+}
+
 .server-stat-unavailable {
     opacity: 0.5;
 }
@@ -94,6 +114,10 @@
 
     .server-compact {
         gap: 1rem;
+    }
+
+    .server-compact-header {
+        flex: 1;
     }
 
     .server-compact .server-stats {
