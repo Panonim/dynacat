@@ -209,7 +209,6 @@ func newConfigFromYAML(contents []byte) (*config, error) {
 var envVariableNamePattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
 var configVariablePattern = regexp.MustCompile(`(^|.)\$\{(?:([a-zA-Z]+):)?([a-zA-Z0-9_-]+)\}`)
 
-// TODO: don't match against commented out sections
 func parseConfigVariables(contents []byte) ([]byte, error) {
 	return expandConfigVariables(contents, true)
 }
@@ -219,10 +218,27 @@ func parseEnvVariablesOnly(contents []byte) ([]byte, error) {
 	return expandConfigVariables(contents, false)
 }
 
+func yamlCommentIndex(line []byte) int {
+	var quote byte
+	for i, c := range line {
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '"' || c == '\'':
+			quote = c
+		case c == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t'):
+			return i
+		}
+	}
+	return len(line)
+}
+
 func expandConfigVariables(contents []byte, allowTypedVariables bool) ([]byte, error) {
 	var err error
 
-	replaced := configVariablePattern.ReplaceAllFunc(contents, func(match []byte) []byte {
+	replace := func(match []byte) []byte {
 		if err != nil {
 			return nil
 		}
@@ -258,13 +274,20 @@ func expandConfigVariables(contents []byte, allowTypedVariables bool) ([]byte, e
 		}
 
 		return []byte(prefix + parsedValue)
-	})
+	}
+
+	var replaced bytes.Buffer
+	for _, line := range bytes.SplitAfter(contents, []byte("\n")) {
+		commentStart := yamlCommentIndex(line)
+		replaced.Write(configVariablePattern.ReplaceAllFunc(line[:commentStart], replace))
+		replaced.Write(line[commentStart:])
+	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	return replaced, nil
+	return replaced.Bytes(), nil
 }
 
 func parseConfigVariableOfType(variableType, variableName string) (string, bool, error) {
