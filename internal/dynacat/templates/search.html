@@ -3,7 +3,7 @@
 {{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
 
 {{ define "widget-content" }}
-<div class="search widget-content-frame padding-inline-widget flex gap-15 items-center" data-default-search-url="{{ .SearchEngine }}" data-new-tab="{{ .NewTab }}" data-target="{{ .Target }}"{{ if .Autocomplete }} data-autocomplete="true" data-autocomplete-provider="{{ .AutocompleteProviderKind }}"{{ if eq .AutocompleteProviderKind "custom" }} data-autocomplete-widget-id="{{ .GetID }}"{{ end }}{{ end }}{{ if .TargetsEnabled }} data-targets-enabled="true"{{ end }}>
+<div class="search widget-content-frame padding-inline-widget flex gap-15 items-center" data-default-search-url="{{ .SearchEngine }}" data-new-tab="{{ .NewTab }}" data-target="{{ .Target }}"{{ if .Autocomplete }} data-autocomplete="true" data-autocomplete-provider="{{ .AutocompleteProviderKind }}"{{ if eq .AutocompleteProviderKind "custom" }} data-autocomplete-widget-id="{{ .GetID }}"{{ end }}{{ end }}{{ if .TargetsEnabled }} data-targets-enabled="true"{{ end }}{{ if .HasRestrictedTargets }} data-restricted-targets-widget-id="{{ .GetID }}"{{ end }}>
     <div class="search-bangs">
         {{ range .Bangs }}
         <input type="hidden" data-shortcut="{{ .Shortcut }}" data-title="{{ .Title }}" data-url="{{ .URL }}"{{ if .Icon.URL }} data-icon="{{ .Icon.URL }}"{{ if .Icon.AutoInvert }} data-icon-auto-invert="true"{{ end }}{{ end }}>

@@ -416,15 +416,27 @@ kbd:active {
     color: var(--color-primary);
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
 .logout-button {
     width: 2rem;
     height: 2rem;
-    stroke: var(--color-text-subdue);
-    transition: stroke .2s;
+    fill: var(--color-text-subdue);
+    transition: fill .2s;
 }
 
 .logout-button:hover, .logout-button:focus {
-    stroke: var(--color-text-highlight);
+    fill: var(--color-text-highlight);
 }
 
 .theme-choices {

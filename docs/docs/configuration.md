@@ -2805,36 +2805,33 @@ A custom URL must return the [OpenSearch suggestions format](https://github.com/
 > Older configs written with `autocomplete-provider: custom` alongside a separate `autocomplete-url: <url>` still work, but should be migrated to the single-field form above — the `autocomplete-url` property is deprecated and no longer shown in the interactive editor.
 
 ##### `include-bookmarks`
-When set to `true`, matches what you type against the titles of your [bookmarks](#bookmarks) (case-insensitive, matching from the start of the title) and shows matching bookmarks above the regular search suggestions. Clicking a bookmark match navigates straight to its URL instead of performing a search. Up to 3 matches are shown.
+When set to `true`, the titles of [bookmarks](#bookmarks) on the same page are matched as you type and shown above the regular search suggestions. Each word you type has to match the start of a word in the title, ignoring case, so `home dash` finds "Homelab Dashboard". Selecting a match opens its URL instead of running a search.
 
-By default only bookmarks on the same page as the search widget are matched. Use [`cross-page-bookmarks`](#cross-page-bookmarks) to match bookmarks from every page.
-
-Each match shows the bookmark's own [icon](#icons) if it has one, or a small arrow otherwise, exactly like in the bookmarks widget itself.
+Each match shows the bookmark's [icon](#icons), or a small arrow if it has none.
 
 ```yaml
 - type: search
   include-bookmarks: true
 ```
 
-##### `cross-page-bookmarks`
-When set to `true`, implies [`include-bookmarks`](#include-bookmarks) and widens the search to bookmarks on every page, not just the page the search widget is on.
-
-```yaml
-- type: search
-  cross-page-bookmarks: true
-```
-
 ##### `include-docker`
-When set to `true`, matches what you type against the container names from the [docker containers](#docker-containers) widgets on the same page. Only containers with a URL are matched and each match shows the container's [icon](#icons).
-
-##### `cross-page-docker`
-When set to `true`, widens the search to containers from every page.
+Same as [`include-bookmarks`](#include-bookmarks), but for containers from [docker containers](#docker-containers) widgets on the same page. Only containers that have a URL are matched.
 
 ##### `include-monitor`
-When set to `true`, matches what you type against the site titles from the [monitor](#monitor) widgets on the same page. Each match shows the site's [icon](#icons) and points at the same URL as the widget.
+Same as [`include-bookmarks`](#include-bookmarks), but for sites from [monitor](#monitor) widgets on the same page.
+
+Up to 3 matches are shown for each of bookmarks, containers and sites, so one kind can't push the others out.
+
+##### `cross-page-bookmarks`
+When set to `true`, bookmarks from every page are matched instead of only the page the search widget is on. Implies [`include-bookmarks`](#include-bookmarks).
+
+##### `cross-page-docker`
+When set to `true`, containers from every page are matched. Implies [`include-docker`](#include-docker).
 
 ##### `cross-page-monitor`
-When set to `true`, widens the search to sites from every page.
+When set to `true`, sites from every page are matched.
+
+Cross-page search follows page permissions. Results from a page restricted with `allowed-users` or `allowed-groups` are only shown to logged in users who can open that page, so one search widget gives every user their own set of results.
 
 ##### `bangs`
 What now? [Bangs](https://duckduckgo.com/bangs). They're shortcuts that allow you to use the same search box for many different sites. Assuming you have it configured, if for example you start your search input with `!yt` you'd be able to perform a search on YouTube:

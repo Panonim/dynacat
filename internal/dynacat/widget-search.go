@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ type searchTargetMatch struct {
 	URL    string
 	Target string
 	Icon   customIconField
+	source *page
 }
 
 // A suggestion endpoint taken from the config, which may point at a private
@@ -57,6 +59,7 @@ type searchWidget struct {
 	CrossPageMonitor          bool                `yaml:"cross-page-monitor"`
 	BookmarkMatches           []searchTargetMatch `yaml:"-"`
 	LiveMatches               []searchTargetMatch `yaml:"-"`
+	bookmarkTargets           []searchTargetMatch
 }
 
 func convertSearchUrl(url string) string {
@@ -194,10 +197,7 @@ func (widget *searchWidget) collectBookmarks(app *application, pageFilter *page)
 		return
 	}
 
-	ownPage := app.widgetToPage[widget.GetID()]
-
 	var matches []searchTargetMatch
-	seen := make(map[string]bool)
 	for id, w := range app.widgetByID {
 		bookmarks, ok := w.(*bookmarksWidget)
 		if !ok {
@@ -209,24 +209,15 @@ func (widget *searchWidget) collectBookmarks(app *application, pageFilter *page)
 			continue
 		}
 
-		if searchSourceIsRestricted(source, ownPage) {
-			continue
-		}
-
 		for _, group := range bookmarks.Groups {
 			for _, link := range group.Links {
-				key := link.Title + "\x00" + link.URL
-				if seen[key] {
-					continue
-				}
-				seen[key] = true
-
 				matches = append(matches, searchTargetMatch{
 					Kind:   "bookmark",
 					Title:  link.Title,
 					URL:    link.URL,
 					Target: link.Target,
 					Icon:   link.Icon,
+					source: source,
 				})
 			}
 		}
@@ -234,7 +225,8 @@ func (widget *searchWidget) collectBookmarks(app *application, pageFilter *page)
 
 	sort.Slice(matches, func(i, j int) bool { return matches[i].Title < matches[j].Title })
 
-	widget.BookmarkMatches = matches
+	widget.bookmarkTargets = matches
+	widget.BookmarkMatches = widget.publicTargets(matches)
 	widget.cachedHTML = widget.renderTemplate(widget, searchWidgetTemplate)
 }
 
@@ -288,28 +280,81 @@ func publishSearchTargets(widget widget, providers *widgetProviders, matches []s
 	providers.app.searchTargets.publish(widget.GetID(), matches)
 }
 
-// Pages limited to certain users or groups stay hidden unless the search widget sits on them.
+// Pages limited to certain users or groups stay out of the shared HTML unless the search widget sits on them.
 func searchSourceIsRestricted(source, ownPage *page) bool {
 	return source != ownPage && source != nil && (len(source.AllowedUsers) > 0 || len(source.AllowedGroups) > 0)
 }
 
-// Gathered per render rather than once at startup, since the snapshots change while the app runs.
-func (widget *searchWidget) collectLiveMatches() {
+func filterSearchTargets(matches []searchTargetMatch, keep func(source *page) bool) []searchTargetMatch {
+	var filtered []searchTargetMatch
+	seen := make(map[string]bool)
+
+	for _, match := range matches {
+		key := match.Kind + "\x00" + match.Title + "\x00" + match.URL
+		if seen[key] || !keep(match.source) {
+			continue
+		}
+		seen[key] = true
+
+		filtered = append(filtered, match)
+	}
+
+	return filtered
+}
+
+func (widget *searchWidget) ownPage() *page {
 	if widget.Providers == nil || widget.Providers.app == nil {
-		return
+		return nil
+	}
+
+	return widget.Providers.app.widgetToPage[widget.GetID()]
+}
+
+func (widget *searchWidget) publicTargets(matches []searchTargetMatch) []searchTargetMatch {
+	ownPage := widget.ownPage()
+	return filterSearchTargets(matches, func(source *page) bool { return !searchSourceIsRestricted(source, ownPage) })
+}
+
+// Restricted pages' targets are served per request, so only users allowed on those pages receive them.
+func (widget *searchWidget) restrictedTargetsFor(user *authenticatedUser) []searchTargetMatch {
+	app := widget.Providers.app
+	ownPage := widget.ownPage()
+	matches := append(slices.Clone(widget.bookmarkTargets), widget.collectLiveMatches()...)
+
+	return filterSearchTargets(matches, func(source *page) bool {
+		return searchSourceIsRestricted(source, ownPage) && app.canUserAccessPage(user, source)
+	})
+}
+
+func (widget *searchWidget) HasRestrictedTargets() bool {
+	ownPage := widget.ownPage()
+	if ownPage == nil || !(widget.CrossPageBookmarks || widget.CrossPageDocker || widget.CrossPageMonitor) {
+		return false
+	}
+
+	pages := widget.Providers.app.Config.Pages
+	for i := range pages {
+		if searchSourceIsRestricted(&pages[i], ownPage) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Gathered per render rather than once at startup, since the snapshots change while the app runs.
+func (widget *searchWidget) collectLiveMatches() []searchTargetMatch {
+	if widget.Providers == nil || widget.Providers.app == nil {
+		return nil
 	}
 
 	app := widget.Providers.app
-	ownPage := app.widgetToPage[widget.GetID()]
+	ownPage := widget.ownPage()
 
 	var matches []searchTargetMatch
-	seen := make(map[string]bool)
 
 	app.searchTargets.each(func(id uint64, targets []searchTargetMatch) {
 		source := app.widgetToPage[id]
-		if searchSourceIsRestricted(source, ownPage) {
-			return
-		}
 
 		for _, target := range targets {
 			var include, crossPage bool
@@ -324,12 +369,7 @@ func (widget *searchWidget) collectLiveMatches() {
 				continue
 			}
 
-			key := target.Kind + "\x00" + target.Title + "\x00" + target.URL
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-
+			target.source = source
 			matches = append(matches, target)
 		}
 	})
@@ -338,7 +378,7 @@ func (widget *searchWidget) collectLiveMatches() {
 		return strings.ToLower(matches[i].Title) < strings.ToLower(matches[j].Title)
 	})
 
-	widget.LiveMatches = matches
+	return matches
 }
 
 func (widget *searchWidget) TargetsEnabled() bool {
@@ -353,7 +393,7 @@ func (widget *searchWidget) TargetMatches() []searchTargetMatch {
 
 func (widget *searchWidget) Render() template.HTML {
 	if widget.IncludeDocker || widget.IncludeMonitor {
-		widget.collectLiveMatches()
+		widget.LiveMatches = widget.publicTargets(widget.collectLiveMatches())
 		return widget.renderTemplate(widget, searchWidgetTemplate)
 	}
 

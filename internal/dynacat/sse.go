@@ -181,6 +181,41 @@ func (a *application) respondWithOpenSearchSuggestions(w http.ResponseWriter, r 
 	json.NewEncoder(w).Encode(result)
 }
 
+func (a *application) handleSearchTargetsRequest(w http.ResponseWriter, r *http.Request) {
+	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
+		return
+	}
+
+	widgetID, err := strconv.ParseUint(r.PathValue("widget"), 10, 64)
+	search, ok := a.widgetByID[widgetID].(*searchWidget)
+	if err != nil || !ok {
+		a.handleNotFound(w, r)
+		return
+	}
+
+	if a.handleAccessControl(w, r, a.widgetToPage[widgetID], showUnauthorizedJSON) {
+		return
+	}
+
+	type target struct {
+		Kind           string `json:"kind"`
+		Title          string `json:"title"`
+		URL            string `json:"url"`
+		Target         string `json:"target"`
+		Icon           string `json:"icon"`
+		IconAutoInvert bool   `json:"iconAutoInvert"`
+	}
+
+	matches := search.restrictedTargetsFor(a.getAuthenticatedUser(w, r))
+	result := make([]target, len(matches))
+	for i, m := range matches {
+		result[i] = target{m.Kind, m.Title, m.URL, m.Target, string(m.Icon.URL), m.Icon.AutoInvert}
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *http.Request) {
 	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
 		return

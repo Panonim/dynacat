@@ -373,6 +373,19 @@ function setupSearchBoxes() {
                 icon: el.dataset.icon || "",
                 iconAutoInvert: el.dataset.iconAutoInvert === "true",
             }));
+            if (widget.dataset.restrictedTargetsWidgetId) {
+                const targetKey = (t) => t.kind + "\0" + t.title + "\0" + t.url;
+                fetch("/api/search/" + encodeURIComponent(widget.dataset.restrictedTargetsWidgetId) + "/targets")
+                    .then((r) => r.ok ? r.json() : [])
+                    .then((data) => {
+                        const known = new Set(targets.map(targetKey));
+                        for (const t of data) {
+                            if (known.has(targetKey(t))) continue;
+                            targets.push({ type: "target", ...t, titleWords: toWords(t.title || "") });
+                        }
+                    })
+                    .catch(() => {});
+            }
             let acItems = [];
             let acIndex = -1;
             let acDebounce = null;

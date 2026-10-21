@@ -132,7 +132,7 @@ body.editing {
 }
 
 /* The username crowds the header enough to squeeze out the editor toggle. */
-body.editing .nav-username {
+body.editing .nav-user {
     display: none;
 }
 
