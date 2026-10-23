@@ -152,21 +152,48 @@ jobs:
 
   windows-installer:
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
-    runs-on: ubuntu-latest
+    # Native Inno Setup, since Wine in the innosetup image fails on Linux runners.
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    defaults:
+      run:
+        shell: bash
+    env:
+      ARCH: ${{ matrix.arch }}
+      MSYS_NO_PATHCONV: '1'
     steps:
       - name: Checkout the target Git reference
         uses: actions/checkout@v6
 
-      - name: Build Windows installers
-        run: |
-          for ARCH in amd64 arm64; do
-            docker build -f windows/Dockerfile --build-arg APP_VERSION="${GITHUB_REF_NAME}" --build-arg ARCH="${ARCH}" --output "build/windows/${ARCH}" .
-          done
+      - name: Set up Golang
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
 
-      - name: Upload release assets
+      - name: Build icons
+        run: |
+          magick internal/dynacat/static/favicon.png -background none -gravity center -extent 920x920 -resize 256x256 dynacat.png
+          magick dynacat.png -define icon:auto-resize=256,128,64,48,32,16 dynacat.ico
+          magick dynacat.png \
+            -fill '#261F3F' -stroke white -strokewidth 8 -draw 'circle 198,198 198,250' \
+            -stroke none -fill white -draw 'rectangle 189,164 207,198' -draw 'polygon 172,194 224,194 198,222' \
+            -draw 'roundrectangle 172,230 224,238 4,4' \
+            -define icon:auto-resize=256,128,64,48,32,16 windows/setup.ico
+
+      - name: Build binary
+        run: |
+          go run github.com/tc-hib/go-winres@v0.3.3 simply --arch "${ARCH}" --icon dynacat.ico --product-name Dynacat --file-description Dynacat
+          CGO_ENABLED=0 GOARCH="${ARCH}" go build -ldflags "-s -w -X github.com/Panonim/dynacat/internal/dynacat.buildVersion=${GITHUB_REF_NAME}" -o windows/dynacat.exe .
+
+      - name: Build installer
+        run: iscc /DAppVersion="${GITHUB_REF_NAME}" /DArch="${ARCH}" windows/dynacat.iss
+
+      - name: Upload release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" build/windows/*/dynacat-windows-*-setup.exe --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" "windows/output/dynacat-windows-${ARCH}-setup.exe" --clobber
 
   checksums:
     needs: [release-binaries, windows-installer]
