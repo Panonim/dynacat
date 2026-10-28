@@ -1044,7 +1044,7 @@ function setupCollapsibleGrids() {
         }
 
         const getCardsPerRow = () => {
-            return parseInt(getComputedStyle(gridElement).getPropertyValue('--cards-per-row'));
+            return getComputedStyle(gridElement).gridTemplateColumns.split(" ").length;
         };
 
         let cardsPerRow;
