@@ -234,6 +234,8 @@ jobs:
             '{
               username: "Github Update",
               avatar_url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/github-light.svg",
+              content: "<@&1474154933757673677>",
+              allowed_mentions: { roles: ["1474154933757673677"] },
               embeds: [{
                 title: "New Dynacat Release - \($version)",
                 url: "https://github.com/Panonim/dynacat/releases/latest",
