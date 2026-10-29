@@ -108,6 +108,21 @@
     text-align: left;
 }
 
+.calendar-release-card-available .calendar-release-title,
+.calendar-release-card-available .calendar-release-type-icon {
+    color: var(--color-positive);
+}
+
+.calendar-release-card-released .calendar-release-title,
+.calendar-release-card-released .calendar-release-type-icon {
+    color: var(--color-negative);
+}
+
+.calendar-release-card-upcoming .calendar-release-title,
+.calendar-release-card-upcoming .calendar-release-type-icon {
+    color: var(--color-upcoming);
+}
+
 .calendar-release-type-icon {
     flex-shrink: 0;
     align-self: center;

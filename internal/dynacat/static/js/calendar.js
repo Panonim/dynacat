@@ -49,6 +49,12 @@ const releaseTypes = {
     },
 };
 
+const releaseCardStates = {
+    available: true,
+    released: true,
+    upcoming: true,
+};
+
 export default function(element) {
     if (element.querySelector(".calendar-dates")) return;
 
@@ -318,7 +324,7 @@ function Dates(firstDay, releases, showReleaseState) {
 function releaseMarker(items, showReleaseState) {
     const list = elem().classes("list", "list-gap-10");
     for (const item of items) {
-        list.append(releaseCard(item));
+        list.append(releaseCard(item, showReleaseState));
     }
 
     const indicator = elem().classes("calendar-release-indicator");
@@ -340,7 +346,7 @@ function releaseMarker(items, showReleaseState) {
         );
 }
 
-function releaseCard(item) {
+function releaseCard(item, showReleaseState) {
     const body = elem().classes("min-width-0", "flex-1").append(
         elem().classes("size-h6", "color-subdue").text(item.source)
     );
@@ -354,7 +360,7 @@ function releaseCard(item) {
                 .html(`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0.9" stroke-linejoin="round"><path d="${type.path}"/></svg>`)
         );
     }
-    titleRow.append(elem().classes("color-highlight", "text-truncate").text(item.title));
+    titleRow.append(elem().classes("calendar-release-title", "color-highlight", "text-truncate").text(item.title));
     body.append(titleRow);
 
     if (item.description) {
@@ -365,6 +371,10 @@ function releaseCard(item) {
         ? elem("a").attrs({ href: item.link, target: "_blank", rel: "noreferrer" })
         : elem()
     ).classes("calendar-release-card", "flex", "items-center", "gap-10");
+
+    if (showReleaseState && releaseCardStates[item.state]) {
+        card.classes("calendar-release-card-" + item.state);
+    }
 
     if (item.thumbnail) {
         const spinner = elem().classes("calendar-thumb-spinner");

@@ -979,6 +979,8 @@ Set `show-release-state` to `true` to instead color that line by the availabilit
 
 If a day has several releases with different states, the line shows the least available one, so it stays on the `released` or `upcoming` color until nothing is left pending. The priority is `released` → `upcoming` → `available`.
 
+The same colors are also applied inside the hover popover: each release's title and type icon are colored by that release's own state, so on a day that mixes states you can tell exactly which releases are downloaded, out, or still upcoming.
+
 Only relevant when `hosts` is configured.
 
 ```yaml
