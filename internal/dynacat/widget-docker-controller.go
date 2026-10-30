@@ -355,7 +355,7 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, "invalid image ID", http.StatusBadRequest)
 			return
 		}
-		if !slices.ContainsFunc(widget.Images, func(img dockerCtrlImage) bool { return img.ID == id }) {
+		if !slices.ContainsFunc(widget.Images, func(img dockerCtrlImage) bool { return img.ID == id[:12] }) {
 			http.Error(w, "image not listed by this widget", http.StatusForbidden)
 			return
 		}

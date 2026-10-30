@@ -41,7 +41,10 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 		if newSrc == originalSrc {
 			return match
 		}
-		fallback := ` data-fallback-src="` + strings.ReplaceAll(originalSrc, `"`, `&quot;`) + `"`
+		fallback := ""
+		if validatePublicFetchURL(originalSrc) == nil {
+			fallback = ` data-fallback-src="` + strings.ReplaceAll(originalSrc, `"`, `&quot;`) + `"`
+		}
 		return "<img" + parts[1] + ` src="` + newSrc + `"` + parts[3] + fallback + ">"
 	})
 	return template.HTML(result)
