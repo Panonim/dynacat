@@ -10,13 +10,18 @@ import (
 	"html/template"
 	"io"
 	"math/rand/v2"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
+
+	"golang.org/x/net/http/httpproxy"
 )
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
@@ -31,7 +36,7 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 			return match
 		}
 		originalSrc := parts[2]
-		newSrc := providers.SecureImageURL(ctx, originalSrc, false)
+		newSrc := providers.SecureImageURL(ctx, originalSrc, false, true)
 		if newSrc == originalSrc {
 			return match
 		}
@@ -39,6 +44,14 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 		return "<img" + parts[1] + ` src="` + newSrc + `"` + parts[3] + fallback + ">"
 	})
 	return template.HTML(result)
+}
+
+// Remote feeds pick their own link schemes and templates render links through safeURL, so anything but http(s) is dropped.
+func httpURLOrEmpty(rawURL string) string {
+	if parsed, err := url.Parse(rawURL); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+		return rawURL
+	}
+	return ""
 }
 
 var (
@@ -91,17 +104,50 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 	return validatePublicFetchURL(req.URL.String())
 }
 
-func newPublicOnlyHTTPClient(base *http.Client) *http.Client {
+// A configured proxy resolves and dials upstreams itself, so only the URL and redirect checks apply then.
+var outboundProxyConfigured = func() bool {
+	cfg := httpproxy.FromEnvironment()
+	return cfg.HTTPProxy != "" || cfg.HTTPSProxy != ""
+}()
+
+// Checks the address actually dialed, so a host that re-resolves to a private address after validation is still refused.
+func rejectDisallowedDial(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	if isDisallowedIP(net.ParseIP(host)) {
+		return fmt.Errorf("dialing disallowed address %s", host)
+	}
+	return nil
+}
+
+func newPublicOnlyHTTPClient(insecure bool) *http.Client {
+	dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+	if !outboundProxyConfigured {
+		dialer.Control = rejectDisallowedDial
+	}
+
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 10,
+		Proxy:               http.ProxyFromEnvironment,
+		DialContext:         dialer.DialContext,
+		ForceAttemptHTTP2:   true,
+	}
+	if insecure {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
 	return &http.Client{
-		Transport:     base.Transport,
+		Transport:     transport,
 		Timeout:       defaultClientTimeout,
 		CheckRedirect: checkPublicRedirect,
 	}
 }
 
-var publicOnlyHTTPClient = newPublicOnlyHTTPClient(defaultHTTPClient)
+var publicOnlyHTTPClient = newPublicOnlyHTTPClient(false)
 
-var publicOnlyInsecureHTTPClient = newPublicOnlyHTTPClient(defaultInsecureHTTPClient)
+var publicOnlyInsecureHTTPClient = newPublicOnlyHTTPClient(true)
 
 type requestDoer interface {
 	Do(*http.Request) (*http.Response, error)

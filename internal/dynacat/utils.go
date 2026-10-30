@@ -180,6 +180,20 @@ func titleToSlug(s string) string {
 	return s
 }
 
+// Compares file identity rather than paths, so case or short-name variants on Windows still match.
+func isSameFileAsAny(name string, others ...string) bool {
+	info, err := os.Stat(name)
+	if err != nil {
+		return false
+	}
+	for _, other := range others {
+		if otherInfo, err := os.Stat(other); err == nil && os.SameFile(info, otherInfo) {
+			return true
+		}
+	}
+	return false
+}
+
 func fileServerWithCache(fs http.FileSystem, cacheDuration time.Duration) http.Handler {
 	server := http.FileServer(fs)
 	cacheControlValue := fmt.Sprintf("public, max-age=%d", int(cacheDuration.Seconds()))

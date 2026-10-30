@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -258,8 +259,12 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, "invalid container ID", http.StatusBadRequest)
 			return
 		}
-		if widget.selfID != "" && id == widget.selfID {
+		if widget.selfID != "" && id[:12] == widget.selfID {
 			http.Error(w, "cannot control own container", http.StatusForbidden)
+			return
+		}
+		if !slices.ContainsFunc(widget.Containers, func(c dockerCtrlContainer) bool { return c.ID == id }) {
+			http.Error(w, "container not listed by this widget", http.StatusForbidden)
 			return
 		}
 		if op != "start" && op != "stop" && op != "restart" && op != "remove" {
@@ -273,6 +278,10 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 		w.WriteHeader(http.StatusNoContent)
 
 	case parts[0] == "images" && len(parts) == 2 && parts[1] == "pull":
+		if widget.Show == "containers" {
+			http.Error(w, "images are not shown by this widget", http.StatusForbidden)
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, 1024)
 		var body struct {
 			Image string `json:"image"`
@@ -342,6 +351,10 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 		id := parts[1]
 		if !validDockerIDPattern.MatchString(id) {
 			http.Error(w, "invalid image ID", http.StatusBadRequest)
+			return
+		}
+		if !slices.ContainsFunc(widget.Images, func(img dockerCtrlImage) bool { return img.ID == id }) {
+			http.Error(w, "image not listed by this widget", http.StatusForbidden)
 			return
 		}
 		if err := dockerCtrlRemoveImage(client, id); err != nil {

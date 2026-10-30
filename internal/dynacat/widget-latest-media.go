@@ -609,7 +609,7 @@ func (widget *latestMediaWidget) resolveCachedImageURL(ctx context.Context, orig
 		return proxyURL
 	}
 
-	cachedURL, err := widget.Providers.imageCache.CacheURLWithClient(ctx, originalURL, allowInsecure, 0)
+	cachedURL, err := widget.Providers.imageCache.CacheURLWithClient(ctx, originalURL, allowInsecure, true, 0)
 	if err == nil && cachedURL != "" {
 		return cachedURL
 	}

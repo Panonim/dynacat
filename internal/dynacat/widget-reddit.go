@@ -140,7 +140,7 @@ func (widget *redditWidget) update(ctx context.Context) {
 			if posts[i].ThumbnailUrl == "" {
 				continue
 			}
-			posts[i].ThumbnailUrl = widget.Providers.SecureImageURL(ctx, posts[i].ThumbnailUrl, false)
+			posts[i].ThumbnailUrl = widget.Providers.SecureImageURL(ctx, posts[i].ThumbnailUrl, false, false)
 		}
 	}
 
@@ -404,7 +404,7 @@ func (widget *redditWidget) fetchSubredditPostsFromRSS() (forumPostList, error) 
 		post := forumPost{
 			Title:         html.UnescapeString(item.Title),
 			Subreddit:     widget.Subreddit,
-			DiscussionUrl: item.Link,
+			DiscussionUrl: httpURLOrEmpty(item.Link),
 			StatsUnknown:  true,
 			ThumbnailUrl:  findThumbnailInItemExtensions(item),
 		}

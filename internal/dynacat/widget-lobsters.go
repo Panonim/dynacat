@@ -98,7 +98,7 @@ func fetchLobstersPostsFromFeed(ctx context.Context, feedUrl string) (forumPostL
 
 		posts = append(posts, forumPost{
 			Title:           feed[i].Title,
-			DiscussionUrl:   feed[i].CommentsURL,
+			DiscussionUrl:   httpURLOrEmpty(feed[i].CommentsURL),
 			TargetUrl:       feed[i].URL,
 			TargetUrlDomain: extractDomainFromUrl(feed[i].URL),
 			CommentCount:    feed[i].CommentCount,

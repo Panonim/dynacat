@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -435,10 +436,7 @@ func newApplication(c *config) (*application, error) {
 	app.parsedManifest = []byte(manifest)
 
 	if len(app.todoListIDToPage) > 0 {
-		dbPath := config.Server.DBPath
-		if dbPath == "" {
-			dbPath = filepath.Join(config.assetsPath(), "dynacat.db")
-		}
+		dbPath := config.dbPath()
 		app.todoStorage = newTodoStorage(dbPath)
 
 		if err := app.todoStorage.init(); err != nil {
@@ -1079,7 +1077,14 @@ func (a *application) server() (func() error, func() error) {
 
 	absAssetsPath, _ := filepath.Abs(assetsPath)
 	assetsFS := fileServerWithCache(http.Dir(assetsPath), 2*time.Hour)
-	assetsHandler := http.StripPrefix("/assets/", assetsFS)
+	dbPath := a.Config.dbPath()
+	assetsHandler := http.StripPrefix("/assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isSameFileAsAny(filepath.Join(assetsPath, filepath.FromSlash(path.Clean("/"+r.URL.Path))), dbPath, dbPath+"-wal", dbPath+"-shm", dbPath+"-journal") {
+			http.NotFound(w, r)
+			return
+		}
+		assetsFS.ServeHTTP(w, r)
+	}))
 	if a.RequiresAuth {
 		mux.Handle("/assets/{path...}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
