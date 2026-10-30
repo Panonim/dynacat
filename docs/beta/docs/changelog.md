@@ -1,3 +1,12 @@
+# Changes for 3.0.3
+- Fixed an issue where images in `latest-media` widget, were not responding to the device size
+- Fixed a security issue where image URLs from feeds and other remote content could make Dynacat fetch internal addresses and expose them through the image cache
+- Cached images are now checked to actually be images, so text, HTML or JSON is never stored even when the server labels it as one
+- The `todo` database is no longer served from `/assets/`
+- `docker-controller` actions now only work on containers and images the widget lists, and pulling is disabled with `show: containers`
+- Dropped `javascript:` and other non-http links coming from Lobsters and Reddit RSS posts
+- Updated Go to 1.26.10 and Go packages, Docker images now use Alpine 3.24
+
 # Changes for 3.0.2
 - Fixed a bug where users were randomly logged out after a config reload -> https://github.com/Panonim/dynacat/issues/174
 - Fixed `secureImageURL` in `custom-api` never refreshing cached images, they are now re-downloaded after the widget `cache` duration -> https://github.com/Panonim/dynacat/issues/176
