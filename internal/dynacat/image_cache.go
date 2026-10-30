@@ -84,21 +84,23 @@ func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allo
 		return "", nil
 	}
 
-	hashHex := hashString(rawURL)
+	// Public-only fetches get their own entries, so they never reuse a file fetched without the address checks.
+	cacheKey := ternary(allowPrivate, rawURL, "public:"+rawURL)
+	hashHex := hashString(cacheKey)
 	existing, found := c.findExistingFile(hashHex, parsed.Path)
 	if found && (maxAge <= 0 || !c.isStale(existing, maxAge)) {
 		return c.publicURL(existing), nil
 	}
 
 	c.mu.Lock()
-	if entry, ok := c.inFlight[rawURL]; ok {
+	if entry, ok := c.inFlight[cacheKey]; ok {
 		c.mu.Unlock()
 		<-entry.done
 		return entry.url, entry.err
 	}
 
 	entry := &cacheEntry{done: make(chan struct{})}
-	c.inFlight[rawURL] = entry
+	c.inFlight[cacheKey] = entry
 	c.mu.Unlock()
 
 	entry.url, entry.err = c.downloadAndCacheWithClient(ctx, rawURL, hashHex, parsed.Path, allowInsecure, allowPrivate)
@@ -107,7 +109,7 @@ func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allo
 	}
 
 	c.mu.Lock()
-	delete(c.inFlight, rawURL)
+	delete(c.inFlight, cacheKey)
 	c.mu.Unlock()
 	close(entry.done)
 
@@ -202,6 +204,11 @@ func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL stri
 	if err := os.Rename(tmpPath, finalPath); err != nil {
 		_ = os.Remove(tmpPath)
 		return "", err
+	}
+	for _, other := range allowedImageExtensions {
+		if other != ext {
+			_ = os.Remove(filepath.Join(c.dir, hashHex+other))
+		}
 	}
 
 	return c.publicURL(filename), nil

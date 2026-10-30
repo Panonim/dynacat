@@ -181,17 +181,31 @@ func titleToSlug(s string) string {
 }
 
 // Compares file identity rather than paths, so case or short-name variants on Windows still match.
-func isSameFileAsAny(name string, others ...string) bool {
-	info, err := os.Stat(name)
-	if err != nil {
-		return false
-	}
+func isSameFileAsAny(info os.FileInfo, others ...string) bool {
 	for _, other := range others {
 		if otherInfo, err := os.Stat(other); err == nil && os.SameFile(info, otherInfo) {
 			return true
 		}
 	}
 	return false
+}
+
+// Checks the already opened handle, so a symlink swapped after the check can't expose a hidden file.
+type hideFilesFS struct {
+	fs     http.FileSystem
+	hidden []string
+}
+
+func (h hideFilesFS) Open(name string) (http.File, error) {
+	file, err := h.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	if info, err := file.Stat(); err != nil || isSameFileAsAny(info, h.hidden...) {
+		file.Close()
+		return nil, os.ErrNotExist
+	}
+	return file, nil
 }
 
 func fileServerWithCache(fs http.FileSystem, cacheDuration time.Duration) http.Handler {

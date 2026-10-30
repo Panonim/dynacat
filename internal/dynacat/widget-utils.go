@@ -1,6 +1,7 @@
 package dynacat
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -36,7 +37,7 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 			return match
 		}
 		originalSrc := parts[2]
-		newSrc := providers.SecureImageURL(ctx, originalSrc, false, true)
+		newSrc := providers.SecureImageURL(ctx, originalSrc, false, false)
 		if newSrc == originalSrc {
 			return match
 		}
@@ -48,7 +49,7 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 
 // Remote feeds pick their own link schemes and templates render links through safeURL, so anything but http(s) is dropped.
 func httpURLOrEmpty(rawURL string) string {
-	if parsed, err := url.Parse(rawURL); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+	if parsed, err := url.Parse(rawURL); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != "" {
 		return rawURL
 	}
 	return ""
@@ -104,10 +105,20 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 	return validatePublicFetchURL(req.URL.String())
 }
 
-// A configured proxy resolves and dials upstreams itself, so only the URL and redirect checks apply then.
-var outboundProxyConfigured = func() bool {
+// A configured proxy resolves upstreams itself, so only dials to the proxy skip the address check while NO_PROXY hosts keep it.
+var outboundProxyAddrs = func() map[string]bool {
 	cfg := httpproxy.FromEnvironment()
-	return cfg.HTTPProxy != "" || cfg.HTTPSProxy != ""
+	defaultPorts := map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}
+	addrs := map[string]bool{}
+	for _, raw := range []string{cfg.HTTPProxy, cfg.HTTPSProxy} {
+		if raw != "" && !strings.Contains(raw, "://") {
+			raw = "http://" + raw
+		}
+		if parsed, err := url.Parse(raw); err == nil && parsed.Host != "" {
+			addrs[net.JoinHostPort(parsed.Hostname(), cmp.Or(parsed.Port(), defaultPorts[parsed.Scheme]))] = true
+		}
+	}
+	return addrs
 }()
 
 // Checks the address actually dialed, so a host that re-resolves to a private address after validation is still refused.
@@ -123,15 +134,16 @@ func rejectDisallowedDial(_, address string, _ syscall.RawConn) error {
 }
 
 func newPublicOnlyHTTPClient(insecure bool) *http.Client {
-	dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
-	if !outboundProxyConfigured {
-		dialer.Control = rejectDisallowedDial
+	proxyDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+	checkedDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: rejectDisallowedDial}
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return ternary(outboundProxyAddrs[addr], proxyDialer, checkedDialer).DialContext(ctx, network, addr)
 	}
 
 	transport := &http.Transport{
 		MaxIdleConnsPerHost: 10,
 		Proxy:               http.ProxyFromEnvironment,
-		DialContext:         dialer.DialContext,
+		DialContext:         dial,
 		ForceAttemptHTTP2:   true,
 	}
 	if insecure {

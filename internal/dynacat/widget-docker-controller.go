@@ -263,10 +263,12 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, "cannot control own container", http.StatusForbidden)
 			return
 		}
-		if !slices.ContainsFunc(widget.Containers, func(c dockerCtrlContainer) bool { return c.ID == id }) {
+		idx := slices.IndexFunc(widget.Containers, func(c dockerCtrlContainer) bool { return c.ID == id[:12] })
+		if idx < 0 {
 			http.Error(w, "container not listed by this widget", http.StatusForbidden)
 			return
 		}
+		id = widget.Containers[idx].ID
 		if op != "start" && op != "stop" && op != "restart" && op != "remove" {
 			http.Error(w, "unknown container action", http.StatusBadRequest)
 			return
