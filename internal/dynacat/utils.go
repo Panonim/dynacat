@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -188,6 +189,9 @@ func sqliteFilePath(dsn string) string {
 		return dsn
 	}
 	rest = strings.TrimPrefix(strings.TrimPrefix(rest, "//localhost"), "//")
+	if runtime.GOOS == "windows" && len(rest) >= 3 && rest[0] == '/' && rest[2] == ':' {
+		rest = rest[1:]
+	}
 	if unescaped, err := url.PathUnescape(rest); err == nil {
 		return unescaped
 	}
@@ -215,11 +219,26 @@ func (h hideFilesFS) Open(name string) (http.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if info, err := file.Stat(); err != nil || isSameFileAsAny(info, h.hidden...) {
+	info, err := file.Stat()
+	if err != nil || isSameFileAsAny(info, h.hidden...) {
 		file.Close()
 		return nil, os.ErrNotExist
 	}
+	if info.IsDir() {
+		return hideFilesDir{file, h.hidden}, nil
+	}
 	return file, nil
+}
+
+// Keeps hidden files out of directory listings too.
+type hideFilesDir struct {
+	http.File
+	hidden []string
+}
+
+func (d hideFilesDir) Readdir(count int) ([]os.FileInfo, error) {
+	infos, err := d.File.Readdir(count)
+	return slices.DeleteFunc(infos, func(info os.FileInfo) bool { return isSameFileAsAny(info, d.hidden...) }), err
 }
 
 func fileServerWithCache(fs http.FileSystem, cacheDuration time.Duration) http.Handler {
