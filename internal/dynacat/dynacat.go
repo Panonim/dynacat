@@ -435,10 +435,7 @@ func newApplication(c *config) (*application, error) {
 	app.parsedManifest = []byte(manifest)
 
 	if len(app.todoListIDToPage) > 0 {
-		dbPath := config.Server.DBPath
-		if dbPath == "" {
-			dbPath = filepath.Join(config.assetsPath(), "dynacat.db")
-		}
+		dbPath := config.dbPath()
 		app.todoStorage = newTodoStorage(dbPath)
 
 		if err := app.todoStorage.init(); err != nil {
@@ -1032,12 +1029,15 @@ func (a *application) server() (func() error, func() error) {
 		)),
 	)
 
+	dbPath := sqliteFilePath(a.Config.dbPath())
+	dbFiles := []string{dbPath, dbPath + "-wal", dbPath + "-shm", dbPath + "-journal"}
+
 	if a.Config.Server.CacheDir != "" {
 		// Cached files are fetched from remote widget content and an SVG among them would
 		// otherwise run scripts on this origin when opened directly.
 		cacheHandler := sandboxedHandler(http.StripPrefix(
 			"/.cache",
-			fileServerWithCache(http.Dir(a.Config.Server.CacheDir), REMOTE_IMAGE_CACHE_DURATION),
+			fileServerWithCache(hideFilesFS{http.Dir(a.Config.Server.CacheDir), dbFiles}, REMOTE_IMAGE_CACHE_DURATION),
 		))
 
 		if a.RequiresAuth {
@@ -1078,8 +1078,7 @@ func (a *application) server() (func() error, func() error) {
 	assetsPath := a.Config.assetsPath()
 
 	absAssetsPath, _ := filepath.Abs(assetsPath)
-	assetsFS := fileServerWithCache(http.Dir(assetsPath), 2*time.Hour)
-	assetsHandler := http.StripPrefix("/assets/", assetsFS)
+	assetsHandler := http.StripPrefix("/assets/", fileServerWithCache(hideFilesFS{http.Dir(assetsPath), dbFiles}, 2*time.Hour))
 	if a.RequiresAuth {
 		mux.Handle("/assets/{path...}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {

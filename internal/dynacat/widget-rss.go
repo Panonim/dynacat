@@ -120,7 +120,7 @@ func (widget *rssWidget) update(ctx context.Context) {
 			if items[i].ImageURL == "" {
 				continue
 			}
-			items[i].ImageURL = widget.Providers.SecureImageURL(ctx, items[i].ImageURL, false)
+			items[i].ImageURL = widget.Providers.SecureImageURL(ctx, items[i].ImageURL, false, false)
 		}
 	}
 
