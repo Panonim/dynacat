@@ -71,6 +71,7 @@ type dockerControllerWidget struct {
 	Images        []dockerCtrlImage     `yaml:"-"`
 	selfID        string
 	selfImageName string
+	dataMu        sync.RWMutex
 	pullsMu       sync.Mutex
 	pulls         map[string]*dockerActivePull
 	pullsSeq      uint64
@@ -230,13 +231,17 @@ func (widget *dockerControllerWidget) update(ctx context.Context) {
 		return
 	}
 
+	widget.dataMu.Lock()
 	widget.selfID = selfID
 	widget.selfImageName = selfImageName
 	widget.Containers = containers
 	widget.Images = images
+	widget.dataMu.Unlock()
 }
 
 func (widget *dockerControllerWidget) Render() template.HTML {
+	widget.dataMu.RLock()
+	defer widget.dataMu.RUnlock()
 	return widget.renderTemplate(widget, dockerControllerWidgetTemplate)
 }
 
@@ -251,6 +256,10 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 
 	client := newDockerCtrlClient(widget.SockPath)
 
+	widget.dataMu.RLock()
+	selfID, containers, images := widget.selfID, widget.Containers, widget.Images
+	widget.dataMu.RUnlock()
+
 	switch {
 	case parts[0] == "containers" && len(parts) == 3:
 		id := parts[1]
@@ -259,16 +268,16 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, "invalid container ID", http.StatusBadRequest)
 			return
 		}
-		if widget.selfID != "" && id[:12] == widget.selfID {
+		if selfID != "" && id[:12] == selfID {
 			http.Error(w, "cannot control own container", http.StatusForbidden)
 			return
 		}
-		idx := slices.IndexFunc(widget.Containers, func(c dockerCtrlContainer) bool { return c.ID == id[:12] })
+		idx := slices.IndexFunc(containers, func(c dockerCtrlContainer) bool { return c.ID == id[:12] })
 		if idx < 0 {
 			http.Error(w, "container not listed by this widget", http.StatusForbidden)
 			return
 		}
-		id = widget.Containers[idx].ID
+		id = containers[idx].ID
 		if op != "start" && op != "stop" && op != "restart" && op != "remove" {
 			http.Error(w, "unknown container action", http.StatusBadRequest)
 			return
@@ -355,7 +364,7 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, "invalid image ID", http.StatusBadRequest)
 			return
 		}
-		if !slices.ContainsFunc(widget.Images, func(img dockerCtrlImage) bool { return img.ID == id[:12] }) {
+		if !slices.ContainsFunc(images, func(img dockerCtrlImage) bool { return img.ID == id[:12] }) {
 			http.Error(w, "image not listed by this widget", http.StatusForbidden)
 			return
 		}
