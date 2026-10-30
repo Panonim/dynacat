@@ -106,7 +106,8 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 }
 
 // A configured proxy resolves upstreams itself, so only dials to the proxy skip the address check while NO_PROXY hosts keep it.
-var outboundProxyAddrs = func() map[string]bool {
+// Read on first dial like http.ProxyFromEnvironment, so proxies loaded from --env-file are included.
+var outboundProxyAddrs = sync.OnceValue(func() map[string]bool {
 	cfg := httpproxy.FromEnvironment()
 	defaultPorts := map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}
 	addrs := map[string]bool{}
@@ -119,7 +120,7 @@ var outboundProxyAddrs = func() map[string]bool {
 		}
 	}
 	return addrs
-}()
+})
 
 // Checks the address actually dialed, so a host that re-resolves to a private address after validation is still refused.
 func rejectDisallowedDial(_, address string, _ syscall.RawConn) error {
@@ -137,7 +138,7 @@ func newPublicOnlyHTTPClient(insecure bool) *http.Client {
 	proxyDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	checkedDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: rejectDisallowedDial}
 	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return ternary(outboundProxyAddrs[addr], proxyDialer, checkedDialer).DialContext(ctx, network, addr)
+		return ternary(outboundProxyAddrs()[addr], proxyDialer, checkedDialer).DialContext(ctx, network, addr)
 	}
 
 	transport := &http.Transport{

@@ -1029,7 +1029,7 @@ func (a *application) server() (func() error, func() error) {
 		)),
 	)
 
-	dbPath := a.Config.dbPath()
+	dbPath := sqliteFilePath(a.Config.dbPath())
 	dbFiles := []string{dbPath, dbPath + "-wal", dbPath + "-shm", dbPath + "-journal"}
 
 	if a.Config.Server.CacheDir != "" {

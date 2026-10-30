@@ -180,6 +180,20 @@ func titleToSlug(s string) string {
 	return s
 }
 
+// Mirrors how the sqlite driver opens a db-path, which may carry query params or be a file: URI.
+func sqliteFilePath(dsn string) string {
+	dsn, _, _ = strings.Cut(dsn, "?")
+	rest, ok := strings.CutPrefix(dsn, "file:")
+	if !ok {
+		return dsn
+	}
+	rest = strings.TrimPrefix(strings.TrimPrefix(rest, "//localhost"), "//")
+	if unescaped, err := url.PathUnescape(rest); err == nil {
+		return unescaped
+	}
+	return rest
+}
+
 // Compares file identity rather than paths, so case or short-name variants on Windows still match.
 func isSameFileAsAny(info os.FileInfo, others ...string) bool {
 	for _, other := range others {
