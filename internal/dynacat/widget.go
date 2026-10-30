@@ -228,11 +228,6 @@ func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL
 		}
 	}
 
-	// The proxy refuses private addresses too, so the browser loads them directly instead.
-	if !allowPrivate && validatePublicFetchURL(imageURL) != nil {
-		return imageURL
-	}
-
 	return p.baseURL + "/api/image-proxy/" + hash
 }
 
