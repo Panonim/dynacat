@@ -1969,6 +1969,53 @@ Example:
 
 Note the use of `|` after `source:`, this allows you to insert a multi-line string.
 
+### Markdown
+Render markdown, either written directly in the widget or loaded from a file in the assets directory.
+
+Example:
+
+```yaml
+- type: markdown
+  title: Notes
+  source: |
+    ## Homelab
+    Backups run nightly at **03:00**.
+
+    1. Check `zpool status`
+    2. Rotate API tokens
+       - Sonarr
+       - Radarr
+
+    > Keep the NAS on the UPS.
+
+    [Runbook](https://example.com)
+
+- type: markdown
+  file: notes.md
+```
+
+Preview:
+
+![](images/markdown-widget-preview.png)
+
+#### Properties
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| source | string | no | |
+| file | string | no | |
+| allow-html | boolean | no | false |
+
+Exactly one of `source` or `file` must be set.
+
+##### `source`
+Markdown content written directly in the widget.
+
+##### `file`
+Path to a markdown file inside the assets directory, e.g. `notes.md` or `/assets/notes.md`. The file is re-read whenever it changes, so edits show up on the next page refresh without a restart.
+
+##### `allow-html`
+Render raw HTML inside the markdown. When disabled, raw HTML is omitted from the output.
+
 ### iframe
 Embed an iframe as a widget.
 
