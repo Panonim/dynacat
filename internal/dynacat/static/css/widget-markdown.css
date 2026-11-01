@@ -1,0 +1,87 @@
+.markdown {
+    color: var(--color-text-paragraph);
+    overflow-wrap: break-word;
+}
+
+.markdown > * + * {
+    margin-top: 1rem;
+}
+
+.markdown :is(h1, h2, h3, h4, h5, h6) {
+    color: var(--color-text-highlight);
+    line-height: 1.3;
+}
+
+.markdown * + :is(h1, h2, h3, h4, h5, h6) {
+    margin-top: 1.6rem;
+}
+
+.markdown h1 { font-size: var(--font-size-h1); }
+.markdown h2 { font-size: var(--font-size-h2); }
+.markdown h3 { font-size: var(--font-size-h3); }
+.markdown h4 { font-size: var(--font-size-h4); }
+.markdown h5 { font-size: var(--font-size-h5); }
+.markdown h6 { font-size: var(--font-size-h6); color: var(--color-text-base); }
+
+.markdown a {
+    color: var(--color-primary);
+}
+
+.markdown a:hover {
+    text-decoration: underline;
+}
+
+.markdown strong {
+    color: var(--color-text-highlight);
+}
+
+.markdown :is(ul, ol) {
+    padding-left: 2rem;
+}
+
+.markdown ul {
+    list-style: disc;
+}
+
+.markdown li + li, .markdown li > :is(ul, ol) {
+    margin-top: 0.3rem;
+}
+
+.markdown li::marker {
+    color: var(--color-text-subdue);
+}
+
+.markdown blockquote {
+    padding-left: 1.2rem;
+    border-left: 2px solid var(--color-separator);
+    color: var(--color-text-base);
+}
+
+.markdown code {
+    font-size: 0.9em;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+    color: var(--color-text-highlight);
+}
+
+.markdown pre {
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    border-radius: var(--border-radius);
+    background: var(--color-widget-background-highlight);
+}
+
+.markdown pre code {
+    padding: 0;
+    background: none;
+    font-size: var(--font-size-h5);
+}
+
+.markdown hr {
+    margin-block: 1.6rem;
+}
+
+.markdown img {
+    border-radius: var(--border-radius);
+}
