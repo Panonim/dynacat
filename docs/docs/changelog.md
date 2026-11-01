@@ -6,6 +6,7 @@
 - `docker-controller` actions now only work on containers and images the widget lists, and pulling is disabled with `show: containers`
 - Dropped `javascript:` and other non-http links coming from Lobsters and Reddit RSS posts
 - Updated Go to 1.26.10 and Go packages, Docker images now use Alpine 3.24
+- Dynacat now shuts down cleanly on `SIGTERM`/`SIGINT` and exits with code `0` -> https://github.com/Panonim/dynacat/issues/210
 
 # Changes for 3.0.2
 - Fixed a bug where users were randomly logged out after a config reload -> https://github.com/Panonim/dynacat/issues/174

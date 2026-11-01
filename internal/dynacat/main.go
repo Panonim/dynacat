@@ -1,12 +1,13 @@
 package dynacat
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -35,17 +36,19 @@ func Main() int {
 	case cliIntentVersionPrint:
 		fmt.Println(buildVersion)
 	case cliIntentServe:
-		// remove in v0.10.0
-		if serveUpdateNoticeIfConfigLocationNotMigrated(options.configPath) {
-			return 1
-		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
 
-		if err := serveFirstRunSetupIfNoConfig(options.configPath); err != nil {
+		err := serveFirstRunSetupIfNoConfig(ctx, options.configPath)
+		if ctx.Err() != nil {
+			return 0
+		}
+		if err != nil {
 			slog.Error("First run setup failed", "error", err)
 			return 1
 		}
 
-		if err := serveApp(options.configPath); err != nil {
+		if err := serveApp(ctx, options.configPath); err != nil {
 			slog.Error("Failed to serve app", "error", err)
 			return 1
 		}
@@ -127,9 +130,10 @@ func resolveConfigPath(primaryPath string) string {
 	return primaryPath
 }
 
-func serveApp(configPath string) error {
+func serveApp(ctx context.Context, configPath string) error {
 	// TODO: refactor, hard to reason about with all the callbacks and simultaneous operations
 	exitChannel := make(chan struct{})
+	var exitErr error
 	hadValidConfigOnStartup := false
 	var stopServer func() error
 
@@ -210,49 +214,24 @@ func serveApp(configPath string) error {
 		}
 		app.configPath = configPath
 
-		startServer, _ := app.server()
-		if err := startServer(); err != nil {
-			return fmt.Errorf("starting server: %w", err)
+		var startServer func() error
+		startServer, stopServer = app.server()
+		go func() {
+			if err := startServer(); err != nil {
+				exitErr = fmt.Errorf("starting server: %w", err)
+				close(exitChannel)
+			}
+		}()
+	}
+
+	select {
+	case <-exitChannel:
+		return exitErr
+	case <-ctx.Done():
+		slog.Info("Shutting down")
+		if stopServer != nil {
+			stopServer()
 		}
+		return nil
 	}
-
-	<-exitChannel
-	return nil
-}
-
-func serveUpdateNoticeIfConfigLocationNotMigrated(configPath string) bool {
-	if !isRunningInsideDockerContainer() {
-		return false
-	}
-
-	if _, err := os.Stat(configPath); err == nil {
-		return false
-	}
-
-	if stat, err := os.Stat("dynacat.yml"); err != nil || stat.IsDir() {
-		return false
-	}
-
-	templateFile, _ := templateFS.Open("v0.7-update-notice-page.html")
-	bodyContents, _ := io.ReadAll(templateFile)
-
-	fmt.Println("!!! WARNING !!!")
-	fmt.Println("The default location of dynacat.yml in the Docker image has changed starting from v0.7.0.")
-	fmt.Println("Please see https://github.com/Panonim/dynacat/blob/main/docs/docs/installation.md#coming-from-glance for more information.")
-
-	mux := http.NewServeMux()
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(bodyContents))
-	})
-
-	server := http.Server{
-		Addr:    ":8080",
-		Handler: mux,
-	}
-	server.ListenAndServe()
-
-	return true
 }
