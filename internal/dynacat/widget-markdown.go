@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/renderer/html"
@@ -30,7 +29,7 @@ type markdownWidget struct {
 	AllowHTML  bool          `yaml:"allow-html"`
 	Content    template.HTML `yaml:"-"`
 	filePath   string        `yaml:"-"`
-	modTime    time.Time     `yaml:"-"`
+	fileData   []byte        `yaml:"-"`
 	cachedHTML template.HTML `yaml:"-"`
 }
 
@@ -65,26 +64,21 @@ func (widget *markdownWidget) Render() template.HTML {
 }
 
 func (widget *markdownWidget) loadFile() {
-	info, err := os.Stat(widget.filePath)
-	if err == nil && info.ModTime().Equal(widget.modTime) {
-		return
-	}
-
-	var data []byte
-	if err == nil {
-		data, err = os.ReadFile(widget.filePath)
-	}
-
+	data, err := os.ReadFile(widget.filePath)
 	if err != nil {
 		// Unwrapping drops the absolute server path from the PathError.
-		widget.modTime = time.Time{}
+		widget.fileData = nil
 		widget.ContentAvailable = false
 		widget.withError(fmt.Errorf("reading %s: %w", widget.File, errors.Unwrap(err)))
 		widget.cachedHTML = widget.renderTemplate(widget, markdownWidgetTemplate)
 		return
 	}
 
-	widget.modTime = info.ModTime()
+	if widget.fileData != nil && bytes.Equal(data, widget.fileData) {
+		return
+	}
+
+	widget.fileData = data
 	widget.withError(nil)
 	widget.renderMarkdown(data)
 }

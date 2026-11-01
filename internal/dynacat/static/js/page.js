@@ -1633,7 +1633,7 @@ async function updateWidget(widgetElement) {
             const callbacksIndexBefore = contentReadyCallbacks.length;
 
             setupClocks();
-            await setupCalendars();
+            await setupCalendars().catch(error => console.error('Calendar setup failed', error));
             setupPopovers();
             setupCarousels();
             setupCollapsibleLists();

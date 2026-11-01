@@ -2011,7 +2011,7 @@ Exactly one of `source` or `file` must be set.
 Markdown content written directly in the widget.
 
 ##### `file`
-Path to a markdown file inside the assets directory, e.g. `notes.md` or `/assets/notes.md`. The file is re-read whenever it changes, so edits show up on the next page refresh without a restart.
+Path to a markdown file inside the assets directory, e.g. `notes.md` or `/assets/notes.md`. The file is re-read whenever it changes, so edits show up on the next page refresh without a restart. Relative links and image paths resolve against the dashboard page rather than the file, so point them at absolute paths such as `/assets/notes/more.md`.
 
 ##### `allow-html`
 Render raw HTML inside the markdown. When disabled, raw HTML is omitted from the output.
