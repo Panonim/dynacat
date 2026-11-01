@@ -18,7 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var editorConfigWarnOnce, editorLoginNoticeOnce sync.Once
+var editorConfigWarnOnce sync.Once
 
 // editorEnabledFromEnv reports whether the web UI editor is available at all.
 func editorEnabledFromEnv() bool {
@@ -52,11 +52,6 @@ func (a *application) setupEditorLoginRequirement() {
 	}
 
 	a.EditorRequiresLogin = required
-	if !set && strings.TrimPrefix(buildVersion, "v") == "3.0.2" {
-		editorLoginNoticeOnce.Do(func() {
-			slog.Warn("Since 3.0.2 the web UI editor is only available to logged in users, set EDITOR_REQUIRE_LOGIN=false to allow anonymous visitors to edit")
-		})
-	}
 }
 
 func warnAboutIgnoredEditorConfig(c *config) {
