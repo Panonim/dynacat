@@ -877,6 +877,7 @@ Preview:
 | ---- | ---- | -------- | ------- |
 | first-day-of-week | string | no | monday |
 | hosts | array | no | |
+| release-state-color | string | no | |
 | release-types | list of strings | no | cinema, physical, digital, episode |
 | show-release-state | boolean | no | false |
 | update-interval | string | no | 15m |
@@ -929,6 +930,25 @@ Optionally override the URL used for the release links in the popover. Useful wh
 `allow-insecure`
 
 Whether to allow invalid/self-signed certificates when making requests to the instance.
+
+##### `release-state-color`
+Color the individual releases inside the hover preview popover by their availability state, using the same `positive-color` / `negative-color` / `color-upcoming` colors described under [`show-release-state`](#show-release-state). Independent of `show-release-state` and disabled by default.
+
+| Value | Effect |
+| ----- | ------ |
+| `icon` | Color only the type icon next to the title |
+| `title` | Color only the release title |
+| `both` | Color the title and the type icon |
+
+```yaml
+- type: calendar
+  release-state-color: both
+  hosts:
+    - url: radarr:https://radarr.domain.com
+      token: ${RADARR_KEY}
+```
+
+Only relevant when `hosts` is configured.
 
 ##### `release-types`
 Which kinds of release to show. Each release is shown as its own entry on the day it lands, with a small icon next to the title indicating the type:
