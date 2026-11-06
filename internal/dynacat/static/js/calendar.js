@@ -55,6 +55,16 @@ const releaseCardStates = {
     upcoming: true,
 };
 
+const releaseStateColorModes = {
+    icon: true,
+    title: true,
+    both: true,
+};
+
+/**
+ * Boots the calendar widget: wires up the optional Sonarr/Radarr release feed and swaps the placeholder for the calendar.
+ * @param {HTMLElement} element - The calendar placeholder element rendered by the widget template.
+ */
 export default function(element) {
     if (element.querySelector(".calendar-dates")) return;
 
@@ -66,11 +76,13 @@ export default function(element) {
         : null;
 
     const showReleaseState = element.dataset.calendarReleaseState === "true";
+    const releaseStateColor = element.dataset.calendarReleaseStateColor || "";
 
     element.swapWith(Calendar(
         Number(element.dataset.firstDayOfWeek ?? 1),
         releases,
-        showReleaseState
+        showReleaseState,
+        releaseStateColor
     ));
 }
 
@@ -118,7 +130,15 @@ function Releases(widgetId, intervalMs) {
 }
 
 // TODO: when viewing the previous/next month, display the current date if it's within the spill-over days
-function Calendar(firstDay, releases, showReleaseState) {
+/**
+ * Builds the full calendar: header, date grid and the timers that keep it current.
+ * @param {number} firstDay - Index of the first day of the week.
+ * @param {object|null} releases - Release feed, or null when no hosts are configured.
+ * @param {boolean} showReleaseState - Color each day's indicator by its aggregated release state.
+ * @param {string} releaseStateColor - Per-release coloring mode: "icon", "title", "both" or "" for off.
+ * @returns {object} The calendar element.
+ */
+function Calendar(firstDay, releases, showReleaseState, releaseStateColor) {
     let header, dates;
     let advanceTimeTicker;
     let releaseTicker;
@@ -156,7 +176,7 @@ function Calendar(firstDay, releases, showReleaseState) {
 
     const calendar = elem().classes("calendar").append(
         header = Header(nextClicked, prevClicked, undoClicked),
-        dates = Dates(firstDay, releases, showReleaseState)
+        dates = Dates(firstDay, releases, showReleaseState, releaseStateColor)
     );
 
     update(now);
@@ -228,7 +248,15 @@ function Header(nextClicked, prevClicked, undoClicked) {
     });
 }
 
-function Dates(firstDay, releases, showReleaseState) {
+/**
+ * Builds the date grid and renders the release markers on top of it.
+ * @param {number} firstDay - Index of the first day of the week.
+ * @param {object|null} releases - Release feed, or null when no hosts are configured.
+ * @param {boolean} showReleaseState - Color each day's indicator by its aggregated release state.
+ * @param {string} releaseStateColor - Per-release coloring mode: "icon", "title", "both" or "" for off.
+ * @returns {object} The date grid element.
+ */
+function Dates(firstDay, releases, showReleaseState, releaseStateColor) {
     let dates, lastRenderedDate, animating = false;
 
     const applyMarkers = function(newDate) {
@@ -249,7 +277,7 @@ function Dates(firstDay, releases, showReleaseState) {
             const cellDate = new Date(firstCellDate.getFullYear(), firstCellDate.getMonth(), firstCellDate.getDate() + i);
             const items = data[isoDate(cellDate)];
             if (items && items.length) {
-                cell.append(releaseMarker(items, showReleaseState));
+                cell.append(releaseMarker(items, showReleaseState, releaseStateColor));
             }
         }
 
@@ -321,10 +349,17 @@ function Dates(firstDay, releases, showReleaseState) {
     ).component({ update, applyMarkers });
 }
 
-function releaseMarker(items, showReleaseState) {
+/**
+ * Builds a day's release marker: the indicator line plus the hover popover listing the day's releases.
+ * @param {object[]} items - Releases landing on the day.
+ * @param {boolean} showReleaseState - Color the indicator by the day's aggregated release state.
+ * @param {string} releaseStateColor - Per-release coloring mode applied to the popover cards.
+ * @returns {object} The release marker element.
+ */
+function releaseMarker(items, showReleaseState, releaseStateColor) {
     const list = elem().classes("list", "list-gap-10");
     for (const item of items) {
-        list.append(releaseCard(item, showReleaseState));
+        list.append(releaseCard(item, releaseStateColor));
     }
 
     const indicator = elem().classes("calendar-release-indicator");
@@ -346,7 +381,13 @@ function releaseMarker(items, showReleaseState) {
         );
 }
 
-function releaseCard(item, showReleaseState) {
+/**
+ * Builds one release card for the day's hover popover.
+ * @param {object} item - Release payload from the feed (title, source, state, ...).
+ * @param {string} releaseStateColor - Coloring mode: "icon", "title", "both" or "" for off.
+ * @returns {object} The release card element.
+ */
+function releaseCard(item, releaseStateColor) {
     const body = elem().classes("min-width-0", "flex-1").append(
         elem().classes("size-h6", "color-subdue").text(item.source)
     );
@@ -372,8 +413,14 @@ function releaseCard(item, showReleaseState) {
         : elem()
     ).classes("calendar-release-card", "flex", "items-center", "gap-10");
 
-    if (showReleaseState && releaseCardStates[item.state]) {
+    if (releaseStateColorModes[releaseStateColor] && releaseCardStates[item.state]) {
         card.classes("calendar-release-card-" + item.state);
+        if (releaseStateColor === "title" || releaseStateColor === "both") {
+            card.classes("calendar-release-color-title");
+        }
+        if (releaseStateColor === "icon" || releaseStateColor === "both") {
+            card.classes("calendar-release-color-icon");
+        }
     }
 
     if (item.thumbnail) {

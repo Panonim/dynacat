@@ -877,6 +877,7 @@ Preview:
 | ---- | ---- | -------- | ------- |
 | first-day-of-week | string | no | monday |
 | hosts | array | no | |
+| release-state-color | string | no | |
 | release-types | list of strings | no | cinema, physical, digital, episode |
 | show-release-state | boolean | no | false |
 | update-interval | string | no | 15m |
@@ -930,6 +931,25 @@ Optionally override the URL used for the release links in the popover. Useful wh
 
 Whether to allow invalid/self-signed certificates when making requests to the instance.
 
+##### `release-state-color`
+Color the individual releases inside the hover preview popover by their availability state, using the same `positive-color` / `negative-color` / `color-upcoming` colors described under [`show-release-state`](#show-release-state). Independent of `show-release-state` and disabled by default.
+
+| Value | Effect |
+| ----- | ------ |
+| `icon` | Color only the type icon next to the title |
+| `title` | Color only the release title |
+| `both` | Color the title and the type icon |
+
+```yaml
+- type: calendar
+  release-state-color: both
+  hosts:
+    - url: radarr:https://radarr.domain.com
+      token: ${RADARR_KEY}
+```
+
+Only relevant when `hosts` is configured.
+
 ##### `release-types`
 Which kinds of release to show. Each release is shown as its own entry on the day it lands, with a small icon next to the title indicating the type:
 
@@ -978,8 +998,6 @@ Set `show-release-state` to `true` to instead color that line by the availabilit
 > `positive-color` defaults to `primary-color`. If you want downloaded (`available`) days to look distinct, set a separate [`positive-color`](#positive-color) in your theme (for example a green). The `upcoming` amber can be overridden with the `--color-upcoming` CSS variable via a [`custom-css-file`](#custom-css-file).
 
 If a day has several releases with different states, the line shows the least available one, so it stays on the `released` or `upcoming` color until nothing is left pending. The priority is `released` → `upcoming` → `available`.
-
-The same colors are also applied inside the hover popover: each release's title and type icon are colored by that release's own state, so on a day that mixes states you can tell exactly which releases are downloaded, out, or still upcoming.
 
 Only relevant when `hosts` is configured.
 
