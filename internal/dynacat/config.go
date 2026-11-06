@@ -161,6 +161,10 @@ func (c *config) assetsPath() string {
 	return cmp.Or(c.Server.AssetsPath, "/app/assets")
 }
 
+func (c *config) dbPath() string {
+	return cmp.Or(c.Server.DBPath, filepath.Join(c.assetsPath(), "dynacat.db"))
+}
+
 func newConfigFromYAML(contents []byte) (*config, error) {
 	contents, err := parseConfigVariables(contents)
 	if err != nil {

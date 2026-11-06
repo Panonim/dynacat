@@ -4,14 +4,15 @@
 
 {{ define "widget-content" }}
 <style>
+    .latest-media-grid { --cards-per-row: var(--lm-columns); }
     @container widget (max-width: 900px) {
-        .latest-media-grid { --cards-per-row: 4; }
+        .latest-media-grid { --cards-per-row: min(var(--lm-columns), 5); }
     }
     @container widget (max-width: 650px) {
-        .latest-media-grid { --cards-per-row: 3; }
+        .latest-media-grid { --cards-per-row: min(var(--lm-columns), 4); }
     }
     @container widget (max-width: 450px) {
-        .latest-media-grid { --cards-per-row: 2; }
+        .latest-media-grid { --cards-per-row: min(var(--lm-columns), 3); }
     }
 
     .latest-media-card {
@@ -27,6 +28,7 @@
         transition: filter 0.15s ease;
         filter: brightness(0.9);
         z-index: 0;
+        container: lm-card / inline-size;
     }
 
     .latest-media-card:hover {
@@ -83,9 +85,8 @@
     .latest-media-meta {
         display: flex;
         align-items: center;
-        gap: 0.4rem;
-        overflow: hidden;
-        white-space: nowrap;
+        flex-wrap: wrap;
+        gap: 0.1rem 0.4rem;
     }
 
     .latest-media-meta-item {
@@ -104,6 +105,26 @@
         height: 1.1rem;
         flex-shrink: 0;
         stroke: currentColor;
+    }
+
+    @container lm-card (max-width: 170px) {
+        .latest-media-overlay { padding: 4rem 0.45rem 0.4rem; gap: 0.1rem; }
+        .latest-media-title {
+            font-size: 1.1rem;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .latest-media-meta { gap: 0 0.35rem; }
+        .latest-media-meta-item { font-size: 0.95rem; }
+        .latest-media-meta-item svg { width: 0.95rem; height: 0.95rem; }
+    }
+
+    @container lm-card (max-width: 120px) {
+        .latest-media-title { font-size: 1rem; }
+        .latest-media-meta-item { font-size: 0.9rem; }
+        .latest-media-meta-item svg { display: none; }
     }
 
     /* Fix button background to match widget, not page; align bottom spacing with card gap */
@@ -129,7 +150,7 @@
 {{ if not .Items }}
     <div class="latest-media-empty">No recently added items.</div>
 {{ else }}
-    <div class="latest-media-grid cards-grid collapsible-container" data-collapse-after-rows="1" style="--cards-per-row: {{ .EffectiveColumns }}">
+    <div class="latest-media-grid cards-grid collapsible-container" data-collapse-after-rows="1" style="--lm-columns: {{ .EffectiveColumns }}">
         {{ range .Items }}
         <a class="latest-media-card" {{ if .LinkURL }}href="{{ .LinkURL }}" target="_blank" rel="noreferrer"{{ end }}>
 
@@ -195,40 +216,5 @@
         {{ end }}
     </div>
 {{ end }}
-
-<script>
-(() => {
-    const root = document.currentScript?.parentElement;
-    if (!root) return;
-
-    function trimMeta(card) {
-        const meta = card.querySelector('.latest-media-meta');
-        if (!meta) return;
-        const items = Array.from(meta.querySelectorAll('.latest-media-meta-item'));
-        if (items.length === 0) return;
-
-        // Reset all items to visible
-        items.forEach(item => item.hidden = false);
-
-        // Hide from right to left until row fits
-        for (let i = items.length - 1; i >= 0; i--) {
-            if (meta.scrollWidth <= meta.clientWidth + 1) break;
-            items[i].hidden = true;
-        }
-    }
-
-    const cards = Array.from(root.querySelectorAll('.latest-media-card'));
-    if (cards.length === 0) return;
-
-    const observer = new ResizeObserver(() => {
-        cards.forEach(trimMeta);
-    });
-
-    cards.forEach(card => {
-        trimMeta(card);
-        observer.observe(card);
-    });
-})();
-</script>
 
 {{ end }}

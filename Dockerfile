@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build \
     -ldflags="-X github.com/Panonim/dynacat/internal/dynacat.buildVersion=${APP_VERSION}" .
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache zfs su-exec
 

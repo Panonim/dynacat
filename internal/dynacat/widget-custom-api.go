@@ -533,14 +533,14 @@ func customAPITemplateFuncs(providers *widgetProviders, imageMaxAge time.Duratio
 		if providers == nil {
 			return rawURL
 		}
-		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, false, imageMaxAge)
+		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, false, true, imageMaxAge)
 	}
 
 	secureImageURLAllowInsecure := func(rawURL string) string {
 		if providers == nil {
 			return rawURL
 		}
-		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, true, imageMaxAge)
+		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, true, true, imageMaxAge)
 	}
 
 	funcs := template.FuncMap{

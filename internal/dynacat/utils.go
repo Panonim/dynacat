@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -178,6 +179,66 @@ func titleToSlug(s string) string {
 	s = strings.Trim(s, "-")
 
 	return s
+}
+
+// Mirrors how the sqlite driver opens a db-path, which may carry query params or be a file: URI.
+func sqliteFilePath(dsn string) string {
+	dsn, _, _ = strings.Cut(dsn, "?")
+	rest, ok := strings.CutPrefix(dsn, "file:")
+	if !ok {
+		return dsn
+	}
+	rest = strings.TrimPrefix(strings.TrimPrefix(rest, "//localhost"), "//")
+	if runtime.GOOS == "windows" && len(rest) >= 3 && rest[0] == '/' && rest[2] == ':' {
+		rest = rest[1:]
+	}
+	if unescaped, err := url.PathUnescape(rest); err == nil {
+		return unescaped
+	}
+	return rest
+}
+
+// Compares file identity rather than paths, so case or short-name variants on Windows still match.
+func isSameFileAsAny(info os.FileInfo, others ...string) bool {
+	for _, other := range others {
+		if otherInfo, err := os.Stat(other); err == nil && os.SameFile(info, otherInfo) {
+			return true
+		}
+	}
+	return false
+}
+
+// Checks the already opened handle, so a symlink swapped after the check can't expose a hidden file.
+type hideFilesFS struct {
+	fs     http.FileSystem
+	hidden []string
+}
+
+func (h hideFilesFS) Open(name string) (http.File, error) {
+	file, err := h.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil || isSameFileAsAny(info, h.hidden...) {
+		file.Close()
+		return nil, os.ErrNotExist
+	}
+	if info.IsDir() {
+		return hideFilesDir{file, h.hidden}, nil
+	}
+	return file, nil
+}
+
+// Keeps hidden files out of directory listings too.
+type hideFilesDir struct {
+	http.File
+	hidden []string
+}
+
+func (d hideFilesDir) Readdir(count int) ([]os.FileInfo, error) {
+	infos, err := d.File.Readdir(count)
+	return slices.DeleteFunc(infos, func(info os.FileInfo) bool { return isSameFileAsAny(info, d.hidden...) }), err
 }
 
 func fileServerWithCache(fs http.FileSystem, cacheDuration time.Duration) http.Handler {

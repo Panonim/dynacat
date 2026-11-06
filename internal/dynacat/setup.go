@@ -164,7 +164,7 @@ func (s *firstRunSetup) isDone() bool {
 }
 
 // serveFirstRunSetupIfNoConfig blocks on a temporary server that writes the initial config.
-func serveFirstRunSetupIfNoConfig(configPath string) error {
+func serveFirstRunSetupIfNoConfig(ctx context.Context, configPath string) error {
 	if !configNeedsFirstRunSetup(configPath) {
 		return nil
 	}
@@ -181,6 +181,7 @@ func serveFirstRunSetupIfNoConfig(configPath string) error {
 		configPath: configPath,
 		onDone:     func() { go server.Shutdown(context.Background()) },
 	}
+	context.AfterFunc(ctx, func() { server.Close() })
 
 	mux.HandleFunc("POST /api/setup", setup.handleCreate)
 

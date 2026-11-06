@@ -342,7 +342,7 @@ func (widget *playingWidget) secureSessionThumbnails(ctx context.Context, host *
 		if sessions[i].ThumbnailURL == "" {
 			continue
 		}
-		sessions[i].ThumbnailURL = widget.Providers.SecureImageURL(ctx, sessions[i].ThumbnailURL, host.AllowInsecure)
+		sessions[i].ThumbnailURL = widget.Providers.SecureImageURL(ctx, sessions[i].ThumbnailURL, host.AllowInsecure, true)
 	}
 
 	return sessions

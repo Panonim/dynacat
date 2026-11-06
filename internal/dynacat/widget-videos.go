@@ -87,7 +87,7 @@ func (widget *videosWidget) update(ctx context.Context) {
 			if videos[i].ThumbnailUrl == "" {
 				continue
 			}
-			videos[i].ThumbnailUrl = widget.Providers.SecureImageURL(ctx, videos[i].ThumbnailUrl, false)
+			videos[i].ThumbnailUrl = widget.Providers.SecureImageURL(ctx, videos[i].ThumbnailUrl, false, false)
 		}
 	}
 
