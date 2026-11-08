@@ -1,4 +1,5 @@
 # Changes for 3.0.3
+- Added a `prowlarr` widget showing the health of your indexers, with `show: errors` to list only failing ones
 - Calendar release preview popovers now color each release's title and type icon by its own state (`available`, `released`, `upcoming`) when `show-release-state` is enabled -> https://github.com/Panonim/dynacat/pull/206
 - Calendar preview release coloring moved off `show-release-state` onto its own opt-in `release-state-color` toggle (`icon`, `title` or `both`) -> https://github.com/Panonim/dynacat/pull/206
 - Fixed an issue where images in `latest-media` widget, were not responding to the device size

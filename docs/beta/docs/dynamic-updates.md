@@ -64,6 +64,7 @@ The following table lists the default update intervals for widgets when `update-
 | Currently Playing | 30s |
 | Home Assistant | 30s |
 | Latest Media | 30m |
+| Prowlarr | 5m |
 | Torrenting | 30s |
 
 ## Efficiency and Optimization
