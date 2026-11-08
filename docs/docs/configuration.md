@@ -3933,6 +3933,10 @@ Example:
 | collapse-after | number | no | 5 |
 | update-interval | string | no | 5m |
 
+Preview:
+
+![](images/prowlarr-widget-preview.png)
+
 ##### `url`
 The base URL of your Prowlarr instance.
 
