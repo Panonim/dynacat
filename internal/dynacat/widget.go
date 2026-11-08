@@ -96,6 +96,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &playingWidget{}
 	case "latest-media":
 		w = &latestMediaWidget{}
+	case "prowlarr":
+		w = &prowlarrWidget{}
 	case "torrenting":
 		w = &torrentingWidget{}
 	case "home-assistant":

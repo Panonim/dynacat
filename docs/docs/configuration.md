@@ -3910,6 +3910,44 @@ hosts:
 
 The server will use an insecure HTTP client to fetch both metadata and images, while the browser only receives the cached local URLs and never needs to establish a direct connection to your media server.
 
+### Prowlarr
+
+Display the health of the indexers configured in Prowlarr. Failing indexers are listed first.
+
+Example:
+
+```yaml
+- type: prowlarr
+  url: ${PROWLARR_URL}
+  token: ${PROWLARR_TOKEN}
+  show: errors
+```
+
+#### Properties
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| url | string | yes | |
+| token | string | yes | |
+| show | string | no | all |
+| allow-insecure | boolean | no | false |
+| collapse-after | number | no | 5 |
+| update-interval | string | no | 5m |
+
+##### `url`
+The base URL of your Prowlarr instance.
+
+##### `token`
+The API key, found in Prowlarr under Settings → General.
+
+##### `show`
+Which indexers to list. `all` shows every indexer with its status (failing, healthy or disabled), `errors` shows only the failing ones.
+
+##### `allow-insecure`
+Whether to skip TLS certificate verification, useful for self-signed certificates.
+
+##### `collapse-after`
+Number of indexers to show before collapsing the rest behind a "Show more" toggle. Set to `-1` to disable collapsing.
+
 ### Torrenting
 
 Display active torrents from one or more qBittorrent, Deluge, or Transmission instances.
