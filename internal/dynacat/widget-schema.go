@@ -78,6 +78,7 @@ var widgetTypeCatalog = []widgetTypeMeta{
 	{"playing", "Now Playing", "mdi:play-circle-outline", "configuration/currently-playing"},
 	{"latest-media", "Latest Media", "mdi:multimedia", "configuration/latest-media"},
 	{"torrenting", "Torrenting", "mdi:download-network-outline", "configuration/torrenting"},
+	{"prowlarr", "Prowlarr", "mdi:radar", "configuration/prowlarr"},
 	{"home-assistant", "Home Assistant", "mdi:home-assistant", "configuration/home-assistant"},
 }
 
@@ -114,6 +115,7 @@ var requiredFields = map[string][]string{
 	"markets":         {"markets", "markets.symbol", "stocks.symbol"},
 	"monitor":         {"sites", "sites.title", "sites.url"},
 	"playing":         {"hosts", "hosts.url", "hosts.token"},
+	"prowlarr":        {"url", "token"},
 	"reddit":          {"subreddit"},
 	"releases":        {"repositories", "repositories.repository"},
 	"repository":      {"repository"},
@@ -286,6 +288,12 @@ var fieldAnnotations = map[string]map[string]fieldAnnotation{
 	},
 	"torrenting": {
 		"hosts.client": {Hint: "qbittorrent (default), deluge or transmission."},
+	},
+	"prowlarr": {
+		"url":            {Hint: "Base URL of your Prowlarr instance."},
+		"token":          {Hint: "Found in Prowlarr under Settings → General → API Key."},
+		"show":           {Options: []string{"all", "errors"}},
+		"allow-insecure": {Advanced: true},
 	},
 	"speedtest": {
 		"server": {Hint: "Leave empty to auto-select a public LibreSpeed server; or set the base URL of your own LibreSpeed instance."},

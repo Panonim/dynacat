@@ -1,0 +1,43 @@
+{{ template "widget-base.html" . }}
+
+{{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
+
+{{ define "widget-content" }}
+{{ if .Error }}
+<div class="text-center padding-block-5 color-negative break-all">{{ .Error }}</div>
+{{ else if .Indexers }}
+<ul class="list list-gap-14 list-with-separator collapsible-container" data-collapse-after="{{ .CollapseAfter }}">
+    {{ range .Indexers }}
+    <li>
+        <div class="flex items-center gap-15">
+            <div class="grow min-width-0">
+                <div class="size-h3 color-highlight text-truncate" title="{{ .Name }}">{{ .Name }}</div>
+                {{ if .IsFailing }}
+                <div class="text-truncate color-negative">Failing{{ if not .FailingSince.IsZero }} for <span {{ dynamicRelativeTimeAttrs .FailingSince }}></span>{{ end }}</div>
+                {{ else if .IsDisabled }}
+                <div class="text-truncate color-subdue">Disabled</div>
+                {{ end }}
+            </div>
+            <div class="monitor-site-status-icon">
+                {{ if .IsFailing }}
+                <svg fill="var(--color-negative)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+                </svg>
+                {{ else if .IsDisabled }}
+                <svg fill="var(--color-text-subdue)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm5 0a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd" />
+                </svg>
+                {{ else }}
+                <svg fill="var(--color-positive)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+                </svg>
+                {{ end }}
+            </div>
+        </div>
+    </li>
+    {{ end }}
+</ul>
+{{ else }}
+<div class="text-center padding-block-5">{{ if .HasIndexers }}All indexers are healthy{{ else }}No indexers configured{{ end }}</div>
+{{ end }}
+{{ end }}
