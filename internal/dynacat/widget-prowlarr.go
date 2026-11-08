@@ -29,6 +29,7 @@ type prowlarrWidget struct {
 	Show          string            `yaml:"show"`
 	CollapseAfter int               `yaml:"collapse-after"`
 	Indexers      []prowlarrIndexer `yaml:"-"`
+	HasIndexers   bool              `yaml:"-"`
 }
 
 type prowlarrIndexer struct {
@@ -76,10 +77,12 @@ func (widget *prowlarrWidget) initialize() error {
 func (widget *prowlarrWidget) update(ctx context.Context) {
 	client := ternary(widget.AllowInsecure, defaultInsecureHTTPClient, defaultHTTPClient)
 
-	indexers, err := fetchProwlarrIndexers(client, widget.URL, widget.Token)
+	indexers, err := fetchProwlarrIndexers(ctx, client, widget.URL, widget.Token)
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
 		return
 	}
+
+	widget.HasIndexers = len(indexers) > 0
 
 	if widget.Show == "errors" {
 		indexers = slices.DeleteFunc(indexers, func(i prowlarrIndexer) bool { return !i.IsFailing() })
@@ -105,8 +108,8 @@ type prowlarrIndexerStatusJson struct {
 	MostRecentFailure time.Time `json:"mostRecentFailure"`
 }
 
-func fetchFromProwlarr[T any](client *http.Client, instanceURL, token, path string) (T, error) {
-	request, err := http.NewRequest("GET", instanceURL+"/api/v1/"+path, nil)
+func fetchFromProwlarr[T any](ctx context.Context, client *http.Client, instanceURL, token, path string) (T, error) {
+	request, err := http.NewRequestWithContext(ctx, "GET", instanceURL+"/api/v1/"+path, nil)
 	if err != nil {
 		var zero T
 		return zero, err
@@ -117,13 +120,13 @@ func fetchFromProwlarr[T any](client *http.Client, instanceURL, token, path stri
 	return decodeJsonFromRequest[T](client, request)
 }
 
-func fetchProwlarrIndexers(client *http.Client, instanceURL, token string) ([]prowlarrIndexer, error) {
-	indexersJson, err := fetchFromProwlarr[[]prowlarrIndexerJson](client, instanceURL, token, "indexer")
+func fetchProwlarrIndexers(ctx context.Context, client *http.Client, instanceURL, token string) ([]prowlarrIndexer, error) {
+	indexersJson, err := fetchFromProwlarr[[]prowlarrIndexerJson](ctx, client, instanceURL, token, "indexer")
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch indexers: %v", err)
 	}
 
-	statusesJson, err := fetchFromProwlarr[[]prowlarrIndexerStatusJson](client, instanceURL, token, "indexerstatus")
+	statusesJson, err := fetchFromProwlarr[[]prowlarrIndexerStatusJson](ctx, client, instanceURL, token, "indexerstatus")
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch indexer statuses: %v", err)
 	}

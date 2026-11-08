@@ -3,7 +3,9 @@
 {{ define "widget-content-classes" }}{{ if .Frameless }}widget-content-frameless{{ end }}{{ end }}
 
 {{ define "widget-content" }}
-{{ if .Indexers }}
+{{ if .Error }}
+<div class="text-center padding-block-5 color-negative break-all">{{ .Error }}</div>
+{{ else if .Indexers }}
 <ul class="list list-gap-14 list-with-separator collapsible-container" data-collapse-after="{{ .CollapseAfter }}">
     {{ range .Indexers }}
     <li>
@@ -36,6 +38,6 @@
     {{ end }}
 </ul>
 {{ else }}
-<div class="text-center padding-block-5">{{ if eq .Show "errors" }}All indexers are healthy{{ else }}No indexers configured{{ end }}</div>
+<div class="text-center padding-block-5">{{ if .HasIndexers }}All indexers are healthy{{ else }}No indexers configured{{ end }}</div>
 {{ end }}
 {{ end }}
