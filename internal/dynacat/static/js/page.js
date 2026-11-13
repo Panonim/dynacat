@@ -2231,6 +2231,8 @@ function _applyWidgetUpdate(widgetId, html) {
     const groupTabStates = getGroupTabStates(target);
     const htmlElem = document.documentElement;
     const prevAnchor = htmlElem.style.overflowAnchor;
+    const anchorEl = _firstVisibleWidget();
+    const anchorTop = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
     htmlElem.style.overflowAnchor = 'none';
 
     try {
@@ -2267,7 +2269,34 @@ function _applyWidgetUpdate(widgetId, html) {
 
     } finally {
         htmlElem.style.overflowAnchor = prevAnchor;
+
+        // A widget growing or shrinking above the viewport moves everything
+        // below it, and scroll anchoring is off for the morph. Pin the first
+        // visible widget to where it was so the page stays put.
+        if (anchorEl && anchorEl.isConnected) {
+            const delta = anchorEl.getBoundingClientRect().top - anchorTop;
+            // site.css sets `scroll-behavior: smooth`, so an unqualified
+            // scrollBy animates the correction and the anchor drifts for the
+            // duration instead of staying put. 'instant' overrides it.
+            if (delta !== 0) window.scrollBy({ top: delta, behavior: 'instant' });
+        }
     }
+}
+
+function _firstVisibleWidget() {
+    const widgets = document.querySelectorAll('.widget');
+    for (let i = 0; i < widgets.length; i++) {
+        const rect = widgets[i].getBoundingClientRect();
+        // Columns render side by side, so "first in the DOM" can be a widget in
+        // a column that is scrolled out of view horizontally while another
+        // column is visible. Require an actual intersection with the viewport.
+        const inView = rect.bottom > 0 && rect.top < window.innerHeight &&
+                       rect.right > 0 && rect.left < window.innerWidth;
+        if (inView) {
+            return widgets[i];
+        }
+    }
+    return null;
 }
 
 function _runPostSettleSetup() {
@@ -2286,6 +2315,10 @@ function _runPostSettleSetup() {
 
 let _sseSource = null;
 let _intentionallyClosed = false;
+
+const _SSE_RETRY_BASE_MS = 3000;
+const _SSE_RETRY_MAX_MS = 60000;
+let _sseRetryDelay = _SSE_RETRY_BASE_MS;
 
 function _closeSSE() {
     if (_sseSource) {
@@ -2312,13 +2345,31 @@ function _initSSE() {
         }
     });
 
+    _sseSource.addEventListener('open', function() {
+        _sseRetryDelay = _SSE_RETRY_BASE_MS;
+    });
+
     _sseSource.onerror = function() {
         if (_intentionallyClosed) {
             return;
         }
-        if (_sseSource.readyState === EventSource.CLOSED) {
-            window.location.reload();
+        if (_sseSource.readyState !== EventSource.CLOSED) {
+            return;
         }
+
+        // A CLOSED EventSource is terminal for that stream: the browser will not
+        // retry it. Reloading the page for one bad response loses scroll position
+        // and every rendered widget, so reconnect instead, with a backoff that
+        // resets once a stream opens.
+        _sseSource.close();
+        _sseSource = null;
+        const delay = _sseRetryDelay;
+        _sseRetryDelay = Math.min(_sseRetryDelay * 2, _SSE_RETRY_MAX_MS);
+        setTimeout(() => {
+            if (!_intentionallyClosed && !_sseSource) {
+                _initSSE();
+            }
+        }, delay);
     };
 }
 
