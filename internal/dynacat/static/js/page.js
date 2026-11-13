@@ -2231,6 +2231,8 @@ function _applyWidgetUpdate(widgetId, html) {
     const groupTabStates = getGroupTabStates(target);
     const htmlElem = document.documentElement;
     const prevAnchor = htmlElem.style.overflowAnchor;
+    const anchorEl = _firstVisibleWidget();
+    const anchorTop = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
     htmlElem.style.overflowAnchor = 'none';
 
     try {
@@ -2267,7 +2269,25 @@ function _applyWidgetUpdate(widgetId, html) {
 
     } finally {
         htmlElem.style.overflowAnchor = prevAnchor;
+
+        // A widget growing or shrinking above the viewport moves everything
+        // below it, and scroll anchoring is off for the morph. Pin the first
+        // visible widget to where it was so the page stays put.
+        if (anchorEl && anchorEl.isConnected) {
+            const delta = anchorEl.getBoundingClientRect().top - anchorTop;
+            if (delta !== 0) window.scrollBy(0, delta);
+        }
     }
+}
+
+function _firstVisibleWidget() {
+    const widgets = document.querySelectorAll('.widget');
+    for (let i = 0; i < widgets.length; i++) {
+        if (widgets[i].getBoundingClientRect().bottom > 0) {
+            return widgets[i];
+        }
+    }
+    return null;
 }
 
 function _runPostSettleSetup() {
