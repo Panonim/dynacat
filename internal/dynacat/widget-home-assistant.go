@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -21,6 +22,11 @@ import (
 var homeAssistantWidgetTemplate = mustParseTemplate("home-assistant.html", "widget-base.html")
 
 var validHomeAssistantEntityPattern = regexp.MustCompile(`^[a-z0-9_]+\.[a-z0-9_]+$`)
+
+var homeAssistantNumberPattern = regexp.MustCompile(`^-?[0-9]+(\.([0-9]+))?$`)
+
+// Sensors without a display precision report raw floats such as 25.3888888888889.
+const homeAssistantDefaultMaxDecimals = 2
 
 var homeAssistantToggleableDomains = map[string]bool{
 	"light":         true,
@@ -40,9 +46,10 @@ type homeAssistantWidget struct {
 }
 
 type homeAssistantEntityConfig struct {
-	Entity string          `yaml:"entity"`
-	Title  string          `yaml:"title"`
-	Icon   customIconField `yaml:"icon"`
+	Entity    string          `yaml:"entity"`
+	Title     string          `yaml:"title"`
+	Icon      customIconField `yaml:"icon"`
+	Precision *int            `yaml:"precision"`
 }
 
 type homeAssistantEntity struct {
@@ -89,6 +96,10 @@ func (widget *homeAssistantWidget) initialize() error {
 	for i := range widget.Entities {
 		if !validHomeAssistantEntityPattern.MatchString(widget.Entities[i].Entity) {
 			return fmt.Errorf("invalid entity id %q", widget.Entities[i].Entity)
+		}
+
+		if precision := widget.Entities[i].Precision; precision != nil && (*precision < 0 || *precision > 10) {
+			return fmt.Errorf("precision of %q must be between 0 and 10", widget.Entities[i].Entity)
 		}
 	}
 
@@ -137,15 +148,17 @@ func (widget *homeAssistantWidget) buildRow(cfg *homeAssistantEntityConfig, stat
 	row.On = state.State == "on"
 	row.Inactive = state.State == "off" || state.State == "unavailable" || state.State == "unknown"
 	row.Toggleable = homeAssistantToggleableDomains[domain] && state.State != "unavailable"
-	row.State = homeAssistantStateText(state.State, state.Attributes.Unit)
+	row.State = homeAssistantStateText(state.State, state.Attributes.Unit, cfg.Precision)
 
 	return row
 }
 
-func homeAssistantStateText(state, unit string) string {
+func homeAssistantStateText(state, unit string, precision *int) string {
 	if state == "" {
 		return state
 	}
+
+	state = homeAssistantFormatNumber(state, precision)
 
 	if unit != "" && state != "unavailable" && state != "unknown" {
 		return state + " " + unit
@@ -154,6 +167,31 @@ func homeAssistantStateText(state, unit string) string {
 	state = strings.ReplaceAll(state, "_", " ")
 	first, size := utf8.DecodeRuneInString(state)
 	return string(unicode.ToUpper(first)) + state[size:]
+}
+
+// Numbers are rounded to precision when it is set, otherwise only those with more than
+// homeAssistantDefaultMaxDecimals decimals are rounded, so values like 86.0 stay as reported.
+func homeAssistantFormatNumber(state string, precision *int) string {
+	match := homeAssistantNumberPattern.FindStringSubmatch(state)
+	if match == nil {
+		return state
+	}
+
+	if precision == nil && len(match[2]) <= homeAssistantDefaultMaxDecimals {
+		return state
+	}
+
+	value, err := strconv.ParseFloat(state, 64)
+	if err != nil {
+		return state
+	}
+
+	if precision != nil {
+		return strconv.FormatFloat(value, 'f', *precision, 64)
+	}
+
+	rounded := strconv.FormatFloat(value, 'f', homeAssistantDefaultMaxDecimals, 64)
+	return strings.TrimSuffix(strings.TrimRight(rounded, "0"), ".")
 }
 
 func homeAssistantDefaultIcon(domain, deviceClass, state string) string {
