@@ -2287,6 +2287,10 @@ function _runPostSettleSetup() {
 let _sseSource = null;
 let _intentionallyClosed = false;
 
+const _SSE_RETRY_BASE_MS = 3000;
+const _SSE_RETRY_MAX_MS = 60000;
+let _sseRetryDelay = _SSE_RETRY_BASE_MS;
+
 function _closeSSE() {
     if (_sseSource) {
         _intentionallyClosed = true;
@@ -2312,13 +2316,31 @@ function _initSSE() {
         }
     });
 
+    _sseSource.addEventListener('open', function() {
+        _sseRetryDelay = _SSE_RETRY_BASE_MS;
+    });
+
     _sseSource.onerror = function() {
         if (_intentionallyClosed) {
             return;
         }
-        if (_sseSource.readyState === EventSource.CLOSED) {
-            window.location.reload();
+        if (_sseSource.readyState !== EventSource.CLOSED) {
+            return;
         }
+
+        // A CLOSED EventSource is terminal for that stream: the browser will not
+        // retry it. Reloading the page for one bad response loses scroll position
+        // and every rendered widget, so reconnect instead, with a backoff that
+        // resets once a stream opens.
+        _sseSource.close();
+        _sseSource = null;
+        const delay = _sseRetryDelay;
+        _sseRetryDelay = Math.min(_sseRetryDelay * 2, _SSE_RETRY_MAX_MS);
+        setTimeout(() => {
+            if (!_intentionallyClosed && !_sseSource) {
+                _initSSE();
+            }
+        }, delay);
     };
 }
 
