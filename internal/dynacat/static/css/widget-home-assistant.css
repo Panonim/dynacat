@@ -47,3 +47,32 @@
     opacity: 0.5;
     cursor: wait;
 }
+
+.ha-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.ha-option {
+    padding: 0.3rem 1.2rem;
+    border-radius: 1rem;
+    border: 1px solid var(--color-popover-border);
+    background: var(--color-widget-background-highlight);
+    color: var(--color-text-base);
+    font: inherit;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.ha-option[aria-pressed="true"] {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-widget-background);
+}
+
+.ha-option:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}

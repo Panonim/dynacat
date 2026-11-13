@@ -11,7 +11,16 @@
         {{- end }}
         <div class="min-width-0 grow">
             <div class="color-highlight text-truncate">{{ .Name }}</div>
+            {{- if .Options }}
+            <div class="ha-options">
+                {{- $selected := .Selected }}
+                {{- range .Options }}
+                <button class="ha-option" type="button" aria-pressed="{{ eq . $selected }}" data-option="{{ . }}">{{ . }}</button>
+                {{- end }}
+            </div>
+            {{- else }}
             <div class="ha-entity-state size-h5 color-subdue text-truncate">{{ .State }}</div>
+            {{- end }}
         </div>
         {{- if .Toggleable }}
         <button class="ha-toggle shrink-0" type="button" role="switch" aria-checked="{{ .On }}" aria-label="Toggle {{ .Name }}"></button>

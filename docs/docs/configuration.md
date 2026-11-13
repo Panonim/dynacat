@@ -3789,10 +3789,13 @@ The entities to show, in the order they should appear. Each entity accepts the f
 | entity | string | yes |  |
 | title | string | no | entity's friendly name |
 | icon | string | no | entity's Home Assistant icon |
+| options | array | no | all of the entity's options |
 
 `entity` is the entity ID, e.g. `light.kitchen`, as shown in Home Assistant under `Settings > Devices & services > Entities`.
 
 When `icon` is not set, the widget uses the icon set on the entity in Home Assistant, otherwise the same default icon Home Assistant uses for that domain, device class and state, e.g. `mdi:lightbulb` and `mdi:lightbulb-off` for lights. Any value from [Icons](#icons) works, so icons copied from Home Assistant (`mdi:...`) can be used as is.
+
+Entities from the `select` and `input_select` domains show their options as buttons with the current one highlighted, and clicking one selects it. `options` limits and orders the buttons, e.g. `options: [Home, Away, Night]`; options the entity doesn't have are left out.
 
 Entities from the `light`, `switch`, `fan` and `input_boolean` domains get a toggle. Sensors show their value with the unit, and an entity that doesn't exist is shown as `Not found` instead of breaking the widget.
 
