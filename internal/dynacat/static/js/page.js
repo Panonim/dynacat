@@ -2275,7 +2275,10 @@ function _applyWidgetUpdate(widgetId, html) {
         // visible widget to where it was so the page stays put.
         if (anchorEl && anchorEl.isConnected) {
             const delta = anchorEl.getBoundingClientRect().top - anchorTop;
-            if (delta !== 0) window.scrollBy(0, delta);
+            // site.css sets `scroll-behavior: smooth`, so an unqualified
+            // scrollBy animates the correction and the anchor drifts for the
+            // duration instead of staying put. 'instant' overrides it.
+            if (delta !== 0) window.scrollBy({ top: delta, behavior: 'instant' });
         }
     }
 }
@@ -2283,7 +2286,13 @@ function _applyWidgetUpdate(widgetId, html) {
 function _firstVisibleWidget() {
     const widgets = document.querySelectorAll('.widget');
     for (let i = 0; i < widgets.length; i++) {
-        if (widgets[i].getBoundingClientRect().bottom > 0) {
+        const rect = widgets[i].getBoundingClientRect();
+        // Columns render side by side, so "first in the DOM" can be a widget in
+        // a column that is scrolled out of view horizontally while another
+        // column is visible. Require an actual intersection with the viewport.
+        const inView = rect.bottom > 0 && rect.top < window.innerHeight &&
+                       rect.right > 0 && rect.left < window.innerWidth;
+        if (inView) {
             return widgets[i];
         }
     }
