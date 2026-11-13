@@ -46,6 +46,42 @@ func TestHomeAssistantLockRow(t *testing.T) {
 	}
 }
 
+func TestHomeAssistantCoverRow(t *testing.T) {
+	tests := []struct {
+		state    string
+		features int
+		service  string
+		on       bool
+		confirm  string
+	}{
+		{"closed", 15, "open_cover", false, "Open Garage Door?"},
+		{"open", 3, "close_cover", true, ""},
+		{"opening", 15, "", false, ""},
+		{"closing", 15, "", false, ""},
+		{"unavailable", 15, "", false, ""},
+		{"closed", 4, "", false, ""},
+	}
+
+	widget := &homeAssistantWidget{}
+	cfg := &homeAssistantEntityConfig{Entity: "cover.garage_door", Title: "Garage Door"}
+
+	for _, test := range tests {
+		state := &homeAssistantStateJSON{EntityID: cfg.Entity, State: test.state}
+		state.Attributes.Features = test.features
+
+		row := widget.buildRow(cfg, state)
+		if row.service != test.service || row.Toggleable != (test.service != "") {
+			t.Errorf("state %q, features %d: service %q toggleable %v, want service %q", test.state, test.features, row.service, row.Toggleable, test.service)
+		}
+		if test.service != "" && row.On != test.on {
+			t.Errorf("state %q: on = %v, want %v", test.state, row.On, test.on)
+		}
+		if row.Confirm != test.confirm {
+			t.Errorf("state %q: confirm = %q, want %q", test.state, row.Confirm, test.confirm)
+		}
+	}
+}
+
 func TestHomeAssistantToggleRowUnchanged(t *testing.T) {
 	widget := &homeAssistantWidget{}
 	cfg := &homeAssistantEntityConfig{Entity: "light.kitchen"}
