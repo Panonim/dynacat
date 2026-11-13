@@ -9,6 +9,7 @@
         const row = button.closest('.ha-entity');
         const widget = button.closest('.widget');
         if (!row || !widget) return;
+        if (button.dataset.confirm && !window.confirm(button.dataset.confirm)) return;
 
         button.disabled = true;
 
@@ -28,6 +29,8 @@
             button.setAttribute('aria-checked', state.on ? 'true' : 'false');
             row.classList.toggle('ha-entity-inactive', state.inactive);
             row.querySelector('.ha-entity-state').textContent = state.state;
+            if (state.confirm) button.dataset.confirm = state.confirm;
+            else delete button.dataset.confirm;
             if (!state.toggleable) button.remove();
 
             const icon = row.querySelector('.ha-entity-icon');

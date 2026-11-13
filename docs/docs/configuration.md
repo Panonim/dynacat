@@ -3794,7 +3794,7 @@ The entities to show, in the order they should appear. Each entity accepts the f
 
 When `icon` is not set, the widget uses the icon set on the entity in Home Assistant, otherwise the same default icon Home Assistant uses for that domain, device class and state, e.g. `mdi:lightbulb` and `mdi:lightbulb-off` for lights. Any value from [Icons](#icons) works, so icons copied from Home Assistant (`mdi:...`) can be used as is.
 
-Entities from the `light`, `switch`, `fan` and `input_boolean` domains get a toggle. Sensors show their value with the unit, and an entity that doesn't exist is shown as `Not found` instead of breaking the widget.
+Entities from the `light`, `switch`, `fan` and `input_boolean` domains get a toggle. Locks get one too: it locks an unlocked lock and unlocks a locked one after asking for confirmation. A lock that is jammed, moving or needs a code is shown without a toggle. Sensors show their value with the unit, and an entity that doesn't exist is shown as `Not found` instead of breaking the widget.
 
 > [!WARNING]
 >
