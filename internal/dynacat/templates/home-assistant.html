@@ -14,7 +14,7 @@
             <div class="ha-entity-state size-h5 color-subdue text-truncate">{{ .State }}</div>
         </div>
         {{- if .Toggleable }}
-        <button class="ha-toggle shrink-0" type="button" role="switch" aria-checked="{{ .On }}" aria-label="Toggle {{ .Name }}"></button>
+        <button class="ha-toggle shrink-0" type="button" role="switch" aria-checked="{{ .On }}" aria-label="Toggle {{ .Name }}"{{ if .Confirm }} data-confirm="{{ .Confirm }}"{{ end }}></button>
         {{- end }}
     </li>
     {{- end }}

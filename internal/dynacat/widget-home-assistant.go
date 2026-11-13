@@ -29,6 +29,22 @@ var homeAssistantToggleableDomains = map[string]bool{
 	"input_boolean": true,
 }
 
+// Locks have no toggle service, so the action depends on the current state. Transitional
+// states such as locking, jammed or open map to nothing and get no toggle.
+var homeAssistantLockServices = map[string]string{
+	"locked":   "unlock",
+	"unlocked": "lock",
+}
+
+// Covers likewise: opening and closing covers, and ones stopped part-way, get no toggle.
+var homeAssistantCoverServices = map[string]string{
+	"closed": "open_cover",
+	"open":   "close_cover",
+}
+
+// Cover supported_features bits for open and close.
+const homeAssistantCoverOpenClose = 1 | 2
+
 type homeAssistantWidget struct {
 	widgetBase    `yaml:",inline"`
 	Frameless     bool                        `yaml:"frameless"`
@@ -52,7 +68,9 @@ type homeAssistantEntity struct {
 	On         bool
 	Inactive   bool
 	Toggleable bool
+	Confirm    string
 	Icon       customIconField
+	service    string
 }
 
 type homeAssistantStateJSON struct {
@@ -63,6 +81,8 @@ type homeAssistantStateJSON struct {
 		Unit         string `json:"unit_of_measurement"`
 		Icon         string `json:"icon"`
 		DeviceClass  string `json:"device_class"`
+		CodeFormat   string `json:"code_format"`
+		Features     int    `json:"supported_features"`
 	} `json:"attributes"`
 }
 
@@ -136,7 +156,25 @@ func (widget *homeAssistantWidget) buildRow(cfg *homeAssistantEntityConfig, stat
 
 	row.On = state.State == "on"
 	row.Inactive = state.State == "off" || state.State == "unavailable" || state.State == "unknown"
-	row.Toggleable = homeAssistantToggleableDomains[domain] && state.State != "unavailable"
+
+	switch {
+	case homeAssistantToggleableDomains[domain] && state.State != "unavailable":
+		row.service = "toggle"
+	// A lock that needs a code can't be operated without one, so it is shown read-only.
+	case domain == "lock" && state.Attributes.CodeFormat == "":
+		row.service = homeAssistantLockServices[state.State]
+		row.On = state.State == "locked"
+		if row.service == "unlock" {
+			row.Confirm = "Unlock " + row.Name + "?"
+		}
+	case domain == "cover" && state.Attributes.Features&homeAssistantCoverOpenClose == homeAssistantCoverOpenClose:
+		row.service = homeAssistantCoverServices[state.State]
+		row.On = state.State == "open"
+		if row.service == "open_cover" {
+			row.Confirm = "Open " + row.Name + "?"
+		}
+	}
+	row.Toggleable = row.service != ""
 	row.State = homeAssistantStateText(state.State, state.Attributes.Unit)
 
 	return row
@@ -201,10 +239,11 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 	domain, _, _ := strings.Cut(body.Entity, ".")
 	payload, _ := json.Marshal(map[string]string{"entity_id": body.Entity})
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	// Locks and covers can take several seconds to report back, so they get a longer timeout.
+	ctx, cancel := context.WithTimeout(r.Context(), ternary(domain == "lock" || domain == "cover", 30*time.Second, 10*time.Second))
 	defer cancel()
 
-	changed, err := homeAssistantRequest[[]homeAssistantStateJSON](ctx, widget, "POST", "/api/services/"+domain+"/toggle", payload)
+	changed, err := homeAssistantRequest[[]homeAssistantStateJSON](ctx, widget, "POST", "/api/services/"+domain+"/"+widget.Rows[index].service, payload)
 	if err != nil {
 		slog.Error("Home Assistant toggle failed", "entity", body.Entity, "error", err)
 		http.Error(w, "toggle failed", http.StatusBadGateway)
@@ -238,6 +277,7 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 		"on":         row.On,
 		"inactive":   row.Inactive,
 		"toggleable": row.Toggleable,
+		"confirm":    row.Confirm,
 		"icon":       row.Icon.URL,
 	})
 }
