@@ -3789,10 +3789,13 @@ The entities to show, in the order they should appear. Each entity accepts the f
 | entity | string | yes |  |
 | title | string | no | entity's friendly name |
 | icon | string | no | entity's Home Assistant icon |
+| precision | number | no |  |
 
 `entity` is the entity ID, e.g. `light.kitchen`, as shown in Home Assistant under `Settings > Devices & services > Entities`.
 
 When `icon` is not set, the widget uses the icon set on the entity in Home Assistant, otherwise the same default icon Home Assistant uses for that domain, device class and state, e.g. `mdi:lightbulb` and `mdi:lightbulb-off` for lights. Any value from [Icons](#icons) works, so icons copied from Home Assistant (`mdi:...`) can be used as is.
+
+`precision` is the number of decimals a numeric state is rounded to, from `0` to `10`. When it is not set, numbers with more than two decimals are rounded to two, so a raw `25.3888888888889` shows as `25.39` while `86.0` is left as is.
 
 Entities from the `light`, `switch`, `fan` and `input_boolean` domains get a toggle. Sensors show their value with the unit, and an entity that doesn't exist is shown as `Not found` instead of breaking the widget.
 
