@@ -12,6 +12,7 @@
 - Dynacat now shuts down cleanly on `SIGTERM`/`SIGINT` and exits with code `0` -> https://github.com/Panonim/dynacat/issues/210
 - Fixed `calendar` widget disappearing when placed inside a `split-column` or `group` after a live update -> https://github.com/Panonim/dynacat/issues/209
 - Added a `markdown` widget that renders markdown written inline or loaded from a file in `/assets`
+- `home-assistant` widget now rounds numeric states with more than two decimals, and entities accept a `precision` to set the number of decimals
 
 # Changes for 3.0.2
 - Fixed a bug where users were randomly logged out after a config reload -> https://github.com/Panonim/dynacat/issues/174
