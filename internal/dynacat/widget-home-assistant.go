@@ -29,6 +29,11 @@ var homeAssistantToggleableDomains = map[string]bool{
 	"input_boolean": true,
 }
 
+var homeAssistantSelectDomains = map[string]bool{
+	"input_select": true,
+	"select":       true,
+}
+
 type homeAssistantWidget struct {
 	widgetBase    `yaml:",inline"`
 	Frameless     bool                        `yaml:"frameless"`
@@ -40,9 +45,10 @@ type homeAssistantWidget struct {
 }
 
 type homeAssistantEntityConfig struct {
-	Entity string          `yaml:"entity"`
-	Title  string          `yaml:"title"`
-	Icon   customIconField `yaml:"icon"`
+	Entity  string          `yaml:"entity"`
+	Title   string          `yaml:"title"`
+	Icon    customIconField `yaml:"icon"`
+	Options []string        `yaml:"options"`
 }
 
 type homeAssistantEntity struct {
@@ -52,6 +58,8 @@ type homeAssistantEntity struct {
 	On         bool
 	Inactive   bool
 	Toggleable bool
+	Options    []string
+	Selected   string
 	Icon       customIconField
 }
 
@@ -59,10 +67,11 @@ type homeAssistantStateJSON struct {
 	EntityID   string `json:"entity_id"`
 	State      string `json:"state"`
 	Attributes struct {
-		FriendlyName string `json:"friendly_name"`
-		Unit         string `json:"unit_of_measurement"`
-		Icon         string `json:"icon"`
-		DeviceClass  string `json:"device_class"`
+		FriendlyName string   `json:"friendly_name"`
+		Unit         string   `json:"unit_of_measurement"`
+		Icon         string   `json:"icon"`
+		DeviceClass  string   `json:"device_class"`
+		Options      []string `json:"options"`
 	} `json:"attributes"`
 }
 
@@ -139,7 +148,29 @@ func (widget *homeAssistantWidget) buildRow(cfg *homeAssistantEntityConfig, stat
 	row.Toggleable = homeAssistantToggleableDomains[domain] && state.State != "unavailable"
 	row.State = homeAssistantStateText(state.State, state.Attributes.Unit)
 
+	if homeAssistantSelectDomains[domain] && state.State != "unavailable" {
+		row.Options = homeAssistantSelectOptions(cfg.Options, state.Attributes.Options)
+		row.Selected = state.State
+	}
+
 	return row
+}
+
+// Configured options keep their order but are limited to the ones the entity offers,
+// so a renamed or removed option disappears instead of failing when clicked.
+func homeAssistantSelectOptions(configured, available []string) []string {
+	if len(configured) == 0 {
+		return available
+	}
+
+	options := make([]string, 0, len(configured))
+	for _, option := range configured {
+		if slices.Contains(available, option) {
+			options = append(options, option)
+		}
+	}
+
+	return options
 }
 
 func homeAssistantStateText(state, unit string) string {
@@ -178,7 +209,8 @@ func (widget *homeAssistantWidget) Render() template.HTML {
 }
 
 func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.Request) {
-	if r.PathValue("action") != "toggle" {
+	action := r.PathValue("action")
+	if action != "toggle" && action != "select" {
 		http.Error(w, "unknown action", http.StatusBadRequest)
 		return
 	}
@@ -186,28 +218,42 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	var body struct {
 		Entity string `json:"entity"`
+		Option string `json:"option"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 
-	index := slices.IndexFunc(widget.Rows, func(row homeAssistantEntity) bool { return row.ID == body.Entity && row.Toggleable })
+	domain, _, _ := strings.Cut(body.Entity, ".")
+	service := "toggle"
+	payload := map[string]string{"entity_id": body.Entity}
+
+	var index int
+	if action == "toggle" {
+		index = slices.IndexFunc(widget.Rows, func(row homeAssistantEntity) bool { return row.ID == body.Entity && row.Toggleable })
+	} else {
+		index = slices.IndexFunc(widget.Rows, func(row homeAssistantEntity) bool {
+			return row.ID == body.Entity && slices.Contains(row.Options, body.Option)
+		})
+		service = "select_option"
+		payload["option"] = body.Option
+	}
+
 	if index == -1 {
-		http.Error(w, "entity cannot be toggled", http.StatusForbidden)
+		http.Error(w, "entity cannot be changed", http.StatusForbidden)
 		return
 	}
 
-	domain, _, _ := strings.Cut(body.Entity, ".")
-	payload, _ := json.Marshal(map[string]string{"entity_id": body.Entity})
+	encodedPayload, _ := json.Marshal(payload)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	changed, err := homeAssistantRequest[[]homeAssistantStateJSON](ctx, widget, "POST", "/api/services/"+domain+"/toggle", payload)
+	changed, err := homeAssistantRequest[[]homeAssistantStateJSON](ctx, widget, "POST", "/api/services/"+domain+"/"+service, encodedPayload)
 	if err != nil {
-		slog.Error("Home Assistant toggle failed", "entity", body.Entity, "error", err)
-		http.Error(w, "toggle failed", http.StatusBadGateway)
+		slog.Error("Home Assistant action failed", "entity", body.Entity, "action", action, "error", err)
+		http.Error(w, action+" failed", http.StatusBadGateway)
 		return
 	}
 
@@ -238,6 +284,7 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 		"on":         row.On,
 		"inactive":   row.Inactive,
 		"toggleable": row.Toggleable,
+		"selected":   row.Selected,
 		"icon":       row.Icon.URL,
 	})
 }
