@@ -5,7 +5,7 @@
 {{- define "widget-content" }}
 <ul class="list list-gap-10">
     {{- range .Rows }}
-    <li class="ha-entity flex items-center gap-10{{ if .Inactive }} ha-entity-inactive{{ end }}" data-entity="{{ .ID }}">
+    <li class="ha-entity flex items-center gap-10{{ if .Inactive }} ha-entity-inactive{{ end }}" data-entity="{{ .ID }}" data-service="{{ .Service }}">
         {{- if .Icon.URL }}
         <img class="ha-entity-icon shrink-0{{ if .Icon.AutoInvert }} flat-icon{{ end }}" src="{{ .Icon.URL }}" alt="" loading="lazy">
         {{- end }}

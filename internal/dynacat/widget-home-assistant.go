@@ -73,6 +73,11 @@ type homeAssistantEntity struct {
 	service    string
 }
 
+// Template accessor for the action the row currently offers.
+func (row homeAssistantEntity) Service() string {
+	return row.service
+}
+
 type homeAssistantStateJSON struct {
 	EntityID   string `json:"entity_id"`
 	State      string `json:"state"`
@@ -223,7 +228,8 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	var body struct {
-		Entity string `json:"entity"`
+		Entity  string `json:"entity"`
+		Service string `json:"service"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -242,6 +248,23 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 	// Locks and covers can take several seconds to report back, so they get a longer timeout.
 	ctx, cancel := context.WithTimeout(r.Context(), ternary(domain == "lock" || domain == "cover", 30*time.Second, 10*time.Second))
 	defer cancel()
+
+	// The click carries the action the list showed. When the entity has moved since, running
+	// the current service would perform the opposite of what was clicked, so refresh instead.
+	if widget.Rows[index].service != body.Service {
+		fresh, err := homeAssistantRequest[homeAssistantStateJSON](ctx, widget, "GET", "/api/states/"+body.Entity, nil)
+		if err != nil {
+			http.Error(w, "reading state failed", http.StatusBadGateway)
+			return
+		}
+
+		widget.Rows[index] = widget.buildRow(&widget.Entities[index], &fresh)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(homeAssistantRowResponse(&widget.Rows[index])) //nolint:errcheck
+		return
+	}
 
 	changed, err := homeAssistantRequest[[]homeAssistantStateJSON](ctx, widget, "POST", "/api/services/"+domain+"/"+widget.Rows[index].service, payload)
 	if err != nil {
@@ -272,14 +295,19 @@ func (widget *homeAssistantWidget) handleRequest(w http.ResponseWriter, r *http.
 	row := &widget.Rows[index]
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+	json.NewEncoder(w).Encode(homeAssistantRowResponse(row)) //nolint:errcheck
+}
+
+func homeAssistantRowResponse(row *homeAssistantEntity) map[string]any {
+	return map[string]any{
 		"state":      row.State,
 		"on":         row.On,
 		"inactive":   row.Inactive,
 		"toggleable": row.Toggleable,
 		"confirm":    row.Confirm,
 		"icon":       row.Icon.URL,
-	})
+		"service":    row.service,
+	}
 }
 
 // Bypasses the shared fetch cache so a refresh right after a toggle never shows the old state.

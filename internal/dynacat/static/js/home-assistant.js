@@ -17,10 +17,12 @@
             const response = await fetch(base + '/api/widgets/' + widget.dataset.widgetId + '/action/toggle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ entity: row.dataset.entity }),
+                body: JSON.stringify({ entity: row.dataset.entity, service: row.dataset.service || '' }),
             });
 
-            if (!response.ok) {
+            // A conflict means the entity changed since this list was rendered: the body is the
+            // current state, so refresh from it rather than reporting a failure.
+            if (!response.ok && response.status !== 409) {
                 console.error('home-assistant: toggle failed', response.status);
                 return;
             }
@@ -31,6 +33,7 @@
             row.querySelector('.ha-entity-state').textContent = state.state;
             if (state.confirm) button.dataset.confirm = state.confirm;
             else delete button.dataset.confirm;
+            if (typeof state.service === 'string') row.dataset.service = state.service;
             if (!state.toggleable) button.remove();
 
             const icon = row.querySelector('.ha-entity-icon');

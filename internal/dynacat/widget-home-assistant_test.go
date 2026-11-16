@@ -109,8 +109,8 @@ func TestHomeAssistantLockActionCallsService(t *testing.T) {
 	widget := &homeAssistantWidget{URL: server.URL, Token: "token", Entities: []homeAssistantEntityConfig{{Entity: "lock.front_door", Title: "Front Door"}}}
 	widget.Rows = []homeAssistantEntity{widget.buildRow(&widget.Entities[0], &homeAssistantStateJSON{EntityID: "lock.front_door", State: "locked"})}
 
-	for _, want := range []struct{ path, state string }{{"/api/services/lock/unlock", "Unlocked"}, {"/api/services/lock/lock", "Locked"}} {
-		request := httptest.NewRequest("POST", "/api/widgets/1/action/toggle", strings.NewReader(`{"entity":"lock.front_door"}`))
+	for _, want := range []struct{ path, state, service string }{{"/api/services/lock/unlock", "Unlocked", "unlock"}, {"/api/services/lock/lock", "Locked", "lock"}} {
+		request := httptest.NewRequest("POST", "/api/widgets/1/action/toggle", strings.NewReader(`{"entity":"lock.front_door","service":"`+want.service+`"}`))
 		request.SetPathValue("action", "toggle")
 		recorder := httptest.NewRecorder()
 
@@ -127,5 +127,43 @@ func TestHomeAssistantLockActionCallsService(t *testing.T) {
 		if response.State != want.state {
 			t.Errorf("state %q, want %q", response.State, want.state)
 		}
+	}
+}
+
+// Two dashboards can show the same lock. When one acts, the other's click must not run the
+// action its list no longer offers: it refreshes instead.
+func TestHomeAssistantStaleActionRefreshesInsteadOfToggling(t *testing.T) {
+	var called []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = append(called, r.Method+" "+r.URL.Path)
+		fmt.Fprintf(w, `{"entity_id":"lock.front_door","state":"locked","attributes":{}}`)
+	}))
+	defer server.Close()
+
+	widget := &homeAssistantWidget{URL: server.URL, Token: "token", Entities: []homeAssistantEntityConfig{{Entity: "lock.front_door", Title: "Front Door"}}}
+	widget.Rows = []homeAssistantEntity{widget.buildRow(&widget.Entities[0], &homeAssistantStateJSON{EntityID: "lock.front_door", State: "locked"})}
+
+	// The list offered "lock"; the lock is already locked, so clicking would unlock it.
+	request := httptest.NewRequest("POST", "/api/widgets/1/action/toggle", strings.NewReader(`{"entity":"lock.front_door","service":"lock"}`))
+	request.SetPathValue("action", "toggle")
+	recorder := httptest.NewRecorder()
+
+	widget.handleRequest(recorder, request)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status %d, want %d: %s", recorder.Code, http.StatusConflict, recorder.Body.String())
+	}
+	for _, call := range called {
+		if call != "GET /api/states/lock.front_door" {
+			t.Errorf("called %q, want only the state read", call)
+		}
+	}
+	var response struct {
+		State   string
+		Service string
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &response) //nolint:errcheck
+	if response.State != "Locked" || response.Service != "unlock" {
+		t.Errorf("response %+v, want the current locked/unlock row", response)
 	}
 }
