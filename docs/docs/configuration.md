@@ -2999,6 +2999,7 @@ If not provided it will display the statistics of the server Dynacat is running 
 | type | string | yes |  |
 | name | string | no |  |
 | compact | boolean | no | false |
+| hide-compact-header | boolean | no | false |
 | hide-swap | boolean | no | false |
 
 ###### `type`
@@ -3008,9 +3009,12 @@ Whether to display statistics for the local server or a remote server. Possible 
 The name of the server which will be displayed on the widget. If not provided it will default to the server's hostname.
 
 ###### `compact`
-Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average. A single line above the stats still shows a status dot in the theme's positive or negative color (with `unreachable` when the server is down), plus the server's name when the widget has more than one server.
+Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average. A single line above the stats shows `unreachable` when the server is down, plus the server's name when the widget has more than one server.
 
 ![](images/server-stats-compact-preview.webp)
+
+###### `hide-compact-header`
+Whether to hide the line above the stats in `compact` mode (server name and `unreachable` label). Has no effect when `compact` is false.
 
 ###### `hide-swap`
 Whether to hide the swap usage.

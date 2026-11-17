@@ -109,6 +109,7 @@ type serverStatsRequest struct {
 	StatusText                 string              `yaml:"-"`
 	Name                       string              `yaml:"name"`
 	Compact                    bool                `yaml:"compact"`
+	HideCompactHeader          bool                `yaml:"hide-compact-header"`
 	HideSwap                   bool                `yaml:"hide-swap"`
 	Type                       string              `yaml:"type"`
 	URL                        string              `yaml:"url"`
