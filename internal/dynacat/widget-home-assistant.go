@@ -169,8 +169,6 @@ func homeAssistantStateText(state, unit string, precision *int) string {
 	return string(unicode.ToUpper(first)) + state[size:]
 }
 
-// Numbers are rounded to precision when it is set, otherwise only those with more than
-// homeAssistantDefaultMaxDecimals decimals are rounded, so values like 86.0 stay as reported.
 func homeAssistantFormatNumber(state string, precision *int) string {
 	match := homeAssistantNumberPattern.FindStringSubmatch(state)
 	if match == nil {
