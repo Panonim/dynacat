@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	utls "github.com/refraction-networking/utls"
@@ -116,10 +117,16 @@ func (widget *redditWidget) update(ctx context.Context) {
 	if err != nil && !widget.AppAuth.enabled {
 		rssPosts, rssErr := widget.fetchSubredditPostsFromRSS()
 		if rssErr != nil {
-			err = fmt.Errorf("%w, rss fallback also failed: %v", err, rssErr)
+			err = fmt.Errorf("%w, rss fallback also failed: %w", err, rssErr)
 		} else {
 			posts, err, fromRSS = rssPosts, nil, true
 		}
+	}
+
+	// Keeps the last fetched posts on screen while Reddit is rate limiting.
+	if errors.Is(err, errRedditRateLimited) && len(widget.Posts) > 0 {
+		widget.canContinueUpdateAfterHandlingErr(fmt.Errorf("%w: %v", errPartialContent, err))
+		return
 	}
 
 	if !widget.canContinueUpdateAfterHandlingErr(err) {
@@ -348,9 +355,57 @@ func (widget *redditWidget) fetchSubredditPosts() (forumPostList, error) {
 	return posts, nil
 }
 
-var redditRSSTargetLinkPattern = regexp.MustCompile(`<a href="([^"]+)">\[link\]</a>`)
+var (
+	redditRSSTargetLinkPattern = regexp.MustCompile(`<a href="([^"]+)">\[link\]</a>`)
+	errRedditRateLimited       = errors.New("reddit is rate limiting requests")
+)
+
+// Reddit rate limits RSS per IP, so direct requests from all widgets share one backoff.
+var redditRSSRateLimit struct {
+	sync.Mutex
+	until time.Time
+}
+
+// Pauses direct RSS requests until Reddit's rate limit window resets once it's exhausted or exceeded.
+func backoffRedditRSS(response *http.Response) {
+	remaining, err := strconv.ParseFloat(response.Header.Get("x-ratelimit-remaining"), 64)
+	if response.StatusCode != http.StatusTooManyRequests && (err != nil || remaining >= 1) {
+		return
+	}
+
+	now := time.Now()
+	until := now.Add(time.Minute)
+	retryAfter := response.Header.Get("retry-after")
+
+	if reset, err := strconv.Atoi(response.Header.Get("x-ratelimit-reset")); err == nil && reset > 0 {
+		until = now.Add(time.Duration(reset) * time.Second)
+	} else if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
+		until = now.Add(time.Duration(seconds) * time.Second)
+	} else if date, err := http.ParseTime(retryAfter); err == nil && date.After(now) {
+		until = date
+	}
+
+	// Concurrent responses may carry shorter windows, so the furthest deadline wins.
+	redditRSSRateLimit.Lock()
+	if until.After(redditRSSRateLimit.until) {
+		redditRSSRateLimit.until = until
+	}
+	redditRSSRateLimit.Unlock()
+}
 
 func (widget *redditWidget) fetchSubredditPostsFromRSS() (forumPostList, error) {
+	direct := widget.RequestURLTemplate == "" && widget.Proxy.client == nil
+
+	if direct {
+		redditRSSRateLimit.Lock()
+		wait := time.Until(redditRSSRateLimit.until)
+		redditRSSRateLimit.Unlock()
+
+		if wait > 0 {
+			return nil, fmt.Errorf("%w, retrying after %s", errRedditRateLimited, wait.Round(time.Second))
+		}
+	}
+
 	query := url.Values{}
 
 	if widget.SortBy == "top" {
@@ -384,6 +439,14 @@ func (widget *redditWidget) fetchSubredditPostsFromRSS() (forumPostList, error) 
 		return nil, err
 	}
 	defer response.Body.Close()
+
+	if direct {
+		backoffRedditRSS(response)
+	}
+
+	if response.StatusCode == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("%w (429 from %s)", errRedditRateLimited, requestURL)
+	}
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %d from %s", response.StatusCode, requestURL)
