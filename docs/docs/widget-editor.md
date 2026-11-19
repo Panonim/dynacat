@@ -37,7 +37,7 @@ The editor takes over the whole screen and is split into four areas:
 
 The editor fetches the url once when it opens, and again every time you press **Refresh data**.
 
-`${VARIABLE}` references in the url and in headers are expanded the same way they are in the config file, so widgets that depend on a token or a secret work in the editor too.
+To use a token or other value in the url or headers, add it to your `.env` file and reference it as `${VARIABLE}`, it is expanded once the widget is saved but not in the preview. `${secret:...}` and `${readFileFromEnv:...}` can't be added through the editor, see [environment variables](configuration.md#environment-variables).
 
 The field paths listed in the left pane are [gjson](https://github.com/tidwall/gjson) paths, the same syntax you would use in a hand written template.
 
@@ -151,7 +151,7 @@ The **Preview** toggle renders the template on the server using the real API dat
 
 Any template error is shown in the status line and the editor stays open, so nothing is lost.
 
-New widgets are written inline into the page by default. Set [`EDITOR_SEPARATE_WIDGET_FILES`](docker-options.md#editor_separate_widget_files) to save each one to its own file next to the page instead.
+New widgets are written inline into the page by default. Set [`EDITOR_SEPARATE_WIDGET_FILES`](env-options.md#editor_separate_widget_files) to save each one to its own file next to the page instead.
 
 ## The builder key
 

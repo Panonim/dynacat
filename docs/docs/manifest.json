@@ -9,7 +9,7 @@
     { "id": "changelog", "title": "Changelog", "file": "docs/changelog.md" },
     { "id": "custom-api", "title": "Custom API", "file": "docs/custom-api.md" },
     { "id": "dynamic-updates", "title": "Dynamic Updates", "file": "docs/dynamic-updates.md" },
-    { "id": "docker-options", "title": "Docker Options", "file": "docs/docker-options.md" },
+    { "id": "env-options", "title": "Env Options", "file": "docs/env-options.md" },
     { "id": "extensions", "title": "Extensions", "file": "docs/extensions.md" },
     { "id": "faq", "title": "Faq", "file": "docs/faq.md" },
     { "id": "installation", "title": "Installation", "file": "docs/installation.md" },

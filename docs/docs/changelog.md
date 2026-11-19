@@ -1,3 +1,31 @@
+# Changes for 3.0.3
+- Added a `prowlarr` widget showing the health of your indexers, with `show: errors` to list only failing ones
+- Calendar release preview popovers now color each release's title and type icon by its own state (`available`, `released`, `upcoming`) when `show-release-state` is enabled -> https://github.com/Panonim/dynacat/pull/206
+- Calendar preview release coloring moved off `show-release-state` onto its own opt-in `release-state-color` toggle (`icon`, `title` or `both`) -> https://github.com/Panonim/dynacat/pull/206
+- Fixed an issue where images in `latest-media` widget, were not responding to the device size
+- Fixed a security issue where image URLs from feeds and other remote content could make Dynacat fetch internal addresses and expose them through the image cache
+- Cached images are now checked to actually be images, so text, HTML or JSON is never stored even when the server labels it as one
+- The `todo` database is no longer served from `/assets/`
+- `docker-controller` actions now only work on containers and images the widget lists, and pulling is disabled with `show: containers`
+- Dropped `javascript:` and other non-http links coming from Lobsters and Reddit RSS posts
+- Updated Go to 1.26.10 and Go packages, Docker images now use Alpine 3.24
+- Dynacat now shuts down cleanly on `SIGTERM`/`SIGINT` and exits with code `0` -> https://github.com/Panonim/dynacat/issues/210
+- Fixed `calendar` widget disappearing when placed inside a `split-column` or `group` after a live update -> https://github.com/Panonim/dynacat/issues/209
+- Added a `markdown` widget that renders markdown written inline or loaded from a file in `/assets`
+- Added `HideCompactHeader` in server stats widget 
+- `home-assistant` widget now rounds numeric states with more than two decimals -> https://github.com/Panonim/dynacat/pull/217
+- Reddit widget's RSS fallback now backs off when Reddit rate limits it and keeps the last posts on screen instead of showing an error
+- Fixed a security issue where the UI editor could be used to read Docker secrets and files, new `${secret:...}` and `${readFileFromEnv:...}` references written through the editor are now escaped, keep variables meant for widgets in your `.env` file
+- `branding.custom-footer` is no longer shown on the login page
+- Logging out now revokes the session token until Dynacat restarts, instead of only clearing the cookie
+- The first run setup page now rejects requests coming from other websites
+- Login attempts with unknown usernames now take as long as ones with known usernames
+- `dynawidgets` templates are now only downloaded from the `Panonim/dynawidgets` repository, and automatic updates that change a template's `required` section are skipped until the cached template is deleted
+- Dropped `javascript:`, `data:` and `vbscript:` links coming from `docker-containers` labels, the extension `Widget-Title-URL` header and search suggestions
+- Loading a widget's content no longer forces it to refetch its data before its `cache` duration runs out
+- The image cache is now cleaned up hourly, images unused for 30 days are removed and the cache is capped at 1 GiB, configurable with the `IMAGE_CACHE_MAX_IDLE`, `IMAGE_CACHE_CLEANUP_INTERVAL` and `IMAGE_CACHE_MAX_SIZE` environment variables
+- RSS and Reddit responses are now size limited and Reddit requests time out
+
 # Changes for 3.0.2
 - Fixed a bug where users were randomly logged out after a config reload -> https://github.com/Panonim/dynacat/issues/174
 - Fixed `secureImageURL` in `custom-api` never refreshing cached images, they are now re-downloaded after the widget `cache` duration -> https://github.com/Panonim/dynacat/issues/176
