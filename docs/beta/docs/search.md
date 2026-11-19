@@ -13,7 +13,7 @@ Examples:
 
 - `$in:configuration`
 - `cache $in:configuration`
-- `$in:docker-options`
+- `$in:env-options`
 
 ### `$has:<type>`
 

@@ -50,6 +50,10 @@ If you need to use the syntax `${NAME}` in your config without it being interpre
 something: \${NOT_AN_ENV_VAR}
 ```
 
+> [!IMPORTANT]
+>
+> Define your variables in the `.env` file instead of typing values directly into pages. The UI editor can reference any `${ENV_VAR}`, so anyone allowed to edit can read every environment variable. Keep auth passwords and other sensitive secrets in `${secret:...}` or `${readFileFromEnv:...}`, which only work when written in the config file by hand.
+
 #### Other ways of providing tokens/passwords/secrets
 
 You can use [Docker secrets](https://docs.docker.com/compose/how-tos/use-secrets/) with the following syntax:
@@ -284,6 +288,8 @@ icon: /assets/gitea-icon.png
 Directory where Dynacat stores cached remote images (for example, widget icons). Cached files are served from `/.cache/` with long cache headers so browsers reuse them without refetching from the original host.
 
 If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
+
+Unused images are cleaned up automatically, see the [`IMAGE_CACHE_*` environment variables](env-options.md#image_cache_max_idle) to change how long they're kept, the size cap and how often cleanup runs.
 
 #### `db-path`
 Path to the SQLite database file used for server-side todo storage. Only required when at least one `to-do` widget has `storage: server` set. If the path is relative, it will be resolved relative to the Dynacat working directory. The file will be created if it does not exist.
@@ -2350,6 +2356,9 @@ Display a list of posts from a specific subreddit.
 > response. As a workaround you can either [register an app on Reddit](https://ssl.reddit.com/prefs/apps/) and use the
 > generated ID and secret in the widget configuration to authenticate your requests (see `app-auth` property), use a proxy
 > (see `proxy` property) or route the traffic from Dynacat through a VPN.
+>
+> When signed-out requests are blocked the widget falls back to the subreddit's RSS feed, which has no scores or comment
+> counts and is rate limited per IP, so several Reddit widgets may briefly show a rate limit notice.
 
 Example:
 
@@ -2983,7 +2992,7 @@ volumes:
   - /etc/os-release:/host/etc/os-release:ro
 ```
 
-Alternatively, set [`HOST_ETC`](docker-options.md#host_etc) if you'd rather bind mount the host's whole `/etc` to a custom path.
+Alternatively, set [`HOST_ETC`](env-options.md#host_etc) if you'd rather bind mount the host's whole `/etc` to a custom path.
 
 #### Properties
 | Name | Type | Required | Default |
@@ -2999,6 +3008,7 @@ If not provided it will display the statistics of the server Dynacat is running 
 | type | string | yes |  |
 | name | string | no |  |
 | compact | boolean | no | false |
+| hide-compact-header | boolean | no | false |
 | hide-swap | boolean | no | false |
 
 ###### `type`
@@ -3008,9 +3018,12 @@ Whether to display statistics for the local server or a remote server. Possible 
 The name of the server which will be displayed on the widget. If not provided it will default to the server's hostname.
 
 ###### `compact`
-Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average. A single line above the stats still shows a status dot in the theme's positive or negative color (with `unreachable` when the server is down), plus the server's name when the widget has more than one server.
+Whether to use a compact layout that hides system info, swap usage and the CPU 15-minute average. A single line above the stats shows `unreachable` when the server is down, plus the server's name when the widget has more than one server.
 
 ![](images/server-stats-compact-preview.webp)
+
+###### `hide-compact-header`
+Whether to hide the line above the stats in `compact` mode (server name and `unreachable` label). Has no effect when `compact` is false.
 
 ###### `hide-swap`
 Whether to hide the swap usage.
@@ -3789,10 +3802,13 @@ The entities to show, in the order they should appear. Each entity accepts the f
 | entity | string | yes |  |
 | title | string | no | entity's friendly name |
 | icon | string | no | entity's Home Assistant icon |
+| precision | number | no |  |
 
 `entity` is the entity ID, e.g. `light.kitchen`, as shown in Home Assistant under `Settings > Devices & services > Entities`.
 
 When `icon` is not set, the widget uses the icon set on the entity in Home Assistant, otherwise the same default icon Home Assistant uses for that domain, device class and state, e.g. `mdi:lightbulb` and `mdi:lightbulb-off` for lights. Any value from [Icons](#icons) works, so icons copied from Home Assistant (`mdi:...`) can be used as is.
+
+`precision` is the number of decimals a numeric state is rounded to, from `0` to `10`. When it is not set, numbers with more than two decimals are rounded to two, so a raw `25.3888888888889` shows as `25.39` while `86.0` is left as is.
 
 Entities from the `light`, `switch`, `fan` and `input_boolean` domains get a toggle. Sensors show their value with the unit, and an entity that doesn't exist is shown as `Not found` instead of breaking the widget.
 

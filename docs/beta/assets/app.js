@@ -31,6 +31,7 @@ function rebuildRouteAliases() {
   const aliases = new Map();
 
   registerRouteAlias(aliases, 'home', 'home');
+  registerRouteAlias(aliases, 'docker-options', 'env-options');
 
   Object.keys(PAGES).forEach(pageId => {
     registerRouteAlias(aliases, pageId, pageId);
@@ -1835,7 +1836,7 @@ async function renderHome() {
 
   const docs = [
     { page: 'configuration', title: 'Configuration', desc: 'Full reference for config options and widgets', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>` },
-    { page: 'docker-options', title: 'Docker Options', desc: 'Environment variables and deployment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M8 7h.01"/><path d="M8 17h.01"/><path d="M12 7h6"/><path d="M12 17h6"/></svg>` },
+    { page: 'env-options', title: 'Env Options', desc: 'Environment variables and deployment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M8 7h.01"/><path d="M8 17h.01"/><path d="M12 7h6"/><path d="M12 17h6"/></svg>` },
     { page: 'themes', title: 'Themes', desc: 'Browse dark and light theme options', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>` },
     { page: 'preconfigured-pages', title: 'Preconfigured Pages', desc: 'Ready-to-use page layouts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 10v10"/></svg>` },
     { page: 'custom-api', title: 'Custom API', desc: 'Build widgets from any HTTP JSON API', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6L3 12l5 6"/><path d="M16 6l5 6-5 6"/><path d="M13 4l-2 16"/></svg>` },

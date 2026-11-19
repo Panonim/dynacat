@@ -1,4 +1,4 @@
-# Docker Configuration & Options
+# Environment Options
 ## Environment Variables
 
 Environment variables can be set in the `docker-compose.yml` file or through a `.env` file. These control runtime behavior of Dynacat without requiring changes to the configuration file.
@@ -135,6 +135,37 @@ environment:
 
 See [Running as a non-root user](installation.md#running-as-a-non-root-user) for details and the `user` alternative.
 
+### IMAGE_CACHE_MAX_IDLE
+
+Removes cached images (see [`cache-dir`](configuration.md#cache-dir)) that haven't been used for this long. Defaults to `30d` and accepts the same format as config durations (`30s`, `5m`, `1h`, `7d`). Icons set in the config and images in `html` and `markdown` widgets are never removed:
+
+```yaml
+environment:
+  - IMAGE_CACHE_MAX_IDLE=7d
+```
+
+### IMAGE_CACHE_MAX_SIZE
+
+Caps the total size of the image cache. Defaults to `1GB` and accepts a whole number ending in `MB` or `GB`, set it to `0` to disable the cap. When the cache grows past it, the least recently used images are removed until it's back to 90% of the cap, except for images shown within the last 7 days since browsers may still have them cached:
+
+```yaml
+environment:
+  - IMAGE_CACHE_MAX_SIZE=500MB
+```
+
+### IMAGE_CACHE_CLEANUP_INTERVAL
+
+How often the image cache is cleaned up. Defaults to `1h`, the first cleanup runs one interval after Dynacat starts:
+
+```yaml
+environment:
+  - IMAGE_CACHE_CLEANUP_INTERVAL=6h
+```
+
+> [!NOTE]
+>
+> The image cache variables can be set in a `.env` file or the compose `environment:` section. Invalid values log a warning and fall back to the default. Changes require restarting the container, they're not picked up by a config reload.
+
 ## Dynamic Refreshing
 
 Dynamic refreshing allows widgets to automatically update their data at specified intervals. This behavior can be controlled through two mechanisms:
@@ -181,6 +212,9 @@ The global page update interval can be disabled by:
 | `EDITOR_SEPARATE_WIDGET_FILES` | `false` | Set to `true`, `1`, or `t` to write new Widget Editor widgets to their own `$include` file next to the page. |
 | `ENABLE_EDITOR` | `true` | Set to `false`, `0`, `f`, `no`, or `off` to disable the page editor everywhere. Editor config keys are ignored with a startup warning. |
 | `EDITOR_REQUIRE_LOGIN` | `true` | Set to `false`, `0`, `f`, `no`, or `off` to let anonymous visitors use the page editor. Only applies when authentication is configured. |
+| `IMAGE_CACHE_MAX_IDLE` | `30d` | Cached images unused for this long are removed. |
+| `IMAGE_CACHE_MAX_SIZE` | `1GB` | Size cap for the image cache, as a number ending in `MB` or `GB`. Set to `0` to disable. |
+| `IMAGE_CACHE_CLEANUP_INTERVAL` | `1h` | How often the image cache is cleaned up. |
 
 ## ZFS Mountpoint Support
 
