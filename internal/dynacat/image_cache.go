@@ -27,8 +27,8 @@ type imageCache struct {
 	mu       sync.Mutex
 	inFlight map[string]*cacheEntry
 	limits   imageCacheLimits
-	// Images only fetched while the config loads, such as icons, are pinned since evicting them would break them until a reload.
-	pinned map[string]bool
+	// Images rendered only once, such as icons, are pinned per owner since evicting them would break them until a reload.
+	pinned map[any]map[string]bool
 }
 
 type cacheEntry struct {
@@ -135,28 +135,41 @@ func newImageCache(baseURL string, dir string) *imageCache {
 		dir:      dir,
 		inFlight: make(map[string]*cacheEntry),
 		limits:   imageCacheLimitsFromEnv(),
-		pinned:   make(map[string]bool),
+		pinned:   make(map[any]map[string]bool),
 	}
 }
 
 func (c *imageCache) CacheURL(ctx context.Context, rawURL string) (string, error) {
-	return c.CacheURLWithClient(ctx, rawURL, false, true, 0, true)
+	return c.CacheURLWithClient(ctx, rawURL, false, true, 0, c)
 }
 
 // A maxAge of 0 never refetches a cached file. Only URLs the admin configured, or got from their own services, should allowPrivate.
-func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allowInsecure bool, allowPrivate bool, maxAge time.Duration, pin bool) (string, error) {
+func (c *imageCache) CacheURLWithClient(ctx context.Context, rawURL string, allowInsecure bool, allowPrivate bool, maxAge time.Duration, pinOwner any) (string, error) {
 	filename, err := c.cacheFile(ctx, rawURL, allowInsecure, allowPrivate, maxAge)
 	if filename == "" {
 		return "", err
 	}
 
-	if pin {
+	if pinOwner != nil {
 		c.mu.Lock()
-		c.pinned[filename] = true
+		if c.pinned[pinOwner] == nil {
+			c.pinned[pinOwner] = make(map[string]bool)
+		}
+		c.pinned[pinOwner][filename] = true
 		c.mu.Unlock()
 	}
 
 	return c.publicURL(filename), err
+}
+
+// Drops the owner's pins so images it no longer renders can be evicted, unless another owner still pins them.
+func (c *imageCache) unpin(owner any) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	delete(c.pinned, owner)
+	c.mu.Unlock()
 }
 
 func (c *imageCache) cacheFile(ctx context.Context, rawURL string, allowInsecure bool, allowPrivate bool, maxAge time.Duration) (string, error) {
@@ -177,9 +190,12 @@ func (c *imageCache) cacheFile(ctx context.Context, rawURL string, allowInsecure
 	cacheKey := ternary(allowPrivate, rawURL, "public:"+rawURL)
 	hashHex := hashString(cacheKey)
 	existing, found := c.findExistingFile(hashHex, parsed.Path)
-	if found && (maxAge <= 0 || !c.isStale(existing, maxAge)) {
+	if found {
+		// Also keeps the janitor from evicting a stale file while its refresh runs.
 		markImageUsed(existing)
-		return existing, nil
+		if maxAge <= 0 || !c.isStale(existing, maxAge) {
+			return existing, nil
+		}
 	}
 
 	c.mu.Lock()
@@ -194,7 +210,7 @@ func (c *imageCache) cacheFile(ctx context.Context, rawURL string, allowInsecure
 	c.mu.Unlock()
 
 	entry.filename, entry.err = c.downloadAndCacheWithClient(ctx, rawURL, hashHex, parsed.Path, allowInsecure, allowPrivate)
-	if entry.err != nil && found {
+	if entry.err != nil && found && fileExists(filepath.Join(c.dir, existing)) {
 		entry.filename, entry.err = existing, nil
 	}
 
@@ -283,8 +299,11 @@ func (c *imageCache) evict() {
 	lastUsed := maps.Clone(imageCacheLastUsed)
 	imageCacheSharedMu.Unlock()
 
+	pinned := make(map[string]bool)
 	c.mu.Lock()
-	pinned := maps.Clone(c.pinned)
+	for _, files := range c.pinned {
+		maps.Copy(pinned, files)
+	}
 	c.mu.Unlock()
 
 	type cachedFile struct {

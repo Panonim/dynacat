@@ -220,7 +220,7 @@ func dynawidgetsCheckTemplate(slug string, repo string) error {
 	if _, newRequired := dynawidgetsSplitTemplate(string(body)); newRequired != cachedRequired {
 		dynawidgetsWriteMeta(slug, repo, meta)
 		slog.Warn(
-			"Dynawidget template update changes its required section and was not applied, delete the cached template to accept it",
+			"Dynawidget template update changes its required section and was not applied, delete the cached template and restart Dynacat to accept it",
 			"slug", slug, "repo", repo, "path", templatePath,
 		)
 		return nil

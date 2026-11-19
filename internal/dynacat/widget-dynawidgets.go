@@ -172,7 +172,7 @@ func (widget *dynawidgetsWidget) update(ctx context.Context) {
 
 	widget.APIResponse = rawResponse
 	widget.Hidden = hidden
-	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers, false)
+	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers, nil)
 	widget.noticeTemplateUpdate()
 }
 

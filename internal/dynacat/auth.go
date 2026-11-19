@@ -31,7 +31,8 @@ const AUTH_TOKEN_SECRET_LENGTH = 32
 const AUTH_USERNAME_HASH_LENGTH = 32
 const AUTH_SECRET_KEY_LENGTH = AUTH_TOKEN_SECRET_LENGTH + AUTH_USERNAME_HASH_LENGTH
 const AUTH_TIMESTAMP_LENGTH = 8
-const AUTH_TOKEN_DATA_LENGTH = AUTH_USERNAME_HASH_LENGTH + AUTH_TIMESTAMP_LENGTH
+const AUTH_TOKEN_NONCE_LENGTH = 16
+const AUTH_TOKEN_DATA_LENGTH = AUTH_USERNAME_HASH_LENGTH + AUTH_TIMESTAMP_LENGTH + AUTH_TOKEN_NONCE_LENGTH
 
 const AUTH_TOKEN_VALID_PERIOD = 14 * 24 * time.Hour
 const AUTH_TOKEN_REGEN_BEFORE = 7 * 24 * time.Hour
@@ -69,6 +70,10 @@ func generateSessionToken(usernameHash []byte, secret []byte, now time.Time) (st
 	copy(data, usernameHash)
 	expires := now.Add(AUTH_TOKEN_VALID_PERIOD).Unix()
 	binary.LittleEndian.PutUint64(data[AUTH_USERNAME_HASH_LENGTH:], uint64(expires))
+	// The nonce keeps a login in the same second as a logout from reissuing the revoked token.
+	if _, err := rand.Read(data[AUTH_USERNAME_HASH_LENGTH+AUTH_TIMESTAMP_LENGTH:]); err != nil {
+		return "", err
+	}
 
 	h := hmac.New(sha256.New, secret[0:AUTH_TOKEN_SECRET_LENGTH])
 	h.Write(data)
@@ -284,7 +289,7 @@ func (a *application) userWithPassword(username, password string) *user {
 	return u
 }
 
-// Logged-out password session tokens mapped to when they would expire anyway, shared across config reloads.
+// Logged-out password session tokens mapped to when they would expire anyway, shared across config reloads but not restarts.
 var revokedSessionTokens sync.Map
 var revokedSessionTokensPruned atomic.Int64
 

@@ -27,8 +27,8 @@ import (
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
 
-// Widgets that render only once should pin, since nothing refreshes their images' last use.
-func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pin bool) template.HTML {
+// Widgets that render only once should pass themselves as pinOwner, since nothing refreshes their images' last use.
+func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pinOwner any) template.HTML {
 	if providers == nil {
 		return html
 	}
@@ -38,7 +38,7 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 			return match
 		}
 		originalSrc := parts[2]
-		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, false, 0, pin)
+		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, false, 0, pinOwner)
 		if newSrc == originalSrc {
 			return match
 		}

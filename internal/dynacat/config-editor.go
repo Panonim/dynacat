@@ -780,6 +780,15 @@ func sanitizeEditorValue(key string, old, value *yaml.Node) error {
 	}
 
 	for _, n := range nodeTree(value, nil) {
+		if n.Kind == yaml.MappingNode {
+			for i := 0; i < len(n.Content); i += 2 {
+				if k := n.Content[i].Value; !kept[k] {
+					if err := rejectVariableKey(k); err != nil {
+						return err
+					}
+				}
+			}
+		}
 		refs := editorConfigVariablePattern.FindAllString(n.Value, -1)
 		if len(refs) == 0 {
 			continue
@@ -790,9 +799,10 @@ func sanitizeEditorValue(key string, old, value *yaml.Node) error {
 			})
 			refs = editorConfigVariablePattern.FindAllString(n.Value, -1)
 		}
-		// Double quotes would write the backslash as \\, which the expander turns into the invalid escape \$.
-		if n.Style&yaml.DoubleQuotedStyle != 0 && slices.ContainsFunc(refs, func(ref string) bool { return ref[0] == '\\' }) {
-			n.Style = n.Style&^yaml.DoubleQuotedStyle | ternary(strings.Contains(n.Value, "\n"), yaml.LiteralStyle, yaml.SingleQuotedStyle)
+		// Double quotes would write the backslash as \\, which the expander turns into the invalid escape \$, and the emitter picks them itself for tabs and line breaks unless the scalar is literal.
+		breaks := strings.ContainsAny(n.Value, "\t\n")
+		if (breaks || n.Style&yaml.DoubleQuotedStyle != 0) && slices.ContainsFunc(refs, func(ref string) bool { return ref[0] == '\\' }) {
+			n.Style = n.Style&^(yaml.DoubleQuotedStyle|yaml.SingleQuotedStyle|yaml.FoldedStyle) | ternary(breaks, yaml.LiteralStyle, yaml.SingleQuotedStyle)
 		}
 	}
 
