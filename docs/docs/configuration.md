@@ -2350,6 +2350,9 @@ Display a list of posts from a specific subreddit.
 > response. As a workaround you can either [register an app on Reddit](https://ssl.reddit.com/prefs/apps/) and use the
 > generated ID and secret in the widget configuration to authenticate your requests (see `app-auth` property), use a proxy
 > (see `proxy` property) or route the traffic from Dynacat through a VPN.
+>
+> When signed-out requests are blocked the widget falls back to the subreddit's RSS feed, which has no scores or comment
+> counts and is rate limited per IP, so several Reddit widgets may briefly show a rate limit notice.
 
 Example:
 
