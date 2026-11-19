@@ -29,9 +29,8 @@
             </svg>
         </div>
     </div>
-    {{- else }}
+    {{- else if and (not .HideCompactHeader) (or (gt (len $.Servers) 1) (not .IsReachable)) }}
     <div class="server-compact-header size-h5">
-        <span class="server-status-dot color-{{ if .IsReachable }}positive{{ else }}negative{{ end }}" role="img" aria-label="{{ if .IsReachable }}Online{{ else }}Offline{{ end }}" title="{{ if .IsReachable }}Online{{ else }}Offline{{ end }}"></span>
         {{- if gt (len $.Servers) 1 }}
         <span class="color-highlight text-truncate">{{ if .Name }}{{ .Name }}{{ else }}{{ .Info.Hostname }}{{ end }}</span>
         {{- end }}

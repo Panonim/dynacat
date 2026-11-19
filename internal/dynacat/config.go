@@ -54,6 +54,8 @@ type config struct {
 		AutoRedirectOIDC bool             `yaml:"auto-redirect-oidc"`
 		Users            map[string]*user `yaml:"users"`
 		OIDC             *oidcConfig      `yaml:"oidc"`
+
+		dummyPasswordHash []byte
 	} `yaml:"auth"`
 
 	API struct {
@@ -159,6 +161,10 @@ func (p *page) normalizeKeyBind() {
 
 func (c *config) assetsPath() string {
 	return cmp.Or(c.Server.AssetsPath, "/app/assets")
+}
+
+func (c *config) dbPath() string {
+	return cmp.Or(c.Server.DBPath, filepath.Join(c.assetsPath(), "dynacat.db"))
 }
 
 func newConfigFromYAML(contents []byte) (*config, error) {

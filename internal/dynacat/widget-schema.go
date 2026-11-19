@@ -49,6 +49,7 @@ var widgetTypeCatalog = []widgetTypeMeta{
 	{"bookmarks", "Bookmarks", "mdi:bookmark-outline", "configuration/bookmarks"},
 	{"iframe", "IFrame", "mdi:application-brackets-outline", "configuration/iframe"},
 	{"html", "HTML", "mdi:language-html5", "configuration/html"},
+	{"markdown", "Markdown", "mdi:language-markdown-outline", "configuration/markdown"},
 	{"hacker-news", "Hacker News", "mdi:newspaper-variant-outline", "configuration/hacker-news"},
 	{"releases", "Releases", "mdi:tag-outline", "configuration/releases"},
 	{"videos", "Videos", "mdi:youtube", "configuration/videos"},
@@ -77,6 +78,7 @@ var widgetTypeCatalog = []widgetTypeMeta{
 	{"playing", "Now Playing", "mdi:play-circle-outline", "configuration/currently-playing"},
 	{"latest-media", "Latest Media", "mdi:multimedia", "configuration/latest-media"},
 	{"torrenting", "Torrenting", "mdi:download-network-outline", "configuration/torrenting"},
+	{"prowlarr", "Prowlarr", "mdi:radar", "configuration/prowlarr"},
 	{"home-assistant", "Home Assistant", "mdi:home-assistant", "configuration/home-assistant"},
 }
 
@@ -113,6 +115,7 @@ var requiredFields = map[string][]string{
 	"markets":         {"markets", "markets.symbol", "stocks.symbol"},
 	"monitor":         {"sites", "sites.title", "sites.url"},
 	"playing":         {"hosts", "hosts.url", "hosts.token"},
+	"prowlarr":        {"url", "token"},
 	"reddit":          {"subreddit"},
 	"releases":        {"repositories", "repositories.repository"},
 	"repository":      {"repository"},
@@ -246,6 +249,11 @@ var fieldAnnotations = map[string]map[string]fieldAnnotation{
 		"headers":        {Advanced: true},
 		"allow-insecure": {Advanced: true},
 	},
+	"markdown": {
+		"file":       {Hint: "Path to a .md file inside the assets directory, e.g. notes.md. Leave empty to use Source instead."},
+		"source":     {Kind: "text-block", Hint: "Markdown written directly in the widget, used when File is empty."},
+		"allow-html": {Advanced: true, Hint: "Render raw HTML inside the markdown instead of omitting it."},
+	},
 	"dynawidgets": {
 		"repo":           {Advanced: true, Options: []string{"main", "testing"}, Hint: "Branch of the dynawidgets repository to fetch the widget from, defaults to main."},
 		"subrequests":    {Advanced: true},
@@ -280,6 +288,12 @@ var fieldAnnotations = map[string]map[string]fieldAnnotation{
 	},
 	"torrenting": {
 		"hosts.client": {Hint: "qbittorrent (default), deluge or transmission."},
+	},
+	"prowlarr": {
+		"url":            {Hint: "Base URL of your Prowlarr instance."},
+		"token":          {Hint: "Found in Prowlarr under Settings → General → API Key."},
+		"show":           {Options: []string{"all", "errors"}},
+		"allow-insecure": {Advanced: true},
 	},
 	"speedtest": {
 		"server": {Hint: "Leave empty to auto-select a public LibreSpeed server; or set the base URL of your own LibreSpeed instance."},

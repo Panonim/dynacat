@@ -40,6 +40,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &iframeWidget{}
 	case "html":
 		w = &htmlWidget{}
+	case "markdown":
+		w = &markdownWidget{}
 	case "hacker-news":
 		w = &hackerNewsWidget{}
 	case "releases":
@@ -94,6 +96,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &playingWidget{}
 	case "latest-media":
 		w = &latestMediaWidget{}
+	case "prowlarr":
+		w = &prowlarrWidget{}
 	case "torrenting":
 		w = &torrentingWidget{}
 	case "home-assistant":
@@ -200,12 +204,12 @@ type widgetProviders struct {
 	app                  *application
 }
 
-func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, allowInsecure bool) string {
-	return p.SecureImageURLWithMaxAge(ctx, imageURL, allowInsecure, 0)
+func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, allowInsecure bool, allowPrivate bool) string {
+	return p.SecureImageURLWithMaxAge(ctx, imageURL, allowInsecure, allowPrivate, 0, nil)
 }
 
-// A maxAge of 0 keeps the cached copy forever.
-func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL string, allowInsecure bool, maxAge time.Duration) string {
+// A maxAge of 0 means the cached copy is never refetched, and a pinOwner keeps it from eviction for images rendered only once.
+func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL string, allowInsecure bool, allowPrivate bool, maxAge time.Duration, pinOwner any) string {
 	if imageURL == "" {
 		return ""
 	}
@@ -222,7 +226,7 @@ func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL
 	}
 
 	if p.imageCache != nil {
-		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure, maxAge)
+		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure, allowPrivate, maxAge, pinOwner)
 		if err == nil && cachedURL != "" {
 			return cachedURL
 		}

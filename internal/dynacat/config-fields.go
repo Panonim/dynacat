@@ -105,29 +105,37 @@ func (d *durationField) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 
-	matches := durationFieldPattern.FindStringSubmatch(value)
-
-	if len(matches) != 3 {
-		return fmt.Errorf("invalid duration format: %s", value)
-	}
-
-	duration, err := strconv.Atoi(matches[1])
+	duration, err := parseDurationString(value)
 	if err != nil {
 		return err
 	}
 
-	switch matches[2] {
-	case "s":
-		*d = durationField(time.Duration(duration) * time.Second)
-	case "m":
-		*d = durationField(time.Duration(duration) * time.Minute)
-	case "h":
-		*d = durationField(time.Duration(duration) * time.Hour)
-	case "d":
-		*d = durationField(time.Duration(duration) * 24 * time.Hour)
+	*d = durationField(duration)
+	return nil
+}
+
+func parseDurationString(value string) (time.Duration, error) {
+	matches := durationFieldPattern.FindStringSubmatch(value)
+
+	if len(matches) != 3 {
+		return 0, fmt.Errorf("invalid duration format: %s", value)
 	}
 
-	return nil
+	duration, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	switch matches[2] {
+	case "s":
+		return time.Duration(duration) * time.Second, nil
+	case "m":
+		return time.Duration(duration) * time.Minute, nil
+	case "h":
+		return time.Duration(duration) * time.Hour, nil
+	default:
+		return time.Duration(duration) * 24 * time.Hour, nil
+	}
 }
 
 var updateIntervalFieldPattern = regexp.MustCompile(`^(\d+)(s|m|h)$`)

@@ -68,10 +68,10 @@ func (widget *twitchChannelsWidget) update(ctx context.Context) {
 			continue
 		}
 		if channels[i].AvatarUrl != "" {
-			channels[i].AvatarUrl = widget.Providers.SecureImageURL(ctx, channels[i].AvatarUrl, false)
+			channels[i].AvatarUrl = widget.Providers.SecureImageURL(ctx, channels[i].AvatarUrl, false, false)
 		}
 		if channels[i].PreviewUrl != "" {
-			channels[i].PreviewUrl = widget.Providers.SecureImageURL(ctx, channels[i].PreviewUrl, false)
+			channels[i].PreviewUrl = widget.Providers.SecureImageURL(ctx, channels[i].PreviewUrl, false, false)
 		}
 	}
 

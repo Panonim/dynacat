@@ -85,8 +85,12 @@ func (f *sharedFetcher) do(client requestDoer, req *http.Request, maxAge time.Du
 				delete(f.entries, key)
 			default:
 				f.mu.Unlock()
-				<-entry.done
-				continue
+				select {
+				case <-entry.done:
+					continue
+				case <-req.Context().Done():
+					return 0, nil, nil, req.Context().Err()
+				}
 			}
 		}
 

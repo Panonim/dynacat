@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -18,7 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var editorConfigWarnOnce, editorLoginNoticeOnce sync.Once
+var editorConfigWarnOnce sync.Once
 
 // editorEnabledFromEnv reports whether the web UI editor is available at all.
 func editorEnabledFromEnv() bool {
@@ -52,11 +53,6 @@ func (a *application) setupEditorLoginRequirement() {
 	}
 
 	a.EditorRequiresLogin = required
-	if !set && strings.TrimPrefix(buildVersion, "v") == "3.0.2" {
-		editorLoginNoticeOnce.Do(func() {
-			slog.Warn("Since 3.0.2 the web UI editor is only available to logged in users, set EDITOR_REQUIRE_LOGIN=false to allow anonymous visitors to edit")
-		})
-	}
 }
 
 func warnAboutIgnoredEditorConfig(c *config) {
@@ -475,10 +471,12 @@ func (a *application) applyEditorMutation(user *authenticatedUser, m editorMutat
 	if m.Op == "editStyling" {
 		root := documentRoot(mainDoc)
 		if m.PresetKey != "" {
-			applyThemePreset(root, m.PresetKey, m.Theme)
-		} else {
-			applyStylingSection(root, "theme", m.Theme)
-			applyStylingSection(root, "branding", m.Branding)
+			err = applyThemePreset(root, m.PresetKey, m.Theme)
+		} else if err = applyStylingSection(root, "theme", m.Theme); err == nil {
+			err = applyStylingSection(root, "branding", m.Branding)
+		}
+		if err != nil {
+			return err
 		}
 		return a.writeDocument(mainPath, mainDoc)
 	}
@@ -544,8 +542,12 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 
 	switch m.Op {
 	case "addColumn":
+		size := orDefault(m.Size, "full")
+		if size != "small" && size != "full" {
+			return fmt.Errorf("invalid column size %q", size)
+		}
 		col := newMappingNode()
-		addPair(col, "size", scalarNode(orDefault(m.Size, "full")))
+		addPair(col, "size", scalarNode(size))
 		addPair(col, "widgets", sequenceNode())
 
 		seq, at := widgetInsertPoint(colSlots, columns, m.Index)
@@ -732,7 +734,7 @@ func applyPageFields(pageNode *yaml.Node, fields map[string]any) error {
 			continue
 		}
 		node := valueNode(v)
-		if err := rejectIncludeDirective(k, node); err != nil {
+		if err := sanitizeEditorValue(k, getMappingValue(pageNode, k), node); err != nil {
 			return err
 		}
 		setPageMappingKey(pageNode, k, node)
@@ -750,6 +752,72 @@ func rejectIncludeDirective(key string, node *yaml.Node) error {
 	}
 
 	return nil
+}
+
+// Keys are written raw and expand on load like values, so client-supplied ones can't hold ${...} refs.
+func rejectVariableKey(key string) error {
+	if strings.Contains(key, "${") {
+		return fmt.Errorf("key %q must not contain ${", key)
+	}
+	return nil
+}
+
+// Only typed refs like ${secret:x} and ${readFileFromEnv:x}, plain ${VAR} refs to .env variables stay allowed.
+var editorConfigVariablePattern = regexp.MustCompile(`\\?\$\{(?:` + configVarTypeSecret + `|` + configVarTypeFileFromEnv + `):[a-zA-Z0-9_-]+\}`)
+
+// Rejects includes and escapes typed ${...} refs in new or changed scalars, since they expand on reload and would leak secrets and files.
+func sanitizeEditorValue(key string, old, value *yaml.Node) error {
+	if err := rejectVariableKey(key); err != nil {
+		return err
+	}
+	if err := rejectIncludeDirective(key, value); err != nil {
+		return err
+	}
+
+	kept := map[string]bool{}
+	for _, n := range nodeTree(old, nil) {
+		kept[n.Value] = true
+	}
+
+	for _, n := range nodeTree(value, nil) {
+		if n.Kind == yaml.MappingNode {
+			for i := 0; i < len(n.Content); i += 2 {
+				if k := n.Content[i].Value; !kept[k] {
+					if err := rejectVariableKey(k); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		refs := editorConfigVariablePattern.FindAllString(n.Value, -1)
+		if len(refs) == 0 {
+			continue
+		}
+		if !kept[n.Value] {
+			n.Value = editorConfigVariablePattern.ReplaceAllStringFunc(n.Value, func(ref string) string {
+				return ternary(ref[0] == '\\', ref, `\`+ref)
+			})
+			refs = editorConfigVariablePattern.FindAllString(n.Value, -1)
+		}
+		// Double quotes would write the backslash as \\, which the expander turns into the invalid escape \$, and the emitter picks them itself for tabs and line breaks unless the scalar is literal.
+		breaks := strings.ContainsAny(n.Value, "\t\n")
+		if (breaks || n.Style&yaml.DoubleQuotedStyle != 0) && slices.ContainsFunc(refs, func(ref string) bool { return ref[0] == '\\' }) {
+			n.Style = n.Style&^(yaml.DoubleQuotedStyle|yaml.SingleQuotedStyle|yaml.FoldedStyle) | ternary(breaks, yaml.LiteralStyle, yaml.SingleQuotedStyle)
+		}
+	}
+
+	return nil
+}
+
+func nodeTree(n *yaml.Node, out []*yaml.Node) []*yaml.Node {
+	if n == nil {
+		return out
+	}
+	out = append(out, n)
+	for _, c := range n.Content {
+		out = nodeTree(c, out)
+	}
+	return out
 }
 
 func setPageMappingKey(m *yaml.Node, key string, value *yaml.Node) {
@@ -772,7 +840,7 @@ func setPageMappingKey(m *yaml.Node, key string, value *yaml.Node) {
 	addPair(m, key, value)
 }
 
-func newPageMapping(m editorMutation) *yaml.Node {
+func newPageMapping(m editorMutation) (*yaml.Node, error) {
 	page := newMappingNode()
 	addPair(page, "name", scalarNode(orDefault(m.Title, "New Page")))
 
@@ -788,7 +856,7 @@ func newPageMapping(m editorMutation) *yaml.Node {
 		columns.Content = append(columns.Content, col)
 	}
 	addPair(page, "columns", columns)
-	return page
+	return page, sanitizeEditorValue("name", nil, page)
 }
 
 func separatePageFilesEnabled() bool {
@@ -841,7 +909,10 @@ func (a *application) addPageInline(mainDoc *yaml.Node, mainPath string, m edito
 		return fmt.Errorf("pages must be a list to hold a page written into the main config")
 	}
 
-	page := newPageMapping(m)
+	page, err := newPageMapping(m)
+	if err != nil {
+		return err
+	}
 	setBlockStyleDeep(page)
 	pages.Content = append(pages.Content, page)
 
@@ -862,7 +933,10 @@ func (a *application) addPageFile(mainDoc *yaml.Node, mainPath string, m editorM
 	file := uniquePageFileName(dir, orDefault(m.Title, "New Page"))
 	pagePath := filepath.Join(dir, file)
 
-	page := newPageMapping(m)
+	page, err := newPageMapping(m)
+	if err != nil {
+		return err
+	}
 	setBlockStyleDeep(page)
 	pageDoc := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{
 		{Kind: yaml.SequenceNode, Content: []*yaml.Node{page}},
@@ -1496,8 +1570,12 @@ func buildWidgetNode(widgetType string, fields map[string]any, rawFields map[str
 	if widgetType == "" {
 		return nil, fmt.Errorf("widget type is required")
 	}
+	typeNode := scalarNode(widgetType)
+	if err := sanitizeEditorValue("type", nil, typeNode); err != nil {
+		return nil, err
+	}
 	node := newMappingNode()
-	addPair(node, "type", scalarNode(widgetType))
+	addPair(node, "type", typeNode)
 	return node, applyFieldsToNode(node, fields, rawFields)
 }
 
@@ -1512,7 +1590,7 @@ func applyFieldsToNode(node *yaml.Node, fields map[string]any, rawFields map[str
 			continue
 		}
 		value := valueNode(fields[k])
-		if err := rejectIncludeDirective(k, value); err != nil {
+		if err := sanitizeEditorValue(k, getMappingValue(node, k), value); err != nil {
 			return err
 		}
 		setMappingKey(node, k, value)
@@ -1527,7 +1605,7 @@ func applyFieldsToNode(node *yaml.Node, fields map[string]any, rawFields map[str
 		if err != nil {
 			return fmt.Errorf("field %s: %w", k, err)
 		}
-		if err := rejectIncludeDirective(k, parsed); err != nil {
+		if err := sanitizeEditorValue(k, getMappingValue(node, k), parsed); err != nil {
 			return err
 		}
 		setMappingKey(node, k, parsed)
@@ -1536,9 +1614,9 @@ func applyFieldsToNode(node *yaml.Node, fields map[string]any, rawFields map[str
 	return nil
 }
 
-func applyStylingSection(root *yaml.Node, key string, fields map[string]any) {
+func applyStylingSection(root *yaml.Node, key string, fields map[string]any) error {
 	if fields == nil {
-		return
+		return nil
 	}
 	section := getMappingValue(root, key)
 	if section == nil {
@@ -1551,14 +1629,19 @@ func applyStylingSection(root *yaml.Node, key string, fields map[string]any) {
 			removeMappingKey(section, k)
 			continue
 		}
-		setMappingKey(section, k, valueNode(v))
+		value := valueNode(v)
+		if err := sanitizeEditorValue(k, getMappingValue(section, k), value); err != nil {
+			return err
+		}
+		setMappingKey(section, k, value)
 	}
 	if len(section.Content) == 0 {
 		removeMappingKey(root, key)
 	}
+	return nil
 }
 
-func applyThemePreset(root *yaml.Node, key string, fields map[string]any) {
+func applyThemePreset(root *yaml.Node, key string, fields map[string]any) error {
 	theme := getMappingValue(root, "theme")
 	if theme == nil {
 		theme = newMappingNode()
@@ -1571,6 +1654,9 @@ func applyThemePreset(root *yaml.Node, key string, fields map[string]any) {
 	}
 	preset := getMappingValue(presets, key)
 	if preset == nil {
+		if err := rejectVariableKey(key); err != nil {
+			return err
+		}
 		preset = newMappingNode()
 		setMappingKey(presets, key, preset)
 	}
@@ -1580,8 +1666,13 @@ func applyThemePreset(root *yaml.Node, key string, fields map[string]any) {
 			removeMappingKey(preset, k)
 			continue
 		}
-		setMappingKey(preset, k, valueNode(v))
+		value := valueNode(v)
+		if err := sanitizeEditorValue(k, getMappingValue(preset, k), value); err != nil {
+			return err
+		}
+		setMappingKey(preset, k, value)
 	}
+	return nil
 }
 
 func removeThemePreset(root *yaml.Node, key string) {

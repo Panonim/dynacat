@@ -79,13 +79,14 @@ type calendarReleaseCacheEntry struct {
 }
 
 type calendarWidget struct {
-	widgetBase       `yaml:",inline"`
-	FirstDayOfWeek   string                   `yaml:"first-day-of-week"`
-	FirstDay         int                      `yaml:"-"`
-	Frameless        bool                     `yaml:"frameless"`
-	Hosts            []calendarReleaseService `yaml:"hosts"`
-	ReleaseTypes     stringListField          `yaml:"release-types"`
-	ShowReleaseState bool                     `yaml:"show-release-state"`
+	widgetBase        `yaml:",inline"`
+	FirstDayOfWeek    string                   `yaml:"first-day-of-week"`
+	FirstDay          int                      `yaml:"-"`
+	Frameless         bool                     `yaml:"frameless"`
+	Hosts             []calendarReleaseService `yaml:"hosts"`
+	ReleaseTypes      stringListField          `yaml:"release-types"`
+	ShowReleaseState  bool                     `yaml:"show-release-state"`
+	ReleaseStateColor string                   `yaml:"release-state-color"`
 
 	cachedHTML          template.HTML   `yaml:"-"`
 	releasesInterval    time.Duration   `yaml:"-"`
@@ -116,6 +117,13 @@ func (widget *calendarWidget) initialize() error {
 				widget.enabledReleaseTypes[normalized] = true
 			}
 		}
+	}
+
+	switch normalized := strings.ToLower(strings.TrimSpace(widget.ReleaseStateColor)); normalized {
+	case "", "icon", "title", "both":
+		widget.ReleaseStateColor = normalized
+	default:
+		return errors.New("invalid release state color")
 	}
 
 	widget.releasesInterval = calendarDefaultReleasesInterval

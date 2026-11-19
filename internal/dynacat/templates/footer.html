@@ -1,6 +1,7 @@
 {{ if not .App.Config.Branding.HideFooter }}
 <footer class="footer flex items-center flex-column">
-{{ if eq "" .App.Config.Branding.CustomFooter }}
+{{/* The login page has no Page and gets the default footer, keeping the custom footer HTML away from unauthenticated visitors. */}}
+{{ if or (eq "" .App.Config.Branding.CustomFooter) (not .Page) }}
     <div>
         <a class="size-h3" href="https://github.com/Panonim/dynacat" target="_blank" rel="noreferrer">Dynacat</a> 
         {{ if ne "dev" .App.Version }}

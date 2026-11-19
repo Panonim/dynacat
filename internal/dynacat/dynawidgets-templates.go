@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -160,7 +161,7 @@ func dynawidgetsCheckLock(slug string, repo string) *sync.Mutex {
 	return lock
 }
 
-// Refetches the cached template once its check interval has passed and rewrites the cache file if it changed.
+// Refetches the cached template once its check interval has passed and rewrites the cache file if it changed and kept its required section.
 func dynawidgetsCheckTemplate(slug string, repo string) error {
 	if repo == "" {
 		repo = dynawidgetsDefaultRepo
@@ -214,6 +215,17 @@ func dynawidgetsCheckTemplate(slug string, repo string) error {
 		return nil
 	}
 
+	// The required block decides where requests go and which env vars they carry, so upstream may not change it silently.
+	_, cachedRequired := dynawidgetsSplitTemplate(string(cached))
+	if _, newRequired := dynawidgetsSplitTemplate(string(body)); newRequired != cachedRequired {
+		dynawidgetsWriteMeta(slug, repo, meta)
+		slog.Warn(
+			"Dynawidget template update changes its required section and was not applied, delete the cached template and restart Dynacat to accept it",
+			"slug", slug, "repo", repo, "path", templatePath,
+		)
+		return nil
+	}
+
 	if err := os.WriteFile(templatePath, body, 0600); err != nil {
 		return fmt.Errorf("writing template: %w", err)
 	}
@@ -236,6 +248,10 @@ func dynawidgetsDownloadTemplate(templateURL string, etag string) (body []byte, 
 			"refusing to fetch template from unexpected host %q (must be https://%s)",
 			parsedURL.Host, dynawidgetsTemplateHost,
 		)
+	}
+	// An uncleaned path could climb out of the repository with dot segments.
+	if p := parsedURL.Path; path.Clean(p) != p || !strings.HasPrefix(p, dynawidgetsRepoPath) {
+		return nil, false, "", fmt.Errorf("refusing to fetch template outside %s%s", dynawidgetsTemplateHost, dynawidgetsRepoPath)
 	}
 
 	request, err := http.NewRequest(http.MethodGet, templateURL, nil)

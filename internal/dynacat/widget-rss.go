@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"html/template"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -120,7 +119,7 @@ func (widget *rssWidget) update(ctx context.Context) {
 			if items[i].ImageURL == "" {
 				continue
 			}
-			items[i].ImageURL = widget.Providers.SecureImageURL(ctx, items[i].ImageURL, false)
+			items[i].ImageURL = widget.Providers.SecureImageURL(ctx, items[i].ImageURL, false, false)
 		}
 	}
 
@@ -264,7 +263,7 @@ func (widget *rssWidget) fetchItemsFromFeedTask(request rssFeedRequest) ([]rssFe
 		return nil, fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, request.URL)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -132,6 +132,8 @@ func newApplication(c *config) (*application, error) {
 		app.PasswordEnabled = true
 		app.usernameHashToUsername = make(map[string]string)
 
+		// Unknown usernames are checked against a dummy hash of the slowest configured cost.
+		dummyCost := 0
 		for username := range config.Auth.Users {
 			user := config.Auth.Users[username]
 
@@ -159,7 +161,17 @@ func newApplication(c *config) (*application, error) {
 				user.Password = ""
 				user.PasswordHash = hashedPassword
 			}
+
+			if cost, err := bcrypt.Cost(user.PasswordHash); err == nil && cost > dummyCost {
+				dummyCost = cost
+			}
 		}
+
+		dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), ternary(dummyCost > 0, dummyCost, bcrypt.DefaultCost))
+		if err != nil {
+			return nil, fmt.Errorf("hashing dummy password: %v", err)
+		}
+		config.Auth.dummyPasswordHash = dummyPasswordHash
 	}
 
 	if config.Auth.OIDC != nil {
@@ -435,10 +447,7 @@ func newApplication(c *config) (*application, error) {
 	app.parsedManifest = []byte(manifest)
 
 	if len(app.todoListIDToPage) > 0 {
-		dbPath := config.Server.DBPath
-		if dbPath == "" {
-			dbPath = filepath.Join(config.assetsPath(), "dynacat.db")
-		}
+		dbPath := config.dbPath()
 		app.todoStorage = newTodoStorage(dbPath)
 
 		if err := app.todoStorage.init(); err != nil {
@@ -784,7 +793,9 @@ func (a *application) handleWidgetContentRequest(w http.ResponseWriter, r *http.
 	page.mu.Lock()
 	defer page.mu.Unlock()
 
-	widget.update(context.Background())
+	if now := time.Now(); widget.requiresUpdate(&now) || widget.IsLazyLoad() {
+		widget.update(context.Background())
+	}
 
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1032,12 +1043,15 @@ func (a *application) server() (func() error, func() error) {
 		)),
 	)
 
+	dbPath := sqliteFilePath(a.Config.dbPath())
+	dbFiles := []string{dbPath, dbPath + "-wal", dbPath + "-shm", dbPath + "-journal"}
+
 	if a.Config.Server.CacheDir != "" {
 		// Cached files are fetched from remote widget content and an SVG among them would
 		// otherwise run scripts on this origin when opened directly.
 		cacheHandler := sandboxedHandler(http.StripPrefix(
 			"/.cache",
-			fileServerWithCache(http.Dir(a.Config.Server.CacheDir), REMOTE_IMAGE_CACHE_DURATION),
+			a.imageCache.fileHandler(fileServerWithCache(hideFilesFS{http.Dir(a.Config.Server.CacheDir), dbFiles}, REMOTE_IMAGE_CACHE_DURATION)),
 		))
 
 		if a.RequiresAuth {
@@ -1078,8 +1092,7 @@ func (a *application) server() (func() error, func() error) {
 	assetsPath := a.Config.assetsPath()
 
 	absAssetsPath, _ := filepath.Abs(assetsPath)
-	assetsFS := fileServerWithCache(http.Dir(assetsPath), 2*time.Hour)
-	assetsHandler := http.StripPrefix("/assets/", assetsFS)
+	assetsHandler := http.StripPrefix("/assets/", fileServerWithCache(hideFilesFS{http.Dir(assetsPath), dbFiles}, 2*time.Hour))
 	if a.RequiresAuth {
 		mux.Handle("/assets/{path...}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
@@ -1110,6 +1123,7 @@ func (a *application) server() (func() error, func() error) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	go a.sseUpdateLoop(ctx)
 	go a.prewarmWidgets()
+	go a.imageCache.runJanitor(ctx)
 	if a.oidcSessions != nil {
 		go a.oidcSessions.runSweeper(ctx, 15*time.Minute, OIDC_SESSION_VALID_PERIOD)
 	}

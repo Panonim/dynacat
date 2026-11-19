@@ -1,6 +1,6 @@
 import { setupPopovers } from './popover.js';
 import { setupMasonries } from './masonry.js';
-import { throttledDebounce, isElementVisible, openURLInNewTab } from './utils.js';
+import { throttledDebounce, isElementVisible, openURLInNewTab, isNavigableURL } from './utils.js';
 import { elem, find, findAll } from './templating.js';
 
 async function fetchPageContent(pageData) {
@@ -486,6 +486,7 @@ function setupSearchBoxes() {
             const selectItem = (item) => {
                 if (item.type === "target") {
                     hideAC();
+                    if (!isNavigableURL(item.url)) return;
                     if (item.target === "_blank") {
                         window.open(item.url, item.target).focus();
                     } else {
@@ -1044,7 +1045,7 @@ function setupCollapsibleGrids() {
         }
 
         const getCardsPerRow = () => {
-            return parseInt(getComputedStyle(gridElement).getPropertyValue('--cards-per-row'));
+            return getComputedStyle(gridElement).gridTemplateColumns.replace(/\[[^\]]*\]/g, "").trim().split(/\s+/).length;
         };
 
         let cardsPerRow;
@@ -1614,6 +1615,7 @@ async function updateWidget(widgetElement) {
                 if (input.value) savedInputs[input.id] = input.value;
             }
 
+            oldContent.querySelectorAll('.calendar').forEach(c => c.component?.suspend?.());
             updateContentPreservingImages(oldContent, newContent);
 
             for (const [id, value] of Object.entries(savedInputs)) {
@@ -1632,6 +1634,7 @@ async function updateWidget(widgetElement) {
             const callbacksIndexBefore = contentReadyCallbacks.length;
 
             setupClocks();
+            await setupCalendars().catch(error => console.error('Calendar setup failed', error));
             setupPopovers();
             setupCarousels();
             setupCollapsibleLists();
@@ -2234,6 +2237,7 @@ function _applyWidgetUpdate(widgetId, html) {
     htmlElem.style.overflowAnchor = 'none';
 
     try {
+        target.querySelectorAll('.calendar').forEach(c => c.component?.suspend?.());
         Idiomorph.morph(target, html, { morphStyle: 'outerHTML' });
 
         const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
@@ -2272,6 +2276,7 @@ function _applyWidgetUpdate(widgetId, html) {
 
 function _runPostSettleSetup() {
     setupClocks();
+    setupCalendars();
     setupPopovers();
     setupCarousels();
     setupGroups();
