@@ -235,7 +235,8 @@ func markImageUsed(filename string) {
 func (c *imageCache) fileHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/")
-		if ext := cacheFileExt(name); ext == "" || ext == ".tmp" || !fileExists(filepath.Join(c.dir, name)) {
+		path := filepath.Join(c.dir, name)
+		if ext := cacheFileExt(name); ext == "" || ext == ".tmp" || !strings.HasPrefix(path, filepath.Clean(c.dir)+string(os.PathSeparator)) || !fileExists(path) {
 			http.NotFound(w, r)
 			return
 		}
