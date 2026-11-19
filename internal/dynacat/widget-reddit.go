@@ -373,16 +373,23 @@ func backoffRedditRSS(response *http.Response) {
 		return
 	}
 
-	reset, err := strconv.Atoi(response.Header.Get("x-ratelimit-reset"))
-	if err != nil || reset <= 0 {
-		reset, err = strconv.Atoi(response.Header.Get("retry-after"))
-	}
-	if err != nil || reset <= 0 {
-		reset = 60
+	now := time.Now()
+	until := now.Add(time.Minute)
+	retryAfter := response.Header.Get("retry-after")
+
+	if reset, err := strconv.Atoi(response.Header.Get("x-ratelimit-reset")); err == nil && reset > 0 {
+		until = now.Add(time.Duration(reset) * time.Second)
+	} else if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
+		until = now.Add(time.Duration(seconds) * time.Second)
+	} else if date, err := http.ParseTime(retryAfter); err == nil && date.After(now) {
+		until = date
 	}
 
+	// Concurrent responses may carry shorter windows, so the furthest deadline wins.
 	redditRSSRateLimit.Lock()
-	redditRSSRateLimit.until = time.Now().Add(time.Duration(reset) * time.Second)
+	if until.After(redditRSSRateLimit.until) {
+		redditRSSRateLimit.until = until
+	}
 	redditRSSRateLimit.Unlock()
 }
 
