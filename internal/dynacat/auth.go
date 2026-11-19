@@ -99,7 +99,8 @@ func computeUsernameHash(username string, credential string, secret []byte) ([]b
 }
 
 func verifySessionToken(token string, secretBytes []byte, now time.Time) ([]byte, bool, error) {
-	tokenBytes, err := base64.StdEncoding.DecodeString(token)
+	// Strict rejects non-zero padding bits, so a revoked token can't be re-encoded into a string the denylist doesn't know.
+	tokenBytes, err := base64.StdEncoding.Strict().DecodeString(token)
 	if err != nil {
 		return nil, false, err
 	}
