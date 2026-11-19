@@ -16,6 +16,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -188,15 +190,8 @@ func (a *application) handleAuthenticationAttempt(w http.ResponseWriter, r *http
 		return
 	}
 
-	u, exists := a.Config.Auth.Users[creds.Username]
-	if !exists {
-		logAuthFailure()
-		time.Sleep(waitOnFailure)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword(u.PasswordHash, []byte(creds.Password)); err != nil {
+	u := a.userWithPassword(creds.Username, creds.Password)
+	if u == nil {
 		logAuthFailure()
 		time.Sleep(waitOnFailure)
 		w.WriteHeader(http.StatusUnauthorized)
@@ -267,22 +262,55 @@ func (a *application) verifyUserPassword(username, password string) *authenticat
 		return nil
 	}
 
-	u, exists := a.Config.Auth.Users[username]
-	if !exists {
-		return nil
-	}
-
-	if bcrypt.CompareHashAndPassword(u.PasswordHash, []byte(password)) != nil {
+	if a.userWithPassword(username, password) == nil {
 		return nil
 	}
 
 	return &authenticatedUser{Username: username}
 }
 
+// Unknown usernames still run bcrypt against a dummy hash so they take as long to reject as a wrong password.
+func (a *application) userWithPassword(username, password string) *user {
+	u, exists := a.Config.Auth.Users[username]
+	hash := a.Config.Auth.dummyPasswordHash
+	if exists {
+		hash = u.PasswordHash
+	}
+
+	if bcrypt.CompareHashAndPassword(hash, []byte(password)) != nil || !exists {
+		return nil
+	}
+
+	return u
+}
+
+// Logged-out password session tokens mapped to when they would expire anyway, shared across config reloads.
+var revokedSessionTokens sync.Map
+var revokedSessionTokensPruned atomic.Int64
+
+func revokeSessionToken(token string) {
+	now := time.Now()
+	// The swap lets a single logout per minute do the pruning.
+	if last := revokedSessionTokensPruned.Load(); now.Unix()-last >= 60 && revokedSessionTokensPruned.CompareAndSwap(last, now.Unix()) {
+		revokedSessionTokens.Range(func(k, expires any) bool {
+			if now.After(expires.(time.Time)) {
+				revokedSessionTokens.Delete(k)
+			}
+			return true
+		})
+	}
+	revokedSessionTokens.Store(token, now.Add(AUTH_TOKEN_VALID_PERIOD))
+}
+
+func sessionTokenRevoked(token string) bool {
+	_, revoked := revokedSessionTokens.Load(token)
+	return revoked
+}
+
 func (a *application) getAuthenticatedUser(w http.ResponseWriter, r *http.Request) *authenticatedUser {
 	if a.PasswordEnabled && len(a.Config.Auth.Users) > 0 {
 		token, err := r.Cookie(AUTH_SESSION_COOKIE_NAME)
-		if err == nil && token.Value != "" {
+		if err == nil && token.Value != "" && !sessionTokenRevoked(token.Value) {
 			usernameHash, shouldRegenerate, err := verifySessionToken(token.Value, a.authSecretKey, time.Now())
 			if err == nil {
 				username, exists := a.usernameHashToUsername[string(usernameHash)]
@@ -462,6 +490,12 @@ func (a *application) AnyAuthEnabled() bool {
 }
 
 func (a *application) handleLogoutRequest(w http.ResponseWriter, r *http.Request) {
+	// Only validly signed tokens are stored, so junk cookies can't grow the denylist.
+	if token, err := r.Cookie(AUTH_SESSION_COOKIE_NAME); err == nil && token.Value != "" {
+		if _, _, err := verifySessionToken(token.Value, a.authSecretKey, time.Now()); err == nil {
+			revokeSessionToken(token.Value)
+		}
+	}
 	a.setAuthSessionCookie(w, r, "", time.Now().Add(-1*time.Hour))
 
 	var session *oidcSession

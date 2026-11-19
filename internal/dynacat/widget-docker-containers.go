@@ -211,7 +211,7 @@ func fetchDockerContainers(
 
 		dc := dockerContainer{
 			Name:        deriveDockerContainerName(container, formatNames),
-			URL:         container.Labels.getOrDefault(dockerContainerLabelURL, ""),
+			URL:         linkURLOrEmpty(container.Labels.getOrDefault(dockerContainerLabelURL, "")),
 			Description: container.Labels.getOrDefault(dockerContainerLabelDescription, ""),
 			SameTab:     stringToBool(container.Labels.getOrDefault(dockerContainerLabelSameTab, "false")),
 			Image:       container.Image,

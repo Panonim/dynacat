@@ -28,7 +28,17 @@ export function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
+// Relative URLs resolve against the page and app schemes like steam: stay allowed, so only script-capable schemes are rejected.
+export function isNavigableURL(url) {
+    try {
+        return !["javascript:", "data:", "vbscript:"].includes(new URL(url, location.href).protocol);
+    } catch {
+        return false;
+    }
+}
+
 export function openURLInNewTab(url, focus = true) {
+    if (!isNavigableURL(url)) return;
     const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
 
     if (focus && newWindow != null) newWindow.focus();

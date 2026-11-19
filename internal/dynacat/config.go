@@ -54,6 +54,8 @@ type config struct {
 		AutoRedirectOIDC bool             `yaml:"auto-redirect-oidc"`
 		Users            map[string]*user `yaml:"users"`
 		OIDC             *oidcConfig      `yaml:"oidc"`
+
+		dummyPasswordHash []byte
 	} `yaml:"auth"`
 
 	API struct {

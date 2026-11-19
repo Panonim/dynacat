@@ -286,6 +286,8 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, "action failed", http.StatusInternalServerError)
 			return
 		}
+		// Lets the follow-up content request refresh the widget instead of serving the cached state.
+		widget.nextUpdate = time.Now()
 		w.WriteHeader(http.StatusNoContent)
 
 	case parts[0] == "images" && len(parts) == 2 && parts[1] == "pull":
@@ -326,6 +328,13 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 				pull.err = err.Error()
 			}
 			pull.mu.Unlock()
+
+			// Takes the page lock the action handler holds so the next content request shows the pulled image.
+			if page := widget.Providers.app.widgetToPage[widget.GetID()]; page != nil {
+				page.mu.Lock()
+				widget.nextUpdate = time.Now()
+				page.mu.Unlock()
+			}
 
 			time.AfterFunc(60*time.Second, func() {
 				widget.pullsMu.Lock()
@@ -372,6 +381,7 @@ func (widget *dockerControllerWidget) handleRequest(w http.ResponseWriter, r *ht
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		widget.nextUpdate = time.Now()
 		w.WriteHeader(http.StatusNoContent)
 
 	default:

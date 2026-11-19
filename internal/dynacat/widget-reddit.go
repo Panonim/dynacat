@@ -452,7 +452,7 @@ func (widget *redditWidget) fetchSubredditPostsFromRSS() (forumPostList, error) 
 		return nil, fmt.Errorf("unexpected status code %d from %s", response.StatusCode, requestURL)
 	}
 
-	feed, err := feedParser.Parse(response.Body)
+	feed, err := feedParser.Parse(io.LimitReader(response.Body, maxResponseBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +538,7 @@ func isRedditHost(host string) bool {
 	return host == "reddit.com" || strings.HasSuffix(host, ".reddit.com")
 }
 
-var redditHTTPClient = &http.Client{Transport: &http2.Transport{
+var redditHTTPClient = &http.Client{Timeout: defaultClientTimeout, Transport: &http2.Transport{
 	DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -612,7 +612,7 @@ func fetchRedditGuestToken() (string, error) {
 		return "", fmt.Errorf("unexpected status code %d when requesting challenge page", response.StatusCode)
 	}
 
-	challengeBody, err := io.ReadAll(response.Body)
+	challengeBody, err := readLimited(response.Body)
 	if err != nil {
 		return "", err
 	}

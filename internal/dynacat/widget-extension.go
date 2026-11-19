@@ -152,9 +152,7 @@ func fetchExtension(options extensionRequestOptions) (extension, error) {
 		extension.Title = response.Header.Get(extensionHeaderTitle)
 	}
 
-	if response.Header.Get(extensionHeaderTitleURL) != "" {
-		extension.TitleURL = response.Header.Get(extensionHeaderTitleURL)
-	}
+	extension.TitleURL = linkURLOrEmpty(response.Header.Get(extensionHeaderTitleURL))
 
 	contentType, ok := extensionStringToType[response.Header.Get(extensionHeaderContentType)]
 

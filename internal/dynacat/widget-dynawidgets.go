@@ -37,6 +37,8 @@ var dynawidgetsSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 var dynawidgetsRepoPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 var dynawidgetsTemplateHost = "raw.githubusercontent.com"
 
+const dynawidgetsRepoPath = "/Panonim/dynawidgets/"
+
 type dynawidgetsWidget struct {
 	widgetBase        `yaml:",inline"`
 	Widget            string `yaml:"widget"`
@@ -170,7 +172,7 @@ func (widget *dynawidgetsWidget) update(ctx context.Context) {
 
 	widget.APIResponse = rawResponse
 	widget.Hidden = hidden
-	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers)
+	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers, false)
 	widget.noticeTemplateUpdate()
 }
 
@@ -371,7 +373,7 @@ func dynawidgetsTemplateURL(slug string, repo string) (templateURL string, title
 		return "", "", fmt.Errorf("invalid slug %q", slug)
 	}
 
-	listURL := fmt.Sprintf("https://%s/Panonim/dynawidgets/refs/heads/%s/database/list-%s.json", dynawidgetsTemplateHost, repo, slug[:1])
+	listURL := fmt.Sprintf("https://%s%srefs/heads/%s/database/list-%s.json", dynawidgetsTemplateHost, dynawidgetsRepoPath, repo, slug[:1])
 
 	slog.Info("Fetching dynawidgets list", "url", listURL)
 

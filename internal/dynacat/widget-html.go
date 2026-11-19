@@ -21,7 +21,7 @@ func (widget *htmlWidget) initialize() error {
 
 func (widget *htmlWidget) setProviders(providers *widgetProviders) {
 	widget.widgetBase.setProviders(providers)
-	widget.processedHTML = rewriteImgSrcs(context.Background(), widget.Source, providers)
+	widget.processedHTML = rewriteImgSrcs(context.Background(), widget.Source, providers, true)
 }
 
 func (widget *htmlWidget) Render() template.HTML {

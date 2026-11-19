@@ -99,7 +99,7 @@ func (widget *customAPIWidget) update(ctx context.Context) {
 
 	widget.APIResponse = rawResponse
 	widget.Hidden = hidden
-	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers)
+	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers, false)
 }
 
 func (widget *customAPIWidget) setProviders(providers *widgetProviders) {
@@ -533,14 +533,14 @@ func customAPITemplateFuncs(providers *widgetProviders, imageMaxAge time.Duratio
 		if providers == nil {
 			return rawURL
 		}
-		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, false, true, imageMaxAge)
+		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, false, true, imageMaxAge, false)
 	}
 
 	secureImageURLAllowInsecure := func(rawURL string) string {
 		if providers == nil {
 			return rawURL
 		}
-		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, true, true, imageMaxAge)
+		return providers.SecureImageURLWithMaxAge(context.Background(), rawURL, true, true, imageMaxAge, false)
 	}
 
 	funcs := template.FuncMap{
