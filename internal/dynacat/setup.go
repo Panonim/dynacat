@@ -175,7 +175,7 @@ func serveFirstRunSetupIfNoConfig(ctx context.Context, configPath string) error 
 	)
 
 	mux := http.NewServeMux()
-	server := &http.Server{Addr: firstRunSetupAddr(configPath), Handler: mux}
+	server := &http.Server{Addr: firstRunSetupAddr(configPath), Handler: sameOriginMiddleware(mux)}
 
 	setup := &firstRunSetup{
 		configPath: configPath,
@@ -316,7 +316,7 @@ func newStarterConfigYAML(existing []byte, pageName string, preset starterPreset
 
 func starterPageNode(preset starterPreset) (*yaml.Node, error) {
 	if preset.file == "" {
-		return newPageMapping(editorMutation{Layout: []string{"full"}}), nil
+		return newPageMapping(editorMutation{Layout: []string{"full"}})
 	}
 
 	contents, err := starterFS.ReadFile("starters/" + preset.file)

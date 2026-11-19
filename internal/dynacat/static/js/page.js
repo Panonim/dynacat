@@ -1,6 +1,6 @@
 import { setupPopovers } from './popover.js';
 import { setupMasonries } from './masonry.js';
-import { throttledDebounce, isElementVisible, openURLInNewTab } from './utils.js';
+import { throttledDebounce, isElementVisible, openURLInNewTab, isNavigableURL } from './utils.js';
 import { elem, find, findAll } from './templating.js';
 
 async function fetchPageContent(pageData) {
@@ -486,6 +486,7 @@ function setupSearchBoxes() {
             const selectItem = (item) => {
                 if (item.type === "target") {
                     hideAC();
+                    if (!isNavigableURL(item.url)) return;
                     if (item.target === "_blank") {
                         window.open(item.url, item.target).focus();
                     } else {

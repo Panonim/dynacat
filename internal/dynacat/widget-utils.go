@@ -27,7 +27,8 @@ import (
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
 
-func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders) template.HTML {
+// Widgets that render only once should pass themselves as pinOwner, since nothing refreshes their images' last use.
+func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pinOwner any) template.HTML {
 	if providers == nil {
 		return html
 	}
@@ -37,7 +38,7 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 			return match
 		}
 		originalSrc := parts[2]
-		newSrc := providers.SecureImageURL(ctx, originalSrc, false, false)
+		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, false, 0, pinOwner)
 		if newSrc == originalSrc {
 			return match
 		}
@@ -56,6 +57,19 @@ func httpURLOrEmpty(rawURL string) string {
 		return rawURL
 	}
 	return ""
+}
+
+// Keeps relative paths and app schemes, trimming like browsers do so " javascript:" can't sneak past.
+func linkURLOrEmpty(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimFunc(rawURL, func(r rune) bool { return r <= ' ' }))
+	if err != nil {
+		return ""
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "javascript", "data", "vbscript":
+		return ""
+	}
+	return rawURL
 }
 
 var (

@@ -63,6 +63,10 @@ server:
 
 This tells Dynacat to read the real client IP from the `X-Forwarded-For` header.
 
+### Sessions
+
+Login sessions last 14 days. Logging out revokes the session in memory only, so a copy of a logged-out session cookie becomes valid again after Dynacat restarts, until it expires. To end every session at once, change `secret-key` or the user's password.
+
 ---
 
 ## OIDC Authentication

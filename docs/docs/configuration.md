@@ -50,6 +50,10 @@ If you need to use the syntax `${NAME}` in your config without it being interpre
 something: \${NOT_AN_ENV_VAR}
 ```
 
+> [!IMPORTANT]
+>
+> Define your variables in the `.env` file instead of typing values directly into pages. The UI editor can reference any `${ENV_VAR}`, so anyone allowed to edit can read every environment variable. Keep auth passwords and other sensitive secrets in `${secret:...}` or `${readFileFromEnv:...}`, which only work when written in the config file by hand.
+
 #### Other ways of providing tokens/passwords/secrets
 
 You can use [Docker secrets](https://docs.docker.com/compose/how-tos/use-secrets/) with the following syntax:
@@ -284,6 +288,8 @@ icon: /assets/gitea-icon.png
 Directory where Dynacat stores cached remote images (for example, widget icons). Cached files are served from `/.cache/` with long cache headers so browsers reuse them without refetching from the original host.
 
 If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
+
+Unused images are cleaned up automatically, see the [`IMAGE_CACHE_*` environment variables](env-options.md#image_cache_max_idle) to change how long they're kept, the size cap and how often cleanup runs.
 
 #### `db-path`
 Path to the SQLite database file used for server-side todo storage. Only required when at least one `to-do` widget has `storage: server` set. If the path is relative, it will be resolved relative to the Dynacat working directory. The file will be created if it does not exist.
@@ -2986,7 +2992,7 @@ volumes:
   - /etc/os-release:/host/etc/os-release:ro
 ```
 
-Alternatively, set [`HOST_ETC`](docker-options.md#host_etc) if you'd rather bind mount the host's whole `/etc` to a custom path.
+Alternatively, set [`HOST_ETC`](env-options.md#host_etc) if you'd rather bind mount the host's whole `/etc` to a custom path.
 
 #### Properties
 | Name | Type | Required | Default |

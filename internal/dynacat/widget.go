@@ -205,11 +205,11 @@ type widgetProviders struct {
 }
 
 func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, allowInsecure bool, allowPrivate bool) string {
-	return p.SecureImageURLWithMaxAge(ctx, imageURL, allowInsecure, allowPrivate, 0)
+	return p.SecureImageURLWithMaxAge(ctx, imageURL, allowInsecure, allowPrivate, 0, nil)
 }
 
-// A maxAge of 0 keeps the cached copy forever.
-func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL string, allowInsecure bool, allowPrivate bool, maxAge time.Duration) string {
+// A maxAge of 0 means the cached copy is never refetched, and a pinOwner keeps it from eviction for images rendered only once.
+func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL string, allowInsecure bool, allowPrivate bool, maxAge time.Duration, pinOwner any) string {
 	if imageURL == "" {
 		return ""
 	}
@@ -226,7 +226,7 @@ func (p *widgetProviders) SecureImageURLWithMaxAge(ctx context.Context, imageURL
 	}
 
 	if p.imageCache != nil {
-		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure, allowPrivate, maxAge)
+		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure, allowPrivate, maxAge, pinOwner)
 		if err == nil && cachedURL != "" {
 			return cachedURL
 		}
