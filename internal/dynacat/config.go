@@ -138,6 +138,7 @@ type page struct {
 	} `yaml:"columns"`
 	AllowedUsers       []string   `yaml:"allowed-users"`
 	AllowedGroups      []string   `yaml:"allowed-groups"`
+	ShowWhenRestricted bool       `yaml:"show-when-restricted"`
 	PrimaryColumnIndex int8       `yaml:"-"`
 	mu                 sync.Mutex `yaml:"-"`
 }
@@ -663,6 +664,10 @@ func isConfigStateValid(config *config) error {
 
 		if (len(page.AllowedUsers) > 0 || len(page.AllowedGroups) > 0) && !hasAnyAuthMethod {
 			return fmt.Errorf("page %d has allowed-users/allowed-groups but no auth method is configured", i+1)
+		}
+
+		if page.ShowWhenRestricted && len(page.AllowedUsers) == 0 && len(page.AllowedGroups) == 0 {
+			return fmt.Errorf("page %d has show-when-restricted but no allowed-users or allowed-groups", i+1)
 		}
 
 		if page.Title == "" {

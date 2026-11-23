@@ -549,6 +549,7 @@ pages:
 | global-background | boolean | no | true |
 | hide-desktop-navigation | boolean | no | false |
 | hide-from-navigation | boolean | no | false |
+| show-when-restricted | boolean | no | false |
 | key-bind | string | no | |
 | show-mobile-header | boolean | no | false |
 | head-widgets | array | no | |

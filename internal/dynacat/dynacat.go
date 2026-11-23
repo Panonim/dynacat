@@ -588,7 +588,7 @@ type templateData struct {
 	Page            *page
 	Request         templateRequestData
 	AuthUser        *authenticatedUser
-	AccessiblePages []*page
+	NavigationPages []navigationPage
 	OIDCError       string
 }
 
@@ -608,18 +608,31 @@ func (a *application) populateTemplateRequestData(data *templateRequestData, r *
 	data.Theme = theme
 }
 
-func (a *application) getAccessiblePages(user *authenticatedUser) []*page {
-	pages := make([]*page, 0, len(a.Config.Pages))
+// navigationPage is a page as the navigation sees it. Clicking a locked
+// page goes through the normal access control (login redirect or denied).
+type navigationPage struct {
+	*page
+	// Locked marks a page the user cannot access; Restricted marks any
+	// show-when-restricted page, so accessible ones can render an open
+	// lock as a signed-in affordance.
+	Locked     bool
+	Restricted bool
+}
+
+func (a *application) getNavigationPages(user *authenticatedUser) []navigationPage {
+	pages := make([]navigationPage, 0, len(a.Config.Pages))
 	for i := range a.Config.Pages {
 		p := &a.Config.Pages[i]
+		var allowed bool
 		if user == nil {
-			if len(p.AllowedUsers) == 0 && len(p.AllowedGroups) == 0 {
-				pages = append(pages, p)
-			}
+			allowed = len(p.AllowedUsers) == 0 && len(p.AllowedGroups) == 0
 		} else {
-			if a.isUserAllowedOnPage(user, p) {
-				pages = append(pages, p)
-			}
+			allowed = a.isUserAllowedOnPage(user, p)
+		}
+		if allowed {
+			pages = append(pages, navigationPage{page: p, Restricted: p.ShowWhenRestricted})
+		} else if p.ShowWhenRestricted {
+			pages = append(pages, navigationPage{page: p, Locked: true, Restricted: true})
 		}
 	}
 	return pages
@@ -641,7 +654,7 @@ func (a *application) handlePageRequest(w http.ResponseWriter, r *http.Request) 
 		Page:            page,
 		App:             a,
 		AuthUser:        user,
-		AccessiblePages: a.getAccessiblePages(user),
+		NavigationPages: a.getNavigationPages(user),
 	}
 	a.populateTemplateRequestData(&data.Request, r)
 

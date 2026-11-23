@@ -23,9 +23,9 @@
 {{ end }}
 
 {{ define "navigation-links" }}
-{{ range .AccessiblePages }}
+{{ range .NavigationPages }}
 {{ if not .HideFromNavigation }}
-<a href="{{ $.App.Config.Server.BaseURL }}/{{ .Slug }}" class="nav-item{{ if eq .Slug $.Page.Slug }} nav-item-current{{ end }}"{{ if eq .Slug $.Page.Slug }} aria-current="page"{{ end }}{{ if .KeyBind }} data-key-bind="{{ .KeyBind }}"{{ end }}>{{ if ne "" .NameIcon.URL }}{{ if .NameIcon.AutoInvert }}<span class="nav-item-icon nav-item-icon-mask" style="--nav-item-icon-url: url('{{ .NameIcon.URL }}')"></span>{{ else }}<img class="nav-item-icon" src="{{ .NameIcon.URL }}" alt="">{{ end }}{{ end }}{{ .Title }}{{ if .KeyBind }}<span class="nav-keybind-hint">{{ .KeyBind }}</span>{{ end }}</a>
+<a href="{{ $.App.Config.Server.BaseURL }}/{{ .Slug }}" class="nav-item{{ if eq .Slug $.Page.Slug }} nav-item-current{{ end }}{{ if .Locked }} nav-item-locked{{ end }}"{{ if eq .Slug $.Page.Slug }} aria-current="page"{{ end }}{{ if .Locked }} title="{{ if $.AuthUser }}Restricted access{{ else }}Sign in required{{ end }}"{{ else if .Restricted }} title="Signed in"{{ end }}{{ if .KeyBind }} data-key-bind="{{ .KeyBind }}"{{ end }}>{{ if ne "" .NameIcon.URL }}{{ if .NameIcon.AutoInvert }}<span class="nav-item-icon nav-item-icon-mask" style="--nav-item-icon-url: url('{{ .NameIcon.URL }}')"></span>{{ else }}<img class="nav-item-icon" src="{{ .NameIcon.URL }}" alt="">{{ end }}{{ end }}{{ .Title }}{{ if .Locked }}<span class="nav-item-lock" aria-hidden="true"></span><span class="visually-hidden">({{ if $.AuthUser }}restricted access{{ else }}sign in required{{ end }})</span>{{ else if .Restricted }}<span class="nav-item-lock nav-item-lock-open" aria-hidden="true"></span>{{ end }}{{ if .KeyBind }}<span class="nav-keybind-hint">{{ .KeyBind }}</span>{{ end }}</a>
 {{ end }}
 {{ end }}
 {{ end }}

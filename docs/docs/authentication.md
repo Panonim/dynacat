@@ -257,6 +257,29 @@ A user can access a restricted page if their username appears in `allowed-users`
 
 Pages without `allowed-users` or `allowed-groups` are accessible to all authenticated users.
 
+### Showing restricted pages in the navigation
+
+By default a page the visitor cannot access is left out of the navigation
+entirely. Set `show-when-restricted: true` on a restricted page to keep its
+tab visible to everyone, marked with a lock icon. Clicking the locked tab
+goes through the normal access control: unauthenticated visitors are sent
+to the login page (and back to the page after signing in), and logged-in
+users without access are denied. Users who do have access see the tab
+with an open lock. Only the page's name is revealed; its
+content, search results, and API data stay protected.
+
+```yaml
+pages:
+  - name: Admin Dashboard
+    allowed-groups:
+      - devops
+    show-when-restricted: true
+    columns: ...
+```
+
+`show-when-restricted` requires `allowed-users` or `allowed-groups` on the
+same page.
+
 ### Guest / public access
 
 Set `require-auth: false` to allow unauthenticated access to unrestricted pages:
