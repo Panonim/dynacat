@@ -97,6 +97,6 @@ func (widget *markdownWidget) renderMarkdown(source []byte) {
 	if widget.Providers != nil {
 		widget.Providers.imageCache.unpin(widget)
 	}
-	widget.Content = rewriteImgSrcs(context.Background(), template.HTML(buf.String()), widget.Providers, widget)
+	widget.Content = rewriteImgSrcs(context.Background(), template.HTML(buf.String()), widget.Providers, widget, literalURLHosts(string(source)))
 	widget.cachedHTML = widget.renderTemplate(widget, markdownWidgetTemplate)
 }

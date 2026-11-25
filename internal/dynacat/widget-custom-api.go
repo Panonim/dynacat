@@ -99,7 +99,22 @@ func (widget *customAPIWidget) update(ctx context.Context) {
 
 	widget.APIResponse = rawResponse
 	widget.Hidden = hidden
-	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers, nil)
+	privateHosts := append(customAPIRequestHosts(widget.CustomAPIRequest, widget.Subrequests), literalURLHosts(widget.Template)...)
+	widget.CompiledHTML = rewriteImgSrcs(ctx, compiledHTML, widget.Providers, nil, privateHosts)
+}
+
+// Hosts the widget already requests, so images served by them add no new reachable targets.
+func customAPIRequestHosts(req *CustomAPIRequest, subrequests map[string]*CustomAPIRequest) []string {
+	var hosts []string
+	if req != nil && req.httpRequest != nil {
+		hosts = append(hosts, req.httpRequest.URL.Host)
+	}
+	for _, sub := range subrequests {
+		if sub != nil && sub.httpRequest != nil {
+			hosts = append(hosts, sub.httpRequest.URL.Host)
+		}
+	}
+	return hosts
 }
 
 func (widget *customAPIWidget) setProviders(providers *widgetProviders) {

@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	stdhtml "html"
 	"html/template"
 	"io"
 	"math/rand/v2"
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,8 +29,30 @@ import (
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
 
+var literalURLPattern = regexp.MustCompile(`(?i)https?://[^\s"'<>{}]+`)
+
+// Hosts of absolute URLs the admin wrote literally, so templated parts can't introduce new ones.
+func literalURLHosts(text string) []string {
+	var hosts []string
+	for _, rawURL := range literalURLPattern.FindAllString(text, -1) {
+		if parsed, err := url.Parse(rawURL); err == nil && parsed.Host != "" {
+			hosts = append(hosts, parsed.Host)
+		}
+	}
+	return hosts
+}
+
+// Public hosts keep the public-only client, which re-checks redirects and dialed addresses.
+func privateImageAllowed(rawURL string, hosts []string) bool {
+	parsed, err := url.Parse(rawURL)
+	return err == nil && parsed.Host != "" &&
+		slices.ContainsFunc(hosts, func(host string) bool { return strings.EqualFold(host, parsed.Host) }) &&
+		validatePublicFetchURL(rawURL) != nil
+}
+
 // Widgets that render only once should pass themselves as pinOwner, since nothing refreshes their images' last use.
-func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pinOwner any) template.HTML {
+// Images on privateHosts may resolve to internal addresses, every other src must be public.
+func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pinOwner any, privateHosts []string) template.HTML {
 	if providers == nil {
 		return html
 	}
@@ -37,14 +61,15 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 		if len(parts) < 4 {
 			return match
 		}
-		originalSrc := parts[2]
-		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, false, 0, pinOwner)
+		originalSrc := stdhtml.UnescapeString(parts[2])
+		allowPrivate := privateImageAllowed(originalSrc, privateHosts)
+		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, allowPrivate, 0, pinOwner)
 		if newSrc == originalSrc {
 			return match
 		}
 		fallback := ""
-		if validatePublicFetchURL(originalSrc) == nil {
-			fallback = ` data-fallback-src="` + strings.ReplaceAll(originalSrc, `"`, `&quot;`) + `"`
+		if allowPrivate || validatePublicFetchURL(originalSrc) == nil {
+			fallback = ` data-fallback-src="` + parts[2] + `"`
 		}
 		return "<img" + parts[1] + ` src="` + newSrc + `"` + parts[3] + fallback + ">"
 	})

@@ -119,7 +119,8 @@ func (widget *rssWidget) update(ctx context.Context) {
 			if items[i].ImageURL == "" {
 				continue
 			}
-			items[i].ImageURL = widget.Providers.SecureImageURL(ctx, items[i].ImageURL, false, false)
+			allowPrivate := privateImageAllowed(items[i].ImageURL, []string{items[i].feedHost})
+			items[i].ImageURL = widget.Providers.SecureImageURL(ctx, items[i].ImageURL, false, allowPrivate)
 		}
 	}
 
@@ -157,6 +158,8 @@ type rssFeedItem struct {
 	Categories  []string
 	Description string
 	PublishedAt time.Time
+	// Host of the configured feed URL, whose own images may be private.
+	feedHost string
 }
 
 type rssFeedRequest struct {
@@ -284,6 +287,7 @@ func (widget *rssWidget) fetchItemsFromFeedTask(request rssFeedRequest) ([]rssFe
 
 		rssItem := rssFeedItem{
 			ChannelURL: feed.Link,
+			feedHost:   req.URL.Host,
 		}
 
 		if request.ItemLinkPrefix != "" {

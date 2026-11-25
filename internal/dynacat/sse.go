@@ -253,6 +253,10 @@ func (a *application) handleSearchAutocompleteRequest(w http.ResponseWriter, r *
 			return
 		}
 
+		if a.handleAccessControl(w, r, a.widgetToPage[widgetID], showUnauthorizedJSON) {
+			return
+		}
+
 		baseURL, rawQuery, _ := strings.Cut(source.URL, "?")
 		rawQuery = strings.ReplaceAll(rawQuery, "{QUERY}", url.QueryEscape(query))
 		// Self-hosted instances named in the config are allowed to sit on a private
