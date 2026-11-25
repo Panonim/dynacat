@@ -29,7 +29,8 @@ import (
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
 
-var literalURLPattern = regexp.MustCompile(`(?i)https?://[^\s"'<>{}]+`)
+// Stops at parentheses so a Markdown destination like (http://host) doesn't capture the closing one.
+var literalURLPattern = regexp.MustCompile(`(?i)https?://[^\s"'<>{}()]+`)
 
 // Hosts of absolute URLs the admin wrote literally, so templated parts can't introduce new ones.
 func literalURLHosts(text string) []string {
@@ -146,6 +147,18 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 
 	return validatePublicFetchURL(req.URL.String())
 }
+
+// Private access only covers the host first requested, so a hop to any other host must be public.
+func checkPrivateRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) < 10 && strings.EqualFold(req.URL.Hostname(), via[0].URL.Hostname()) {
+		return nil
+	}
+	return checkPublicRedirect(req, via)
+}
+
+var privateHTTPClient = &http.Client{Transport: defaultHTTPClient.Transport, Timeout: defaultClientTimeout, CheckRedirect: checkPrivateRedirect}
+
+var privateInsecureHTTPClient = &http.Client{Transport: defaultInsecureHTTPClient.Transport, Timeout: defaultClientTimeout, CheckRedirect: checkPrivateRedirect}
 
 // A configured proxy resolves upstreams itself, so only dials to the proxy skip the address check while NO_PROXY hosts keep it.
 // Read on first dial like http.ProxyFromEnvironment, so proxies loaded from --env-file are included.
