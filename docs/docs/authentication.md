@@ -109,6 +109,8 @@ auth:
 
 The `redirect-url` must match the callback URL configured in your identity provider. The path must end with `/api/oidc/callback`.
 
+While password login is enabled, an OIDC login whose username matches a user under `auth.users` is refused, so an identity provider account can't take over that user's `allowed-users` pages and editor rights. Rename one of them, or set `disable-password: true` if both are meant to be the same person.
+
 ### Disabling password auth (OIDC-only mode)
 
 When OIDC is working and you want to remove the password login option entirely:

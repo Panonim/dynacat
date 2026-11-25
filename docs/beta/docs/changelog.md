@@ -6,6 +6,8 @@
 - The UI editor no longer sends the raw config of pages a `restrict-editing` user can view but not edit
 - OIDC logins whose username matches a password user are now refused while password login is enabled
 - Updated Go packages
+- Added a duplicate button to widgets in the UI editor
+- Widgets can now be moved to another page in the UI editor
 
 # Changes for 3.0.3
 - Added a `prowlarr` widget showing the health of your indexers, with `show: errors` to list only failing ones
