@@ -1,3 +1,14 @@
+# Changes for 3.0.4
+- Images from private addresses work again without changing your widgets, as long as they come from a host the widget already requests (`custom-api`/`dynawidgets` `url` and `subrequests`, the `rss` feed URL) or a host written directly in the `template`, `html` source or `markdown` content. Images pointing anywhere else are still only fetched from public addresses
+- Fixed image URLs containing `&` being fetched in their HTML-escaped form in `custom-api`, `html` and `markdown` widgets
+- A server-side `to-do` list shared by several pages through the same `id` is now only reachable by users allowed on all of those pages
+- Custom `search` autocomplete now checks that the user can access the widget's page
+- The UI editor no longer sends the raw config of pages a `restrict-editing` user can view but not edit
+- OIDC logins whose username matches a password user are now refused while password login is enabled
+- Updated Go packages
+- Added a duplicate button to widgets in the UI editor
+- Widgets can now be moved to another page in the UI editor
+
 # Changes for 3.0.3
 - Added a `prowlarr` widget showing the health of your indexers, with `show: errors` to list only failing ones
 - Calendar release preview popovers now color each release's title and type icon by its own state (`available`, `released`, `upcoming`) when `show-release-state` is enabled -> https://github.com/Panonim/dynacat/pull/206

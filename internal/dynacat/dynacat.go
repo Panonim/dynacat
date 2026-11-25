@@ -69,8 +69,8 @@ type application struct {
 	oauth2Config *oauth2.Config
 	oidcSessions *sessionStore
 
-	todoStorage      *todoStorage
-	todoListIDToPage map[string]*page
+	todoStorage       *todoStorage
+	todoListIDToPages map[string][]*page
 
 	sseMu                sync.RWMutex
 	sseClients           map[*sseClient]struct{}
@@ -102,7 +102,7 @@ func newApplication(c *config) (*application, error) {
 		widgetToPage:           make(map[uint64]*page),
 		sseClients:             make(map[*sseClient]struct{}),
 		imageProxyURLs:         make(map[string]imageProxyInfo),
-		todoListIDToPage:       make(map[string]*page),
+		todoListIDToPages:      make(map[string][]*page),
 		searchAutocompleteURLs: make(map[uint64]searchAutocompleteSource),
 	}
 	config := &app.Config
@@ -336,7 +336,7 @@ func newApplication(c *config) (*application, error) {
 				switch v := w.(type) {
 				case *todoWidget:
 					if v.Storage == "server" && v.TodoID != "" {
-						app.todoListIDToPage[v.TodoID] = page
+						app.todoListIDToPages[v.TodoID] = append(app.todoListIDToPages[v.TodoID], page)
 					}
 				case *groupWidget:
 					collectTodoListIDs(v.Widgets)
@@ -446,7 +446,7 @@ func newApplication(c *config) (*application, error) {
 	}
 	app.parsedManifest = []byte(manifest)
 
-	if len(app.todoListIDToPage) > 0 {
+	if len(app.todoListIDToPages) > 0 {
 		dbPath := config.dbPath()
 		app.todoStorage = newTodoStorage(dbPath)
 
@@ -848,13 +848,16 @@ const todoMaxBodyBytes = 1 << 20
 
 func (a *application) authorizeTodoRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	listID := r.PathValue("listID")
-	pg, exists := a.todoListIDToPage[listID]
+	pages, exists := a.todoListIDToPages[listID]
 	if !exists {
 		a.handleNotFound(w, r)
 		return "", false
 	}
-	if a.handleAccessControl(w, r, pg, showUnauthorizedJSON) {
-		return "", false
+	// A list shared by several pages is only reachable by users allowed on all of them.
+	for _, pg := range pages {
+		if a.handleAccessControl(w, r, pg, showUnauthorizedJSON) {
+			return "", false
+		}
 	}
 	return listID, true
 }

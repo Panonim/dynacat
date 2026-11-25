@@ -155,6 +155,12 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 	}
 	groups := extractGroupsClaim(claims, groupsClaim)
 
+	if a.oidcUsernameTaken(username) {
+		slog.Warn("OIDC username matches a password user, login refused", "username", username)
+		http.Redirect(w, r, baseURL+"/login?error=username_taken", http.StatusSeeOther)
+		return
+	}
+
 	if !oidcUserAllowed(a.Config.Auth.OIDC, username, groups) {
 		slog.Warn("OIDC user not in allowed users/groups", "username", username)
 		http.Redirect(w, r, baseURL+"/login?error=not_allowed", http.StatusSeeOther)
@@ -185,6 +191,11 @@ func (a *application) handleOIDCCallback(w http.ResponseWriter, r *http.Request)
 
 	slog.Info("OIDC user logged in", "username", username)
 	http.Redirect(w, r, a.takeLoginRedirect(w, r), http.StatusSeeOther)
+}
+
+// Usernames are shared by page and editor rules, so an IdP user must not take over a password user's name.
+func (a *application) oidcUsernameTaken(username string) bool {
+	return a.Config.Auth.Users[username] != nil && !a.Config.Auth.DisablePassword
 }
 
 func oidcUserAllowed(cfg *oidcConfig, username string, groups []string) bool {
