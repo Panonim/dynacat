@@ -148,17 +148,36 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 	return validatePublicFetchURL(req.URL.String())
 }
 
-// Private access only covers the host first requested, so a hop to any other host must be public.
+// The host:port a private client may dial without the address check, carried on the request context.
+type privateAuthorityKey struct{}
+
+func urlAuthority(u *url.URL) string {
+	return net.JoinHostPort(strings.ToLower(u.Hostname()), cmp.Or(u.Port(), map[string]string{"http": "80", "https": "443"}[u.Scheme]))
+}
+
+func withPrivateAuthority(req *http.Request) *http.Request {
+	return req.WithContext(context.WithValue(req.Context(), privateAuthorityKey{}, urlAuthority(req.URL)))
+}
+
+// Private access only covers the host:port first requested, so a hop anywhere else must be public.
 func checkPrivateRedirect(req *http.Request, via []*http.Request) error {
-	if len(via) < 10 && strings.EqualFold(req.URL.Hostname(), via[0].URL.Hostname()) {
+	if len(via) < 10 && urlAuthority(req.URL) == urlAuthority(via[0].URL) {
 		return nil
 	}
 	return checkPublicRedirect(req, via)
 }
 
-var privateHTTPClient = &http.Client{Transport: defaultHTTPClient.Transport, Timeout: defaultClientTimeout, CheckRedirect: checkPrivateRedirect}
+// Keep-alives are off so a connection dialed for one authorized host is never reused unchecked.
+func newPrivateHTTPClient(insecure bool) *http.Client {
+	client := newPublicOnlyHTTPClient(insecure)
+	client.Transport.(*http.Transport).DisableKeepAlives = true
+	client.CheckRedirect = checkPrivateRedirect
+	return client
+}
 
-var privateInsecureHTTPClient = &http.Client{Transport: defaultInsecureHTTPClient.Transport, Timeout: defaultClientTimeout, CheckRedirect: checkPrivateRedirect}
+var privateHTTPClient = newPrivateHTTPClient(false)
+
+var privateInsecureHTTPClient = newPrivateHTTPClient(true)
 
 // A configured proxy resolves upstreams itself, so only dials to the proxy skip the address check while NO_PROXY hosts keep it.
 // Read on first dial like http.ProxyFromEnvironment, so proxies loaded from --env-file are included.
@@ -190,10 +209,12 @@ func rejectDisallowedDial(_, address string, _ syscall.RawConn) error {
 }
 
 func newPublicOnlyHTTPClient(insecure bool) *http.Client {
-	proxyDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+	plainDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	checkedDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: rejectDisallowedDial}
 	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return ternary(outboundProxyAddrs()[addr], proxyDialer, checkedDialer).DialContext(ctx, network, addr)
+		authorized, _ := ctx.Value(privateAuthorityKey{}).(string)
+		trusted := outboundProxyAddrs()[addr] || (authorized != "" && strings.EqualFold(authorized, addr))
+		return ternary(trusted, plainDialer, checkedDialer).DialContext(ctx, network, addr)
 	}
 
 	transport := &http.Transport{

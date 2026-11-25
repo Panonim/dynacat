@@ -403,12 +403,12 @@ func (c *imageCache) downloadAndCacheWithClient(ctx context.Context, rawURL stri
 	req.Header.Set("Accept", "image/*")
 	setBrowserUserAgentHeader(req)
 
-	client := ternary(allowInsecure, privateInsecureHTTPClient, privateHTTPClient)
-	if !allowPrivate {
-		if err := validatePublicFetchURL(rawURL); err != nil {
-			return "", err
-		}
-		client = ternary(allowInsecure, publicOnlyInsecureHTTPClient, publicOnlyHTTPClient)
+	client := ternary(allowInsecure, publicOnlyInsecureHTTPClient, publicOnlyHTTPClient)
+	if allowPrivate {
+		client = ternary(allowInsecure, privateInsecureHTTPClient, privateHTTPClient)
+		req = withPrivateAuthority(req)
+	} else if err := validatePublicFetchURL(rawURL); err != nil {
+		return "", err
 	}
 
 	resp, err := client.Do(req)
