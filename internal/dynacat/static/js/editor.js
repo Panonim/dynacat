@@ -475,6 +475,7 @@ function setupPageDropTargets() {
 }
 
 function endWidgetDrag() {
+    state.drag = null;
     document.body.classList.remove("editor-dragging-widget");
     document.querySelectorAll(".editor-page-drop-active").forEach((l) => l.classList.remove("editor-page-drop-active"));
     document.querySelectorAll(".editor-drop-marker").forEach((m) => m.remove());

@@ -648,7 +648,8 @@ func mutateColumns(columns *yaml.Node, dstColSlots []widgetSlot, m editorMutatio
 			return fmt.Errorf("widget index out of range")
 		}
 		seq, at := widgetInsertPoint(slots, widgets, index+1)
-		seq.Content = insertNode(seq.Content, at, cloneWidgetNode(slots[index].node))
+		clone := cloneWidget(slots[index], filepath.Dir(docs.ownerOf(seq)), docs)
+		seq.Content = insertNode(seq.Content, at, clone)
 	case "removeWidget":
 		if !validIndex(slots, index) {
 			return fmt.Errorf("widget index out of range")
@@ -674,6 +675,7 @@ func mutateColumns(columns *yaml.Node, dstColSlots []widgetSlot, m editorMutatio
 			return errNoIncludeToWriteInto("widget")
 		}
 
+		rebaseIncludes(slot.node, filepath.Dir(slot.ownerPath), filepath.Dir(docs.ownerOf(dstSeq)))
 		slot.seq.Content = removeNode(slot.seq.Content, slot.index)
 		if dstSeq == slot.seq && dstIndex > slot.index {
 			dstIndex--
@@ -1095,7 +1097,7 @@ func (a *application) writeConfigCandidates(candidates map[string][]byte) error 
 	perms := map[string]os.FileMode{}
 
 	for path, candidate := range candidates {
-		if err := checkIncludesStayInConfigDir(candidate, filepath.Dir(a.configPath)); err != nil {
+		if err := checkIncludesStayInConfigDir(candidate, filepath.Dir(path), filepath.Dir(a.configPath)); err != nil {
 			return &editorValidationError{err: err, field: "$include"}
 		}
 
@@ -1184,7 +1186,8 @@ func (a *application) writeEditorDocs(docs *editorDocs) error {
 }
 
 // Second line of defence behind rejectIncludeDirective, covering anything the editor writes.
-func checkIncludesStayInConfigDir(candidate []byte, dir string) error {
+// Targets resolve against the file holding them, the same way parseYAMLIncludes reads them.
+func checkIncludesStayInConfigDir(candidate []byte, fileDir, dir string) error {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return err
@@ -1195,7 +1198,7 @@ func checkIncludesStayInConfigDir(candidate []byte, dir string) error {
 
 		path := target
 		if !filepath.IsAbs(path) {
-			path = filepath.Join(absDir, path)
+			path = filepath.Join(fileDir, path)
 		}
 
 		abs, err := filepath.Abs(path)
@@ -1899,19 +1902,61 @@ func insertNode(nodes []*yaml.Node, index int, node *yaml.Node) []*yaml.Node {
 	return nodes
 }
 
-// Anchors and api-ids are dropped from the copy since both have to stay unique.
-func cloneWidgetNode(n *yaml.Node) *yaml.Node {
+// Nested widgets are copied out of their includes and lose their api-id, so the copy shares no file or id with the original.
+func cloneWidget(slot widgetSlot, dstDir string, docs *editorDocs) *yaml.Node {
+	c := cloneNode(slot.node)
+	removeMappingKey(c, "api-id")
+	rebaseIncludes(c, filepath.Dir(slot.ownerPath), dstDir)
+
+	if widgets := getMappingValue(slot.node, "widgets"); widgets != nil {
+		inner := sequenceNode()
+		for _, child := range expandWidgetSlots(widgets, slot.ownerPath, docs, 0) {
+			inner.Content = append(inner.Content, cloneWidget(child, dstDir, docs))
+		}
+		setMappingKey(c, "widgets", inner)
+	}
+	return c
+}
+
+// Aliases are expanded and anchors dropped, so the copy never depends on or redefines an anchor of the original.
+func cloneNode(n *yaml.Node) *yaml.Node {
+	if n.Kind == yaml.AliasNode && n.Alias != nil {
+		return cloneNode(n.Alias)
+	}
 	c := *n
 	c.Anchor = ""
-	c.Content = nil
-	for i := 0; i < len(n.Content); i++ {
-		if n.Kind == yaml.MappingNode && i%2 == 0 && n.Content[i].Value == "api-id" {
-			i++
-			continue
-		}
-		c.Content = append(c.Content, cloneWidgetNode(n.Content[i]))
+	c.Content = make([]*yaml.Node, len(n.Content))
+	for i, child := range n.Content {
+		c.Content[i] = cloneNode(child)
 	}
 	return &c
+}
+
+// Includes resolve against the file holding them, so relative targets are rewritten when a node lands in another directory.
+func rebaseIncludes(n *yaml.Node, fromDir, toDir string) {
+	if fromDir == toDir || n == nil {
+		return
+	}
+	rebase := func(v *yaml.Node) {
+		target := strings.TrimSpace(v.Value)
+		if target == "" || filepath.IsAbs(target) {
+			return
+		}
+		if rel, err := filepath.Rel(toDir, filepath.Join(fromDir, target)); err == nil {
+			v.Value = filepath.ToSlash(rel)
+		}
+	}
+
+	if n.Kind == yaml.ScalarNode && isIncludeTag(n.Tag) {
+		rebase(n)
+	}
+	for i, child := range n.Content {
+		if n.Kind == yaml.MappingNode && i%2 == 1 && isIncludeKeyNode(n.Content[i-1]) && child.Kind == yaml.ScalarNode {
+			rebase(child)
+			continue
+		}
+		rebaseIncludes(child, fromDir, toDir)
+	}
 }
 
 func removeNode(nodes []*yaml.Node, index int) []*yaml.Node {
