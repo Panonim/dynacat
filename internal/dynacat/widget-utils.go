@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpproxy"
+	"golang.org/x/net/idna"
 )
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
@@ -151,8 +152,13 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 // The host:port a private client may dial without the address check, carried on the request context.
 type privateAuthorityKey struct{}
 
+// Converts the hostname to ASCII like net/http does before dialing, so it matches the dialed address.
 func urlAuthority(u *url.URL) string {
-	return net.JoinHostPort(strings.ToLower(u.Hostname()), cmp.Or(u.Port(), map[string]string{"http": "80", "https": "443"}[u.Scheme]))
+	host := u.Hostname()
+	if ascii, err := idna.Lookup.ToASCII(host); err == nil {
+		host = ascii
+	}
+	return net.JoinHostPort(strings.ToLower(host), cmp.Or(u.Port(), map[string]string{"http": "80", "https": "443"}[u.Scheme]))
 }
 
 func withPrivateAuthority(req *http.Request) *http.Request {
