@@ -223,6 +223,10 @@ body.editing .page-column:not(:has(> .widget))::after {
     align-content: flex-start;
 }
 
+.editor-nested-split .editor-widget-header {
+    flex-wrap: wrap;
+}
+
 .editor-nested-split > .editor-widget {
     flex: 1 1 100px;
     min-width: 100px;
@@ -420,6 +424,15 @@ body.editing .page-column:not(:has(> .widget))::after {
 
 .editor-remove-page:hover {
     color: var(--color-negative);
+}
+
+body.editor-dragging-widget .editor-page-drop-target {
+    border-bottom: 2px dashed var(--color-text-subdue);
+}
+
+body.editor-dragging-widget .editor-page-drop-active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
 }
 
 body.editing .editor-styling-trigger {

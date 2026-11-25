@@ -133,6 +133,7 @@ type editorWidgetView struct {
 type editorMutation struct {
 	Op         string            `json:"op"`
 	Page       int               `json:"page"`
+	ToPage     int               `json:"toPage"`
 	Column     int               `json:"column"`
 	Index      int               `json:"index"`
 	Path       []int             `json:"path"`
@@ -442,19 +443,8 @@ func (a *application) applyEditorMutation(user *authenticatedUser, m editorMutat
 			return &editorDisabledError{}
 		}
 	default:
-		slots := expandPageSlots(mainDoc, mainPath, docs)
-		if !validIndex(slots, m.Page) {
-			return fmt.Errorf("page %d out of range", m.Page)
-		}
-		slot = slots[m.Page]
-		if slot.doc == nil {
-			return fmt.Errorf("page %d could not be read from %s", m.Page, slot.path)
-		}
-
-		// Matched by name, so an index can only ever authorise the page it actually points at.
-		configPage := a.configPageForSlot(slot, m.Page)
-		if configPage == nil || !a.EditingAllowedForPage(user, configPage) {
-			return &editorDisabledError{}
+		if slot, err = a.editablePageSlot(user, mainDoc, mainPath, docs, m.Page); err != nil {
+			return err
 		}
 	}
 
@@ -506,21 +496,67 @@ func (a *application) applyEditorMutation(user *authenticatedUser, m editorMutat
 		return a.removePageSlot(slot)
 	}
 
-	columns := getMappingValue(slot.node, "columns")
-	if columns == nil || (columns.Kind != yaml.SequenceNode && columns.Kind != yaml.MappingNode) {
-		return fmt.Errorf("page %d has no columns", m.Page)
+	columns, err := pageColumns(slot, m.Page)
+	if err != nil {
+		return err
 	}
-
-	docs.track(slot.path, slot.doc)
+	docs.trackPage(slot)
 	docs.pagePath = filepath.Clean(slot.path)
 
-	if err := mutateColumns(columns, m, docs); err != nil {
+	var dstColSlots []widgetSlot
+	var dstNode *yaml.Node
+	if m.Op == "moveWidgetToPage" {
+		dst, err := a.editablePageSlot(user, mainDoc, mainPath, docs, m.ToPage)
+		if err != nil {
+			return err
+		}
+		dstColumns, err := pageColumns(dst, m.ToPage)
+		if err != nil {
+			return err
+		}
+		docs.trackPage(dst)
+		dstNode = dst.node
+		dstColSlots = expandWidgetSlots(dstColumns, filepath.Clean(dst.path), docs, 0)
+		// Lands at the bottom of the first full column, the user arranges it from that page.
+		m.ToPath = []int{max(0, slices.IndexFunc(dstColSlots, func(s widgetSlot) bool {
+			return scalarValue(getMappingValue(s.node, "size")) == "full"
+		})), math.MaxInt}
+	}
+
+	if err := mutateColumns(columns, dstColSlots, m, docs); err != nil {
 		return err
 	}
 
 	setBlockStyleDeep(slot.node)
+	setBlockStyleDeep(dstNode)
 
 	return a.writeEditorDocs(docs)
+}
+
+func pageColumns(slot pageSlot, index int) (*yaml.Node, error) {
+	columns := getMappingValue(slot.node, "columns")
+	if columns == nil || (columns.Kind != yaml.SequenceNode && columns.Kind != yaml.MappingNode) {
+		return nil, fmt.Errorf("page %d has no columns", index)
+	}
+	return columns, nil
+}
+
+func (a *application) editablePageSlot(user *authenticatedUser, mainDoc *yaml.Node, mainPath string, docs *editorDocs, index int) (pageSlot, error) {
+	slots := expandPageSlots(mainDoc, mainPath, docs)
+	if !validIndex(slots, index) {
+		return pageSlot{}, fmt.Errorf("page %d out of range", index)
+	}
+	slot := slots[index]
+	if slot.doc == nil {
+		return pageSlot{}, fmt.Errorf("page %d could not be read from %s", index, slot.path)
+	}
+
+	// Matched by name, so an index can only ever authorise the page it actually points at.
+	configPage := a.configPageForSlot(slot, index)
+	if configPage == nil || !a.EditingAllowedForPage(user, configPage) {
+		return pageSlot{}, &editorDisabledError{}
+	}
+	return slot, nil
 }
 
 func setBlockStyleDeep(n *yaml.Node) {
@@ -535,8 +571,12 @@ func setBlockStyleDeep(n *yaml.Node) {
 	}
 }
 
-func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error {
+// dstColSlots holds the columns of the page a widget moves to, nil means the same page.
+func mutateColumns(columns *yaml.Node, dstColSlots []widgetSlot, m editorMutation, docs *editorDocs) error {
 	colSlots := expandWidgetSlots(columns, docs.pagePath, docs, 0)
+	if dstColSlots == nil {
+		dstColSlots = colSlots
+	}
 
 	switch m.Op {
 	case "addColumn":
@@ -603,6 +643,13 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		if err := editWidgetNode(slots[index].node, m.Fields, m.RawFields); err != nil {
 			return err
 		}
+	case "duplicateWidget":
+		if !validIndex(slots, index) {
+			return fmt.Errorf("widget index out of range")
+		}
+		seq, at := widgetInsertPoint(slots, widgets, index+1)
+		clone := cloneWidget(slots[index], filepath.Dir(docs.ownerOf(seq)), docs)
+		seq.Content = insertNode(seq.Content, at, clone)
 	case "removeWidget":
 		if !validIndex(slots, index) {
 			return fmt.Errorf("widget index out of range")
@@ -610,7 +657,7 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		slot := slots[index]
 		slot.seq.Content = removeNode(slot.seq.Content, slot.index)
 		pruneEmptyInclude(slot)
-	case "moveWidget":
+	case "moveWidget", "moveWidgetToPage":
 		if isIntPrefix(m.Path, m.ToPath) {
 			return fmt.Errorf("cannot move a container into itself")
 		}
@@ -618,7 +665,7 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 			return fmt.Errorf("widget index out of range")
 		}
 		slot := slots[index]
-		dstWidgets, dstOwner, err := resolveWidgets(colSlots, m.ToPath, docs)
+		dstWidgets, dstOwner, err := resolveWidgets(dstColSlots, m.ToPath, docs)
 		if err != nil {
 			return err
 		}
@@ -628,6 +675,7 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 			return errNoIncludeToWriteInto("widget")
 		}
 
+		rebaseIncludes(slot.node, filepath.Dir(slot.ownerPath), filepath.Dir(docs.ownerOf(dstSeq)))
 		slot.seq.Content = removeNode(slot.seq.Content, slot.index)
 		if dstSeq == slot.seq && dstIndex > slot.index {
 			dstIndex--
@@ -1049,7 +1097,7 @@ func (a *application) writeConfigCandidates(candidates map[string][]byte) error 
 	perms := map[string]os.FileMode{}
 
 	for path, candidate := range candidates {
-		if err := checkIncludesStayInConfigDir(candidate, filepath.Dir(a.configPath)); err != nil {
+		if err := checkIncludesStayInConfigDir(candidate, filepath.Dir(path), filepath.Dir(a.configPath)); err != nil {
 			return &editorValidationError{err: err, field: "$include"}
 		}
 
@@ -1117,7 +1165,7 @@ func (a *application) writeEditorDocs(docs *editorDocs) error {
 		if root.Kind == 0 {
 			continue
 		}
-		if path != docs.pagePath {
+		if _, isPage := docs.pageFiles[path]; !isPage {
 			setBlockStyleDeep(root)
 		}
 
@@ -1138,7 +1186,8 @@ func (a *application) writeEditorDocs(docs *editorDocs) error {
 }
 
 // Second line of defence behind rejectIncludeDirective, covering anything the editor writes.
-func checkIncludesStayInConfigDir(candidate []byte, dir string) error {
+// Targets resolve against the file holding them, the same way parseYAMLIncludes reads them.
+func checkIncludesStayInConfigDir(candidate []byte, fileDir, dir string) error {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return err
@@ -1149,7 +1198,7 @@ func checkIncludesStayInConfigDir(candidate []byte, dir string) error {
 
 		path := target
 		if !filepath.IsAbs(path) {
-			path = filepath.Join(absDir, path)
+			path = filepath.Join(fileDir, path)
 		}
 
 		abs, err := filepath.Abs(path)
@@ -1167,14 +1216,22 @@ type editorDocs struct {
 	// Documents writeEditorDocs may save, so files opened only to enumerate pages are never rewritten.
 	write    map[string]struct{}
 	pagePath string
+	// Files holding an edited page, only that page's node is restyled there instead of the whole file.
+	pageFiles map[string]struct{}
 }
 
 func newEditorDocs() *editorDocs {
 	return &editorDocs{
-		docs:     map[string]*yaml.Node{},
-		original: map[string][]byte{},
-		write:    map[string]struct{}{},
+		docs:      map[string]*yaml.Node{},
+		original:  map[string][]byte{},
+		write:     map[string]struct{}{},
+		pageFiles: map[string]struct{}{},
 	}
+}
+
+func (d *editorDocs) trackPage(slot pageSlot) {
+	d.track(slot.path, slot.doc)
+	d.pageFiles[filepath.Clean(slot.path)] = struct{}{}
 }
 
 func (d *editorDocs) track(path string, doc *yaml.Node) {
@@ -1843,6 +1900,66 @@ func insertNode(nodes []*yaml.Node, index int, node *yaml.Node) []*yaml.Node {
 	copy(nodes[index+1:], nodes[index:])
 	nodes[index] = node
 	return nodes
+}
+
+// Nested widgets are copied out of their includes and lose their api-id, so the copy shares no file or id with the original.
+func cloneWidget(slot widgetSlot, dstDir string, docs *editorDocs) *yaml.Node {
+	c := cloneNode(slot.node)
+	removeMappingKey(c, "api-id")
+	rebaseIncludes(c, filepath.Dir(slot.ownerPath), dstDir)
+
+	if widgets := getMappingValue(slot.node, "widgets"); widgets != nil {
+		if widgets.Kind == yaml.AliasNode {
+			widgets = widgets.Alias
+		}
+		inner := sequenceNode()
+		for _, child := range expandWidgetSlots(widgets, slot.ownerPath, docs, 0) {
+			inner.Content = append(inner.Content, cloneWidget(child, dstDir, docs))
+		}
+		setMappingKey(c, "widgets", inner)
+	}
+	return c
+}
+
+// Aliases are expanded and anchors dropped, so the copy never depends on or redefines an anchor of the original.
+func cloneNode(n *yaml.Node) *yaml.Node {
+	if n.Kind == yaml.AliasNode && n.Alias != nil {
+		return cloneNode(n.Alias)
+	}
+	c := *n
+	c.Anchor = ""
+	c.Content = make([]*yaml.Node, len(n.Content))
+	for i, child := range n.Content {
+		c.Content[i] = cloneNode(child)
+	}
+	return &c
+}
+
+// Includes resolve against the file holding them, so relative targets are rewritten when a node lands in another directory.
+func rebaseIncludes(n *yaml.Node, fromDir, toDir string) {
+	if fromDir == toDir || n == nil {
+		return
+	}
+	rebase := func(v *yaml.Node) {
+		target := strings.TrimSpace(v.Value)
+		if target == "" || filepath.IsAbs(target) {
+			return
+		}
+		if rel, err := filepath.Rel(toDir, filepath.Join(fromDir, target)); err == nil {
+			v.Value = filepath.ToSlash(rel)
+		}
+	}
+
+	if n.Kind == yaml.ScalarNode && isIncludeTag(n.Tag) {
+		rebase(n)
+	}
+	for i, child := range n.Content {
+		if n.Kind == yaml.MappingNode && i%2 == 1 && isIncludeKeyNode(n.Content[i-1]) && child.Kind == yaml.ScalarNode {
+			rebase(child)
+			continue
+		}
+		rebaseIncludes(child, fromDir, toDir)
+	}
 }
 
 func removeNode(nodes []*yaml.Node, index int) []*yaml.Node {
