@@ -31,6 +31,14 @@ The palette sits at the bottom of the screen and holds every widget type.
 
 Drag an item from the palette onto a column, or onto an existing widget, and drop it where the marker line appears. 
 
+## Moving and duplicating widgets
+
+Drag a widget to move it within the page, into another column or into a `group` or `split-column`.
+
+To move it to another page, drag it onto that page's link in the header. It is added at the bottom of the page's first full column, open that page to put it where you want.
+
+The copy icon in a widget's top right corner duplicates it, the copy is placed right below the original with the same options.
+
 ## Adding a column
 
 Hover the space between two columns, or the space at either edge of the page, and a line with a **+** appears. Click it to insert a column at that spot.

@@ -67,6 +67,7 @@ async function enterEditor() {
 
     buildPalette();
     buildAddPageButton();
+    setupPageDropTargets();
     setupStylingTrigger();
     prepareCanvas();
     renderCanvas();
@@ -329,8 +330,12 @@ function buildWidgetCard(w, path) {
         e.stopPropagation();
         state.drag = { fromPath: path };
         card.classList.add("editor-dragging");
+        document.body.classList.add("editor-dragging-widget");
     });
-    card.addEventListener("dragend", () => card.classList.remove("editor-dragging"));
+    card.addEventListener("dragend", () => {
+        card.classList.remove("editor-dragging");
+        endWidgetDrag();
+    });
 
     const header = div("editor-widget-header");
     const body = div("editor-widget-card");
@@ -340,6 +345,7 @@ function buildWidgetCard(w, path) {
 
     const tools = div("editor-ui editor-widget-tools");
     tools.append(toolButton("Edit", iconPencil, () => openWidgetModal(path)));
+    tools.append(toolButton("Duplicate", iconCopy, () => save({ op: "duplicateWidget", page: state.pageIndex, path })));
     tools.append(toolButton("Delete", iconTrash, () => removeWidget(path)));
     header.append(tools);
     card.append(header);
@@ -365,8 +371,10 @@ function setupDropTarget(element, basePath, horizontal = false) {
     const pointer = (e) => (horizontal ? e.clientX : e.clientY);
 
     element.addEventListener("dragover", (e) => {
-        e.preventDefault();
         e.stopPropagation();
+        // A container can't be dropped inside itself, so its own nested list is no drop target.
+        if (state.drag?.fromPath && isPathPrefix(state.drag.fromPath, basePath)) return;
+        e.preventDefault();
         positionMarker(element, marker, dropIndex(element, pointer(e), horizontal), horizontal);
     });
     element.addEventListener("dragleave", (e) => {
@@ -423,13 +431,61 @@ function handleDrop(path) {
 
     if (drag.type) {
         openNewWidgetModal(drag.type, path);
-    } else {
+    } else if (!isPathPrefix(drag.fromPath, path)) {
         save({ op: "moveWidget", page: state.pageIndex, path: drag.fromPath, toPath: path });
     }
 }
 
+// Mirrors isIntPrefix on the server, a drop at or inside the dragged widget's own path moves nothing.
+function isPathPrefix(prefix, path) {
+    return prefix.length <= path.length && prefix.every((v, i) => v === path[i]);
+}
+
 function removeWidget(path) {
     save({ op: "removeWidget", page: state.pageIndex, path });
+}
+
+//
+// Moving widgets to another page by dropping them on its nav tab
+//
+
+function setupPageDropTargets() {
+    // Looked up on every use, since a save reloads state.config and page indices can shift.
+    const pageIndexOf = (link) =>
+        state.config.pages.findIndex((p) => p.slug && new URL(`${PD.baseURL}/${p.slug}`, location.href).pathname === link.pathname);
+
+    document.querySelectorAll(".header .nav .nav-item").forEach((link) => {
+        const index = pageIndexOf(link);
+        const page = state.config.pages[index];
+        if (index < 0 || index === state.pageIndex || !page.writable || !page.columns.length) return;
+
+        link.classList.add("editor-page-drop-target");
+        link.addEventListener("dragover", (e) => {
+            if (!state.drag?.fromPath) return;
+            e.preventDefault();
+            link.classList.add("editor-page-drop-active");
+        });
+        link.addEventListener("dragleave", () => link.classList.remove("editor-page-drop-active"));
+        link.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const target = pageIndexOf(link);
+            if (target >= 0) moveToPage(target);
+        });
+    });
+}
+
+function endWidgetDrag() {
+    document.body.classList.remove("editor-dragging-widget");
+    document.querySelectorAll(".editor-page-drop-active").forEach((l) => l.classList.remove("editor-page-drop-active"));
+    document.querySelectorAll(".editor-drop-marker").forEach((m) => m.remove());
+}
+
+async function moveToPage(index) {
+    const path = state.drag.fromPath;
+    state.drag = null;
+    if (await save({ op: "moveWidgetToPage", page: state.pageIndex, path, toPage: index })) {
+        toast(`Moved to ${state.config.pages[index].title}`, "positive");
+    }
 }
 
 function widgetAtPath(path) {

@@ -133,6 +133,7 @@ type editorWidgetView struct {
 type editorMutation struct {
 	Op         string            `json:"op"`
 	Page       int               `json:"page"`
+	ToPage     int               `json:"toPage"`
 	Column     int               `json:"column"`
 	Index      int               `json:"index"`
 	Path       []int             `json:"path"`
@@ -442,19 +443,8 @@ func (a *application) applyEditorMutation(user *authenticatedUser, m editorMutat
 			return &editorDisabledError{}
 		}
 	default:
-		slots := expandPageSlots(mainDoc, mainPath, docs)
-		if !validIndex(slots, m.Page) {
-			return fmt.Errorf("page %d out of range", m.Page)
-		}
-		slot = slots[m.Page]
-		if slot.doc == nil {
-			return fmt.Errorf("page %d could not be read from %s", m.Page, slot.path)
-		}
-
-		// Matched by name, so an index can only ever authorise the page it actually points at.
-		configPage := a.configPageForSlot(slot, m.Page)
-		if configPage == nil || !a.EditingAllowedForPage(user, configPage) {
-			return &editorDisabledError{}
+		if slot, err = a.editablePageSlot(user, mainDoc, mainPath, docs, m.Page); err != nil {
+			return err
 		}
 	}
 
@@ -506,21 +496,67 @@ func (a *application) applyEditorMutation(user *authenticatedUser, m editorMutat
 		return a.removePageSlot(slot)
 	}
 
-	columns := getMappingValue(slot.node, "columns")
-	if columns == nil || (columns.Kind != yaml.SequenceNode && columns.Kind != yaml.MappingNode) {
-		return fmt.Errorf("page %d has no columns", m.Page)
+	columns, err := pageColumns(slot, m.Page)
+	if err != nil {
+		return err
 	}
-
-	docs.track(slot.path, slot.doc)
+	docs.trackPage(slot)
 	docs.pagePath = filepath.Clean(slot.path)
 
-	if err := mutateColumns(columns, m, docs); err != nil {
+	var dstColSlots []widgetSlot
+	var dstNode *yaml.Node
+	if m.Op == "moveWidgetToPage" {
+		dst, err := a.editablePageSlot(user, mainDoc, mainPath, docs, m.ToPage)
+		if err != nil {
+			return err
+		}
+		dstColumns, err := pageColumns(dst, m.ToPage)
+		if err != nil {
+			return err
+		}
+		docs.trackPage(dst)
+		dstNode = dst.node
+		dstColSlots = expandWidgetSlots(dstColumns, filepath.Clean(dst.path), docs, 0)
+		// Lands at the bottom of the first full column, the user arranges it from that page.
+		m.ToPath = []int{max(0, slices.IndexFunc(dstColSlots, func(s widgetSlot) bool {
+			return scalarValue(getMappingValue(s.node, "size")) == "full"
+		})), math.MaxInt}
+	}
+
+	if err := mutateColumns(columns, dstColSlots, m, docs); err != nil {
 		return err
 	}
 
 	setBlockStyleDeep(slot.node)
+	setBlockStyleDeep(dstNode)
 
 	return a.writeEditorDocs(docs)
+}
+
+func pageColumns(slot pageSlot, index int) (*yaml.Node, error) {
+	columns := getMappingValue(slot.node, "columns")
+	if columns == nil || (columns.Kind != yaml.SequenceNode && columns.Kind != yaml.MappingNode) {
+		return nil, fmt.Errorf("page %d has no columns", index)
+	}
+	return columns, nil
+}
+
+func (a *application) editablePageSlot(user *authenticatedUser, mainDoc *yaml.Node, mainPath string, docs *editorDocs, index int) (pageSlot, error) {
+	slots := expandPageSlots(mainDoc, mainPath, docs)
+	if !validIndex(slots, index) {
+		return pageSlot{}, fmt.Errorf("page %d out of range", index)
+	}
+	slot := slots[index]
+	if slot.doc == nil {
+		return pageSlot{}, fmt.Errorf("page %d could not be read from %s", index, slot.path)
+	}
+
+	// Matched by name, so an index can only ever authorise the page it actually points at.
+	configPage := a.configPageForSlot(slot, index)
+	if configPage == nil || !a.EditingAllowedForPage(user, configPage) {
+		return pageSlot{}, &editorDisabledError{}
+	}
+	return slot, nil
 }
 
 func setBlockStyleDeep(n *yaml.Node) {
@@ -535,8 +571,12 @@ func setBlockStyleDeep(n *yaml.Node) {
 	}
 }
 
-func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error {
+// dstColSlots holds the columns of the page a widget moves to, nil means the same page.
+func mutateColumns(columns *yaml.Node, dstColSlots []widgetSlot, m editorMutation, docs *editorDocs) error {
 	colSlots := expandWidgetSlots(columns, docs.pagePath, docs, 0)
+	if dstColSlots == nil {
+		dstColSlots = colSlots
+	}
 
 	switch m.Op {
 	case "addColumn":
@@ -603,6 +643,12 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		if err := editWidgetNode(slots[index].node, m.Fields, m.RawFields); err != nil {
 			return err
 		}
+	case "duplicateWidget":
+		if !validIndex(slots, index) {
+			return fmt.Errorf("widget index out of range")
+		}
+		seq, at := widgetInsertPoint(slots, widgets, index+1)
+		seq.Content = insertNode(seq.Content, at, cloneWidgetNode(slots[index].node))
 	case "removeWidget":
 		if !validIndex(slots, index) {
 			return fmt.Errorf("widget index out of range")
@@ -610,7 +656,7 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 		slot := slots[index]
 		slot.seq.Content = removeNode(slot.seq.Content, slot.index)
 		pruneEmptyInclude(slot)
-	case "moveWidget":
+	case "moveWidget", "moveWidgetToPage":
 		if isIntPrefix(m.Path, m.ToPath) {
 			return fmt.Errorf("cannot move a container into itself")
 		}
@@ -618,7 +664,7 @@ func mutateColumns(columns *yaml.Node, m editorMutation, docs *editorDocs) error
 			return fmt.Errorf("widget index out of range")
 		}
 		slot := slots[index]
-		dstWidgets, dstOwner, err := resolveWidgets(colSlots, m.ToPath, docs)
+		dstWidgets, dstOwner, err := resolveWidgets(dstColSlots, m.ToPath, docs)
 		if err != nil {
 			return err
 		}
@@ -1117,7 +1163,7 @@ func (a *application) writeEditorDocs(docs *editorDocs) error {
 		if root.Kind == 0 {
 			continue
 		}
-		if path != docs.pagePath {
+		if _, isPage := docs.pageFiles[path]; !isPage {
 			setBlockStyleDeep(root)
 		}
 
@@ -1167,14 +1213,22 @@ type editorDocs struct {
 	// Documents writeEditorDocs may save, so files opened only to enumerate pages are never rewritten.
 	write    map[string]struct{}
 	pagePath string
+	// Files holding an edited page, only that page's node is restyled there instead of the whole file.
+	pageFiles map[string]struct{}
 }
 
 func newEditorDocs() *editorDocs {
 	return &editorDocs{
-		docs:     map[string]*yaml.Node{},
-		original: map[string][]byte{},
-		write:    map[string]struct{}{},
+		docs:      map[string]*yaml.Node{},
+		original:  map[string][]byte{},
+		write:     map[string]struct{}{},
+		pageFiles: map[string]struct{}{},
 	}
+}
+
+func (d *editorDocs) trackPage(slot pageSlot) {
+	d.track(slot.path, slot.doc)
+	d.pageFiles[filepath.Clean(slot.path)] = struct{}{}
 }
 
 func (d *editorDocs) track(path string, doc *yaml.Node) {
@@ -1843,6 +1897,21 @@ func insertNode(nodes []*yaml.Node, index int, node *yaml.Node) []*yaml.Node {
 	copy(nodes[index+1:], nodes[index:])
 	nodes[index] = node
 	return nodes
+}
+
+// Anchors and api-ids are dropped from the copy since both have to stay unique.
+func cloneWidgetNode(n *yaml.Node) *yaml.Node {
+	c := *n
+	c.Anchor = ""
+	c.Content = nil
+	for i := 0; i < len(n.Content); i++ {
+		if n.Kind == yaml.MappingNode && i%2 == 0 && n.Content[i].Value == "api-id" {
+			i++
+			continue
+		}
+		c.Content = append(c.Content, cloneWidgetNode(n.Content[i]))
+	}
+	return &c
 }
 
 func removeNode(nodes []*yaml.Node, index int) []*yaml.Node {
