@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	stdhtml "html"
 	"html/template"
 	"io"
 	"math/rand/v2"
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,12 +25,36 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpproxy"
+	"golang.org/x/net/idna"
 )
 
 var imgSrcPattern = regexp.MustCompile(`(?i)<img([^>]*)\ssrc="([^"]*)"([^>]*)>`)
 
+// Stops at parentheses so a Markdown destination like (http://host) doesn't capture the closing one.
+var literalURLPattern = regexp.MustCompile(`(?i)https?://[^\s"'<>{}()]+`)
+
+// Hosts of absolute URLs the admin wrote literally, so templated parts can't introduce new ones.
+func literalURLHosts(text string) []string {
+	var hosts []string
+	for _, rawURL := range literalURLPattern.FindAllString(text, -1) {
+		if parsed, err := url.Parse(rawURL); err == nil && parsed.Host != "" {
+			hosts = append(hosts, parsed.Host)
+		}
+	}
+	return hosts
+}
+
+// Public hosts keep the public-only client, which re-checks redirects and dialed addresses.
+func privateImageAllowed(rawURL string, hosts []string) bool {
+	parsed, err := url.Parse(rawURL)
+	return err == nil && parsed.Host != "" &&
+		slices.ContainsFunc(hosts, func(host string) bool { return strings.EqualFold(host, parsed.Host) }) &&
+		validatePublicFetchURL(rawURL) != nil
+}
+
 // Widgets that render only once should pass themselves as pinOwner, since nothing refreshes their images' last use.
-func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pinOwner any) template.HTML {
+// Images on privateHosts may resolve to internal addresses, every other src must be public.
+func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetProviders, pinOwner any, privateHosts []string) template.HTML {
 	if providers == nil {
 		return html
 	}
@@ -37,14 +63,15 @@ func rewriteImgSrcs(ctx context.Context, html template.HTML, providers *widgetPr
 		if len(parts) < 4 {
 			return match
 		}
-		originalSrc := parts[2]
-		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, false, 0, pinOwner)
+		originalSrc := stdhtml.UnescapeString(parts[2])
+		allowPrivate := privateImageAllowed(originalSrc, privateHosts)
+		newSrc := providers.SecureImageURLWithMaxAge(ctx, originalSrc, false, allowPrivate, 0, pinOwner)
 		if newSrc == originalSrc {
 			return match
 		}
 		fallback := ""
-		if validatePublicFetchURL(originalSrc) == nil {
-			fallback = ` data-fallback-src="` + strings.ReplaceAll(originalSrc, `"`, `&quot;`) + `"`
+		if allowPrivate || validatePublicFetchURL(originalSrc) == nil {
+			fallback = ` data-fallback-src="` + parts[2] + `"`
 		}
 		return "<img" + parts[1] + ` src="` + newSrc + `"` + parts[3] + fallback + ">"
 	})
@@ -122,6 +149,42 @@ func checkPublicRedirect(req *http.Request, via []*http.Request) error {
 	return validatePublicFetchURL(req.URL.String())
 }
 
+// The host:port a private client may dial without the address check, carried on the request context.
+type privateAuthorityKey struct{}
+
+// Converts the hostname to ASCII like net/http does before dialing, so it matches the dialed address.
+func urlAuthority(u *url.URL) string {
+	host := u.Hostname()
+	if ascii, err := idna.Lookup.ToASCII(host); err == nil {
+		host = ascii
+	}
+	return net.JoinHostPort(strings.ToLower(host), cmp.Or(u.Port(), map[string]string{"http": "80", "https": "443"}[u.Scheme]))
+}
+
+func withPrivateAuthority(req *http.Request) *http.Request {
+	return req.WithContext(context.WithValue(req.Context(), privateAuthorityKey{}, urlAuthority(req.URL)))
+}
+
+// Private access only covers the host:port first requested, so a hop anywhere else must be public.
+func checkPrivateRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) < 10 && urlAuthority(req.URL) == urlAuthority(via[0].URL) {
+		return nil
+	}
+	return checkPublicRedirect(req, via)
+}
+
+// Keep-alives are off so a connection dialed for one authorized host is never reused unchecked.
+func newPrivateHTTPClient(insecure bool) *http.Client {
+	client := newPublicOnlyHTTPClient(insecure)
+	client.Transport.(*http.Transport).DisableKeepAlives = true
+	client.CheckRedirect = checkPrivateRedirect
+	return client
+}
+
+var privateHTTPClient = newPrivateHTTPClient(false)
+
+var privateInsecureHTTPClient = newPrivateHTTPClient(true)
+
 // A configured proxy resolves upstreams itself, so only dials to the proxy skip the address check while NO_PROXY hosts keep it.
 // Read on first dial like http.ProxyFromEnvironment, so proxies loaded from --env-file are included.
 var outboundProxyAddrs = sync.OnceValue(func() map[string]bool {
@@ -152,10 +215,12 @@ func rejectDisallowedDial(_, address string, _ syscall.RawConn) error {
 }
 
 func newPublicOnlyHTTPClient(insecure bool) *http.Client {
-	proxyDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+	plainDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	checkedDialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: rejectDisallowedDial}
 	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return ternary(outboundProxyAddrs()[addr], proxyDialer, checkedDialer).DialContext(ctx, network, addr)
+		authorized, _ := ctx.Value(privateAuthorityKey{}).(string)
+		trusted := outboundProxyAddrs()[addr] || (authorized != "" && strings.EqualFold(authorized, addr))
+		return ternary(trusted, plainDialer, checkedDialer).DialContext(ctx, network, addr)
 	}
 
 	transport := &http.Transport{

@@ -342,7 +342,7 @@ func (a *application) getAuthenticatedUser(w http.ResponseWriter, r *http.Reques
 		if err == nil && sessionCookie.Value != "" {
 			sess, ok := a.oidcSessions.get(sessionCookie.Value)
 			if ok {
-				if time.Since(sess.CreatedAt) < OIDC_SESSION_VALID_PERIOD &&
+				if time.Since(sess.CreatedAt) < OIDC_SESSION_VALID_PERIOD && !a.oidcUsernameTaken(sess.Username) &&
 					oidcUserAllowed(a.Config.Auth.OIDC, sess.Username, sess.Groups) {
 					return &authenticatedUser{
 						Username: sess.Username,

@@ -284,20 +284,18 @@ func (a *application) buildEditorConfigView(user *authenticatedUser) (editorConf
 	for i, slot := range slots {
 		configPage := a.configPageForSlot(slot, i)
 
-		// Positions have to line up with the page indices mutations are addressed by, so a
-		// page the user cannot see is emitted as an empty slot rather than skipped.
-		if configPage != nil && !a.canUserAccessPage(user, configPage) {
+		// Slots keep their positions for mutation indices, and ones that aren't editable or don't
+		// match a loaded page (mutations reject those too) stay empty so raw values never leak.
+		if configPage == nil || !a.EditingAllowedForPage(user, configPage) {
 			view.Pages = append(view.Pages, editorPageView{Options: map[string]string{}})
 			continue
 		}
 
 		pv := pageNodeToView(slot.node, slot.path, docs)
-		if configPage != nil {
-			pv.Slug = configPage.Slug
-			pv.Title = configPage.Title
-			if configPage.PageBackground == "" {
-				pv.InheritedBackground = a.globalBackground
-			}
+		pv.Slug = configPage.Slug
+		pv.Title = configPage.Title
+		if configPage.PageBackground == "" {
+			pv.InheritedBackground = a.globalBackground
 		}
 		view.Pages = append(view.Pages, pv)
 	}

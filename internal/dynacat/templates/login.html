@@ -24,6 +24,7 @@
                 {{- else if eq .OIDCError "token_verify" }}OIDC login failed: could not verify token
                 {{- else if eq .OIDCError "not_allowed" }}OIDC login failed: access denied
                 {{- else if eq .OIDCError "no_username" }}OIDC login failed: could not determine username
+                {{- else if eq .OIDCError "username_taken" }}OIDC login failed: username belongs to another user
                 {{- else }}OIDC login failed: {{ .OIDCError }}
                 {{- end }}
             </div>
