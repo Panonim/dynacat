@@ -1909,6 +1909,9 @@ func cloneWidget(slot widgetSlot, dstDir string, docs *editorDocs) *yaml.Node {
 	rebaseIncludes(c, filepath.Dir(slot.ownerPath), dstDir)
 
 	if widgets := getMappingValue(slot.node, "widgets"); widgets != nil {
+		if widgets.Kind == yaml.AliasNode {
+			widgets = widgets.Alias
+		}
 		inner := sequenceNode()
 		for _, child := range expandWidgetSlots(widgets, slot.ownerPath, docs, 0) {
 			inner.Content = append(inner.Content, cloneWidget(child, dstDir, docs))
